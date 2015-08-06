@@ -286,9 +286,10 @@ function color.create_opaque_pattern(col)
     -- gradients can do weird self-intersections)
 end
 
+--- @TODO
 function color.recolor_image(image, new_color)
     if type(image) == 'string' then
-        image = cairo.ImageSurface.create_from_png(image)
+        image = surface.duplicate_surface(image)
     end
     local cr = cairo.Context.create(image)
     cr:set_source(color.create_pattern(new_color))
