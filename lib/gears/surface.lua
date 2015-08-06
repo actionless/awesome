@@ -70,25 +70,6 @@ function surface.get_size(surf)
     return w - x, h - y
 end
 
-
---- @TODO
-function surface.duplicate_surface(s)
-    s = surface.load(s)
-
-    -- Figure out surface size (this does NOT work for unbounded recording surfaces)
-    local cr = cairo.Context(s)
-    local x, y, w, h = cr:clip_extents()
-
-    -- Create a copy
-    local result = s:create_similar(s.content, w - x, h - y)
-    cr = cairo.Context(result)
-    cr.source = s
-    cr.operator = cairo.Operator.SOURCE
-    cr:paint()
-    return result
-end
-
-
 return setmetatable(surface, surface.mt)
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80
