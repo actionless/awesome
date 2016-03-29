@@ -6,6 +6,7 @@ branches=(
 	'actionless'
 
 	# my branches
+	'hotkeys_module_instance'
 
 	# psychon
 
