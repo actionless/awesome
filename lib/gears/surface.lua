@@ -12,6 +12,9 @@ local cairo = require("lgi").cairo
 local color = nil
 local gdebug = require("gears.debug")
 local hierarchy = require("wibox.hierarchy")
+local pango = require("lgi").Pango
+local pangocairo = require("lgi").PangoCairo
+local beautiful = require("beautiful")
 
 -- Keep this in sync with build-utils/lgi-check.sh!
 local ver_major, ver_minor, ver_patch = string.match(require('lgi.version'), '(%d)%.(%d)%.(%d)')
@@ -178,6 +181,89 @@ function surface.load_from_shape(width, height, shape, shape_color, bg_color, ..
     cr:fill()
 
     return img
+end
+
+--- Create a surface from text converted into image
+-- This can be used for:
+--
+-- * Import popular "iconic fonts" such as Font Awesome or GitHub octicons font
+-- * Use FontForge to create an Awesome theme icon set
+-- * Create pattern based on UTF-8 symbols
+-- * Create titlebar buttons
+-- * Base to compose a more complex surface
+--
+-- For valid attributes, see https://developer.gnome.org/pango/stable/pango-Fonts.html
+-- For example, `set_family` attribute name will be `family`. The `dpi` attribute
+-- also exist to set the default DPI.
+--
+-- The final size of the surface isn't guaranteed, some fonts only implement some
+-- size.
+--
+-- @tparam string text The text or character to convert to a surface
+-- @tparam[opt] number fit_width The expected surface width
+-- @tparam[opt] number fit_height The expected surface height
+-- @param[opt=beautiful.fg_normal] fg The foreground color/gradient/pattern
+-- @tparam[opt] table pango_attributes Fonts attributes
+-- @tparam[opt] string desc_string A pango font description string
+-- @return The surface
+-- @return The surface width
+-- @return The surface height
+function surface.load_from_string(text, fit_width, fit_height, fg, pango_attributes, desc_string)
+    local pango_attr = pango_attributes or {}
+    local pango_crx  = pangocairo.font_map_get_default():create_context()
+    local pango_l    = pango.Layout.new(pango_crx)
+    local desc       = pango.FontDescription.from_string(desc_string or "")
+    local height     = fit_height or desc:get_size()/pango.SCALE
+    color            = color or require("gears.color")
+
+    -- Copy the default font attributes
+    if not desc_string then
+        desc:copy(pango_l:get_font_description())
+    end
+
+    -- Remove the DPI from the attributes, as it is only for Pango layouts
+    local dpi = pango_attr.dpi
+    pango_attr.dpi = nil
+
+    -- Set font family, size, hinting, weight (bold), etc
+    for k,v in pairs(pango_attr) do
+        desc["set_"..k] = v
+    end
+
+    -- Try to force the font to take the maximum available height
+    -- it will usually produce a smaller image
+    if fit_height then
+        desc:set_size(height * pango.SCALE)
+    end
+
+    pango_l:set_font_description(desc)
+
+    if dpi then
+        pango_l:get_context():set_resolution(dpi)
+        pango_l:context_changed()
+    end
+
+    -- Set the text
+    pango_l.text = text
+    local extents = pango_l:get_pixel_extents()
+
+    -- Reduce the size until it fit the constraint
+    if fit_width and extents.width < fit_width then
+        while height > 0 and extents.width < fit_width do
+            height = height - 1
+            desc:set_size(height * pango.SCALE)
+            extents = pango_l:get_pixel_extents()
+        end
+    end
+
+    -- Create the surface and paint it
+    local img = cairo.ImageSurface(cairo.Format.ARGB32, extents.width, extents.height)
+    local cr  = cairo.Context(img)
+    cr:set_source(color(fg or beautiful.fg_normal))
+
+    cr:show_layout(pango_l)
+
+    return img, extents.width, extents.height
 end
 
 --- Apply a shape to a client or a wibox.
