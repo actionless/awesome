@@ -264,9 +264,9 @@ capi.tag.connect_signal("property::selected", arrange_tag)
 capi.tag.connect_signal("property::activated", arrange_tag)
 capi.tag.connect_signal("property::useless_gap", arrange_tag)
 capi.tag.connect_signal("property::master_fill_policy", arrange_tag)
+capi.tag.connect_signal("property::geometry", arrange_tag)
 capi.tag.connect_signal("tagged", arrange_tag)
 
-capi.screen.connect_signal("property::workarea", layout.arrange)
 capi.screen.connect_signal("padding", layout.arrange)
 
 capi.client.connect_signal("raised", function(c) layout.arrange(c.screen) end)
