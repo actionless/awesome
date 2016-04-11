@@ -173,6 +173,10 @@ end
 -- Add a "buffer" section on each side of the screen where the tiled client
 -- wont be.
 --
+-- Here is the property effect on a layout:
+--
+--@DOC_awful_layout_dynamic_suit_tile_padding_EXAMPLE@
+--
 -- **Signal:**
 --
 -- * *property::padding*
