@@ -10,12 +10,16 @@ branches=(
 
 	# psychon
 
+	# elv13
+	'fix_path'
+
 	# other
 )
 
 cd ~/projects
 rm -r tmp-awesome/awesome -f || true
 cp -prf awesome tmp-awesome/
+cp awesome/PKGBUILD ~/build/awesome-git/
 
 cd tmp-awesome/awesome
 git reset --hard
