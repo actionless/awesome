@@ -166,56 +166,73 @@ local function main_layout(_, handler)
 
 end
 
--- No operation
-local function nop() end
-
--- The cairo context is a matrix proxy, emulate this
-local function cache_miss(self2, key)
-    if matrix[key] then
-        self2[key] = function(self,...)
-            self._matrix = self._matrix[key](self._matrix,...)
-        end
-        return self2[key]
-    end
-end
-
---TODO move to a "virtual_hierachy" module. test it
 local context_index_miss = setmetatable({
-    operator            = 0,
-    rectangle           = nop,
-    clip                = nop,
-    reset_clip          = nop,
-    push_group          = nop,
-    pop_group           = nop,
-    pop                 = nop,
-    pop_group_to_source = nop,
-    paint_with_alpha    = nop,
-    save                = function(self)
+    operator = 0,
+    save = function(self)
         table.insert(self._memento, self._matrix)
     end,
-    restore             = function(self)
+    restore = function(self)
         local pop = self._memento[#self._memento]
         if pop then
             table.remove(self._memento, #self._memento)
             self._matrix = pop
         end
     end,
-    get_matrix          = function(self) return self._matrix        end,
-    clip_extents        = function(_   ) return {width=0, height=0} end,
-    transform           = function(self, cmatrix)
+    get_matrix = function(self) return self._matrix end,
+    transform = function(self, cmatrix)
         self._matrix = self._matrix:multiply(matrix.from_cairo_matrix(cmatrix))
         return self._matrix
     end,
-    _matrix = matrix.identity,
     _memento = {},
-}, {__index = cache_miss})
+    _matrix = matrix.identity*matrix.identity
+},
+{__index = function(self2, key)
+    if matrix[key] then
+        self2[key] = function(self,...)
+            self._matrix = self._matrix[key](self._matrix,...)
+        end
+        return self2[key]
+    end
+end})
+
+local function handle_hierarchy(context, cr, _hierarchy, wa)
+    local widget = _hierarchy:get_widget()
+
+    cr._matrix.x0, cr._matrix.y0 = _hierarchy:get_matrix_to_device():transform_point(0, 0)
+    cr._matrix.x0, cr._matrix.y0 = cr._matrix.x0 + wa.x, cr._matrix.y0 + wa.y
+
+    local w, h = _hierarchy:get_size()
+
+    if widget.before_draw_children then
+        widget:before_draw_children(context, cr, w, h)
+    end
+
+    if widget._client then
+        widget:draw(context, cr, w, h)
+    end
+
+    for i, child in ipairs(_hierarchy:get_children()) do
+        if widget.before_draw_child then
+            assert(type(cr) == "table")
+            widget:before_draw_child(context, i, child, cr, w, h)
+        end
+        handle_hierarchy(context, cr, child, wa)
+        if widget.after_draw_child then
+            widget:after_draw_child(context, i, child, cr, w, h)
+        end
+    end
+
+    if widget.after_draw_children then
+        widget:after_draw_children(context, cr, w, h)
+    end
+end
 
 -- Place all the clients correctly
 local function redraw(_, handler)
     if handler.active then
 
         -- Move to the work area
-        local workarea = handler.param.workarea
+        local wa = handler.param.workarea
 
         -- Use a matrix to emulate a Cairo context. Only the transform methods
         -- are used anyway. Anything else make no sense and deserve to crash
@@ -223,9 +240,7 @@ local function redraw(_, handler)
            __index = context_index_miss,
         })
 
-        m:translate(workarea.x, workarea.y)
-
-        handler.hierarchy:draw(get_context(handler._tag.screen), m)
+        handle_hierarchy(get_context(handler._tag.screen), m, handler.hierarchy, wa)
     end
 end
 
