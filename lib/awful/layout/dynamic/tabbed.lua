@@ -74,7 +74,7 @@ local function create_tabbar(self, widgets)
 end
 
 --- Move/resize the wibox to the right spot when the layout change
-local function before_draw_child(self, context, index, child, cr, width, height) --luacheck: no unused_args
+local function before_place_child(self, context, index, child, x, y, width, height) --luacheck: no unused_args
     if not self._wibox then
         self._wibox = wibox {
             bg = beautiful.tabbar_bg or beautiful.bg_normal,
@@ -83,10 +83,8 @@ local function before_draw_child(self, context, index, child, cr, width, height)
         create_tabbar(self, self._s:get_children())
     end
 
-    local matrix = cr:get_matrix()
-
-    self._wibox.x = matrix.x0
-    self._wibox.y = matrix.y0
+    self._wibox.x = x
+    self._wibox.y = y
     self._wibox.height  = math.ceil(beautiful.get_font_height() * 1.5)
     self._wibox.width   = width
     self._wibox.visible = true
@@ -151,7 +149,7 @@ local function ctr(_, _)
     rawset(m, "wake_up"       , wake_up       )
     rawset(s, "remove_widgets", remove_widgets)
 
-    m.before_draw_child = before_draw_child
+    m.before_place_child = before_place_child
 
     -- "m" is a dumb proxy of "s", it only free the space for the tabbar
     if #fct == 0 then --TODO this check is broken

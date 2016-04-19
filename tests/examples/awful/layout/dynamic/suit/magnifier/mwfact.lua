@@ -45,7 +45,7 @@ local function show_layout(f, s, mwfact)
     assert(#cls == #t:clients())
 
     l.arrange(params)
-
+print("\n\nHERE", margin.top, s.workarea.height, mwfact, s.workarea.height/2 * mwfact)
     -- Test if the main client was correctly set
     assert(margin.top == s.workarea.height/2 * mwfact)
 

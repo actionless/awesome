@@ -69,7 +69,7 @@ local function add(self, widget, ...)
     self:raise_widget(widget)
 end
 
-local function before_draw_children(self, _, _, width, height)
+local function before_place_children(self, _, _, _, width, height)
     local m = self:get_children_by_id("front_layout")[1]
     local mwfact = self._client_layout_handler._tag.master_width_factor
 
@@ -92,7 +92,7 @@ local function ctr(_)
             layout = base_layout.vertical
         },
         display_top_only = false,
-        before_draw_children = before_draw_children,
+        before_place_children = before_place_children,
         layout = stack
     }
 

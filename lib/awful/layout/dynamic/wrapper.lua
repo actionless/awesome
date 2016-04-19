@@ -90,8 +90,6 @@ local function draw(self, _, cr, width, height)
     -- be repainted in the next iteration.
     if not (pcall(function() return c.valid end) and c.valid) then return end
 
-    local matrix = cr:get_matrix()
-
     local gap = (not self._handler._tag and 0 or self._handler._tag.gap)/2
 
     -- Remove the border and gap from the final size
@@ -105,10 +103,10 @@ local function draw(self, _, cr, width, height)
     end
 
     c:geometry {
-        x      = matrix.x0 + gap,
-        y      = matrix.y0 + gap,
-        width  = width          ,
-        height = height         ,
+        x      = x      + gap,
+        y      = y      + gap,
+        width  = width       ,
+        height = height      ,
     }
 end
 
