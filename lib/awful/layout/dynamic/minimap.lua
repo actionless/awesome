@@ -9,19 +9,6 @@
 
 -- local module = {}
 
--- local function handle_hierarchy(h, wa)
---     local w = h:get_widget()
---
---     if widget._client then
---         local x, y = h:get_matrix_to_device():transform_point(0, 0)
---         widget._place_client(wa.x + x, wa.y + y, h:get_size())
---     end
---
---     for _, child in ipairs(h:get_children()) do
---         handle_hierarchy(child, wa)
---     end
--- end
-
 -- local function get_rects(handler)
 --     local ret = {}
 -- 
@@ -30,18 +17,21 @@
 -- 
 --     local add_x, add_y = workarea.x, workarea.y
 -- 
--- local function handle_hierarchy(h, wa)
---     local w = h:get_widget()
---
---     if widget._client then
---         local x, y = h:get_matrix_to_device():transform_point(0, 0)
---         widget._place_client(wa.x + x, wa.y + y, h:get_size())
---     end
---
---     for _, child in ipairs(h:get_children()) do
---         handle_hierarchy(child, wa)
---     end
--- end
+--     local function handle_hierarchy(h)
+--         local widget = h:get_widget()
+--         if widget._client or widget.draw == draw then
+--             local matrix = h:get_matrix_to_device()
+--             local x, y = matrix:transform_point(0, 0)
+--             local width, height = h:get_size()
+--             table.insert(ret, {
+--                 x      = x + add_x,
+--                 y      = y + add_y,
+--                 width  = width,
+--                 height = height,
+--                 client = widget._client,
+--                 widget = widget
+--             })
+--         end
 -- 
 --         for _, child in ipairs(h:get_children()) do
 --             handle_hierarchy(child)
