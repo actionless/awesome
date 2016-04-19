@@ -11,7 +11,6 @@ branches=(
 	# psychon
 
 	# elv13
-	'fix_path'
 
 	# other
 )
