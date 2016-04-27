@@ -7,6 +7,7 @@ branches=(
 
 	# my branches
 	'hotkeys_module_instance'
+	'replace-popen-to-async'
 
 	# psychon
 
