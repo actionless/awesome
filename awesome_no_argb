@@ -1,0 +1,7 @@
+#!/bin/sh
+while $(true) ; do
+	awesome --no-argb $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr ||
+	openbox ||
+	xterm
+	sleep 2
+done
