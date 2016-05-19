@@ -7,7 +7,6 @@ branches=(
 
 	# my branches
 	'hotkeys_module_instance'
-	'fix-wibar-visible'
 
 	# psychon
 
