@@ -11,6 +11,7 @@ branches=(
 	# psychon
 
 	# elv13
+	'widget_api_refactor'
 
 	# other
 )
