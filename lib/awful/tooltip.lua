@@ -53,8 +53,35 @@ local background = require("wibox.container.background")
 local dpi = require("beautiful").xresources.apply_dpi
 local setmetatable = setmetatable
 local ipairs = ipairs
+local capi = {mouse=mouse}
 
 local tooltip = { mt = {}  }
+
+-- The mouse point is 1x1, so anything aligned based on it as parent
+-- geometry will go out of bound. To get the desired placement, it is
+-- necessary to swap left with right and top with bottom
+local align_convert = {
+    top_left     = "bottom_right",
+    left         = "right",
+    bottom_left  = "top_right",
+    right        = "left",
+    top_right    = "bottom_left",
+    bottom_right = "top_left",
+    top          = "bottom",
+    bottom       = "top",
+}
+
+-- If the wibox is under the cursor, it will trigger a mouse::leave
+local offset = {
+    top_left     = {x =  0, y =  0 },
+    left         = {x =  0, y =  0 },
+    bottom_left  = {x =  0, y =  0 },
+    right        = {x =  1, y =  0 },
+    top_right    = {x =  0, y =  0 },
+    bottom_right = {x =  1, y =  1 },
+    top          = {x =  0, y =  0 },
+    bottom       = {x =  0, y =  1 },
+}
 
 -- Place the tooltip under the mouse.
 --
@@ -65,9 +92,19 @@ local function set_geometry(self)
     n_w = n_w + self.marginbox.left + self.marginbox.right
     n_h = n_h + self.marginbox.top + self.marginbox.bottom
 
-    self:get_wibox():geometry({ width = n_w, height = n_h })
-    a_placement.next_to_mouse(self:get_wibox())
-    a_placement.no_offscreen(self:get_wibox(), mouse.screen)
+    local w = self:get_wibox()
+    w:geometry({ width = n_w, height = n_h })
+
+    local align  = self._private.align
+
+    local real_placement = align_convert[align]
+
+    a_placement[real_placement](w, {
+        parent = capi.mouse,
+        offset = offset[align]
+    })
+
+    a_placement.no_offscreen(w)
 end
 
 -- Show a tooltip.
@@ -82,8 +119,9 @@ local function show(self)
             self.timer:start()
         end
     end
-    set_geometry(self)
     self.wibox.visible = true
+
+    set_geometry(self)
     self._private.visible = true
     self:emit_signal("property::visible")
 end
@@ -141,6 +179,42 @@ function tooltip:set_visible(value)
     else
         hide(self)
     end
+end
+
+--- The horizontal alignment.
+--
+-- The following values are valid:
+--
+-- * top_left
+-- * left
+-- * bottom_left
+-- * right
+-- * top_right
+-- * bottom_right
+-- * bottom
+-- * top
+--
+-- @property align
+-- @see beautiful.tooltip_align
+
+--- The default tooltip alignment.
+-- @beautiful beautiful.tooltip_align
+-- @param string
+-- @see align
+
+function tooltip:get_align()
+    return self._private.align
+end
+
+function tooltip:set_align(value)
+    if not align_convert[value] then
+        return
+    end
+
+    self._private.align = value
+
+    set_geometry(self)
+    self:emit_signal("property::align")
 end
 
 --- Change displayed text.
@@ -233,7 +307,10 @@ function tooltip.new(args)
     rawset(self,"_private", {})
 
     self:add_signal("property::visible")
+    self:add_signal("property::align")
+
     self._private.visible = false
+    self._private.align   = beautiful.tooltip_align  or "right"
 
     -- private data
     if args.delay_show then
