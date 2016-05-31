@@ -598,12 +598,31 @@ function naughty.notify(args)
         end
     end
 
+    -- populate widgets
+    local layout = wibox.layout.fixed.horizontal()
+    if iconmargin then
+        layout:add(iconmargin)
+    end
+    layout:add(marginbox)
+
+    local completelayout = wibox.layout.fixed.vertical()
+    completelayout:add(layout)
+    completelayout:add(actionslayout)
+
     -- create container wibox
-    notification.box = wibox({ fg = fg,
+    local gears = require("gears")
+    notification.box = smart_wibox.new(nil, completelayout, { fg = fg,
                                bg = bg,
-                               border_color = border_color,
-                               border_width = border_width,
+                               --border_color = border_color,
+                               --border_width = border_width,
+        shape_border_width = beautiful.notification_border_width,
+        shape_border_color = beautiful.notification_border_color or beautiful.border_color,
+        shape = gears.shape.rounded_rect,
+        shape_args = {10},
+        padding = 20,
                                type = "notification" })
+    --apply_shape(notification.box, gears.shape.rounded_rect, 10)
+    --gears.surface.apply_shape_bounding(notification.box.drawable, gears.shape.rounded_rect, 15)
 
     if hover_timeout then notification.box:connect_signal("mouse::enter", hover_destroy) end
 
@@ -654,17 +673,7 @@ function naughty.notify(args)
     notification.box.visible = true
     notification.idx = offset.idx
 
-    -- populate widgets
-    local layout = wibox.layout.fixed.horizontal()
-    if iconmargin then
-        layout:add(iconmargin)
-    end
-    layout:add(marginbox)
-
-    local completelayout = wibox.layout.fixed.vertical()
-    completelayout:add(layout)
-    completelayout:add(actionslayout)
-    notification.box:set_widget(completelayout)
+    --notification.box:set_widget(completelayout)
 
     -- Setup the mouse events
     layout:buttons(util.table.join(button({ }, 1, run),
