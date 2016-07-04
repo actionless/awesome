@@ -13,6 +13,7 @@ branches=(
 	# psychon
 
 	# elv13
+	'geometry_overhaul_p3.03'
 
 	# other
 )
