@@ -306,9 +306,6 @@ function tooltip.new(args)
 
     rawset(self,"_private", {})
 
-    self:add_signal("property::visible")
-    self:add_signal("property::align")
-
     self._private.visible = false
     self._private.align   = beautiful.tooltip_align  or "right"
 
