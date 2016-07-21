@@ -167,6 +167,34 @@ local function apply_shape(self)
     wb:set_bgimage(img)
 end
 
+local function apply_mouse_mode(self)
+    local w              = self:get_wibox()
+    local align          = self._private.align
+    local real_placement = align_convert[align]
+
+    a_placement[real_placement](w, {
+        parent = capi.mouse,
+        offset = offset[align]
+    })
+end
+
+local function apply_outside_mode(self)
+    local w = self:get_wibox()
+
+    local _, position = a_placement.next_to(w, {
+        geometry            = self._private.widget_geometry,
+        preferred_positions = self.preferred_positions,
+        honor_workarea      = true,
+    })
+
+    if position ~= self._private.direction then
+        -- Re-apply the shape.
+        apply_shape(self.wibox)
+    end
+
+    self.current_position = position
+end
+
 -- Place the tooltip under the mouse.
 --
 -- @tparam tooltip self A tooltip object.
@@ -183,14 +211,13 @@ local function set_geometry(self)
         apply_shape(w)
     end
 
-    local align  = self._private.align
+    local mode = self.mode
 
-    local real_placement = align_convert[align]
-
-    a_placement[real_placement](w, {
-        parent = capi.mouse,
-        offset = offset[align]
-    })
+    if mode == "outside" and self._private.widget_geometry then
+        apply_outside_mode(self)
+    else
+        apply_mouse_mode(self)
+    end
 
     a_placement.no_offscreen(w)
 end
@@ -324,6 +351,53 @@ function tooltip:set_shape(s, ...)
     apply_shape(self.wibox)
 end
 
+--- Set the tooltip positioning mode.
+-- This affects how the tooltip is placed. By default, the tooltip is `align`ed
+-- close to the mouse cursor. It is also possible to place the tooltip relative
+-- to the widget geometry.
+--
+-- Valid modes are:
+--
+-- * "mouse": Next to the mouse cursor
+-- * "outside": Outside of the widget
+--
+-- @property mode
+-- @param string
+
+function tooltip:set_mode(mode)
+    self._private.mode = mode
+
+    set_geometry(self)
+    self:emit_signal("property::mode")
+end
+
+function tooltip:get_mode()
+    return self._private.mode or "mouse"
+end
+
+--- The preferred positions when in `outside` mode.
+--
+-- If the tooltip fits on multiple sides of the drawable, then this defines the
+-- priority
+--
+-- The default is:
+--
+--    {"top", "right", "left", "bottom"}
+--
+-- @property preferred_positions
+-- @tparam table preferred_positions The position, ordered by priorities
+
+function tooltip:get_preferred_positions()
+    return self._private.preferred_positions or
+        {"top", "right", "left", "bottom"}
+end
+
+function tooltip:set_preferred_positions(value)
+    self._private.preferred_positions = value
+
+    set_geometry(self)
+end
+
 --- Change displayed text.
 --
 -- @property text
@@ -386,6 +460,15 @@ function tooltip:remove_from_object(obj)
     obj:disconnect_signal("mouse::leave", self.hide)
 end
 
+-- Tooltip can be applied to both widgets, wibox and client, their geometry
+-- works differently.
+local function get_parent_geometry(arg1, arg2)
+    if type(arg2) == "table" and arg2.width then
+        return arg2
+    elseif type(arg1) == "table" and arg1.width then
+        return arg1
+    end
+end
 
 --- Create a new tooltip and link it to a widget.
 -- Tooltips emit `property::visible` when their visibility changes.
@@ -429,7 +512,10 @@ function tooltip.new(args)
             delay_timeout:stop()
         end)
 
-        function self.show()
+        function self.show(other, geo)
+            -- Cache the geometry in case it is needed later
+            self._private.widget_geometry = get_parent_geometry(other, geo)
+
             if not delay_timeout.started then
                 delay_timeout:start()
             end
@@ -441,7 +527,10 @@ function tooltip.new(args)
             hide(self)
         end
     else
-        function self.show()
+        function self.show(other, geo)
+            -- Cache the geometry in case it is needed later
+            self._private.widget_geometry = get_parent_geometry(other, geo)
+
             show(self)
         end
         function self.hide()
