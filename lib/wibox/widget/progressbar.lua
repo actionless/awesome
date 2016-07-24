@@ -77,6 +77,10 @@ local properties = { "border_color", "color"    , "background_color",
                      "ticks_gap"   , "ticks_size" }
 
 function progressbar.draw(pbar, _, cr, width, height)
+    -- Clear the cached value, it is kept in case min/max_value is set using
+    -- the declarative syntax
+    pbar._private.value_cache = nil
+
     local ticks_gap = pbar._private.ticks_gap or 1
     local ticks_size = pbar._private.ticks_size or 4
 
@@ -144,8 +148,31 @@ function progressbar:set_value(value)
     value = value or 0
     local max_value = self._private.max_value
     self._private.value = math.min(max_value, math.max(0, value))
+
+    -- Keep the value. In case the widget is initiated using the declarative
+    -- syntax, the order in which max_value and value is called is unpredictable.
+    if self._private.value ~= value then
+        self._private.value_cache = value
+    else
+        self._private.value_cache = nil
+    end
+
     self:emit_signal("widget::redraw_needed")
     return self
+end
+
+function progressbar:set_max_value(max_value)
+    local old = self._private.max_value or 1
+    local val = self._private.value
+
+    self._private.max_value = max_value
+
+    -- Restore the value that was trimmed due to a race condition
+    if self._private.value_cache and self._private.value_cache <= max_value then
+        self._private.value = self._private.value_cache
+    end
+
+    self:emit_signal("widget::redraw_needed")
 end
 
 --- Set the progressbar height.
