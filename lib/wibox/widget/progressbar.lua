@@ -335,7 +335,7 @@ function progressbar.draw(pbar, _, cr, width, height)
     end
 end
 
-function progressbar:fit(self, context, width, height)
+function progressbar:fit(context, width, height)
     return width, height
 end
 
