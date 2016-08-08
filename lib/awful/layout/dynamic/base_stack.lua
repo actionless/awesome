@@ -136,6 +136,20 @@ local function ctr()
     rawset(main_layout, "add"             , add             )
     rawset(main_layout, "splitting_points", splitting_points)
 
+    -- Forward all changes.
+    for _, s in ipairs {
+        "widget::swapped",
+        "widget::inserted",
+        "widget::replaced",
+        "widget::removed",
+        "widget::added",
+        "widget::reseted",
+    } do
+        main_layout:connect_signal(s, function(self, ...)
+            main_layout:emit_signal_recursive(s.."_forward", ...)
+        end)
+    end
+
     return main_layout
 end
 
