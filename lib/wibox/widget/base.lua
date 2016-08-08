@@ -153,6 +153,19 @@ function base.widget:get_all_children()
     return ret
 end
 
+--- Emit a signal and ensure all parent widgets in the hierarchies also
+-- forward the signal. This is useful to track signals when there is a dynamic
+-- set of containers and layouts wrapping the widget.
+-- @tparam string signal_name
+-- @param ... Other arguments
+-- @function emit_signal_recursive
+function base.widget:emit_signal_recursive(signal_name, ...)
+    -- This is a convenience wrapper, the real implementation is in the
+    -- hierarchy.
+
+    self:emit_signal("widget::emit_recursive", signal_name, ...)
+end
+
 --- Get a widex index.
 -- @param widget The widget to look for
 -- @param[opt] recursive Also check sub-widgets
