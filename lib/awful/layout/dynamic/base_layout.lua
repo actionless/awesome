@@ -124,6 +124,20 @@ local function get_layout(dir, widget1, ...)
     rawset(ret, "suspend"          , suspend         )
     rawset(ret, "wake_up"          , wake_up         )
 
+    -- Forward all changes.
+    for _, s in ipairs {
+        "widget::swapped",
+        "widget::inserted",
+        "widget::replaced",
+        "widget::removed",
+        "widget::added",
+        "widget::reseted",
+    } do
+        ret:connect_signal(s, function(self, ...)
+            ret:emit_signal_recursive(s.."_forward", ...)
+        end)
+    end
+
     ret.fill_space = nil
 
     return ret
