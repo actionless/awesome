@@ -13,7 +13,7 @@
 
 local capi = {client = client}
 local stack     = require( "awful.layout.dynamic.base_stack" )
-local margins   = require( "wibox.layout.margin"             )
+local margins   = require( "wibox.container.margin"          )
 local wibox     = require( "wibox"                           )
 local timer     = require( "gears.timer"                     )
 local beautiful = require( "beautiful"                       )
@@ -48,7 +48,7 @@ local function create_tab(c)
     local ib = wibox.widget.imagebox(c.icon)
     local tb = wibox.widget.textbox(c.name)
     local l  = wibox.layout.fixed.horizontal(ib, tb)
-    local bg = wibox.widget.background(l)
+    local bg = wibox.container.background(l)
     bg._tb, bg._ib = tb, ib
     tabs[c] = bg
 
@@ -74,6 +74,20 @@ local function create_tab(c)
     end
 
     return bg
+end
+
+local function regen_client_list(self)
+    local all_widgets = self:get_all_children()
+    local ret = {}
+    self._wibox.widget:reset()
+    for _, w in ipairs(all_widgets) do
+        if w._client then
+            if not tabs[w._client] then
+                create_tab(w._client)
+            end
+            self._wibox.widget:add(tabs[w._client])
+        end
+    end
 end
 
 --- Create a rudimentary tabbar widget
@@ -176,6 +190,18 @@ local function ctr(_, _)
 
     for name, func in pairs(fct) do
         rawset(m, name, function(_, ...) return func(s,...) end)
+    end
+
+    -- When something change, recompute the client list.
+    for _, s in ipairs {
+        "widget::swapped_forward",
+        "widget::inserted_forward",
+        "widget::replaced_forward",
+        "widget::removed_forward",
+        "widget::added_forward",
+        "widget::reseted_forward",
+    } do
+        m:connect_signal(s, regen_client_list)
     end
 
     return m
