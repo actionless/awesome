@@ -9,6 +9,7 @@ return function(_, _, luacovpath)
     client  = require( "client"  )
     mouse   = require( "mouse"   )
     drawin  = require( "drawin"  )
+    button  = require( "button"  )
 
     -- Force luacheck to be silent about setting those as unused globals
     assert(awesome and root and tag and screen and client and mouse)
