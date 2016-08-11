@@ -1,9 +1,5 @@
 ---------------------------------------------------------------------------
---- A specialised stack layout with a tabbar on top
---
--- @todo The tab widget is currently hardcoded, but once well defined, it will
---   be possible to set a cusom one. Reusing `awful.widget.common` wasn't
---   really helpful, but could be possible
+--- A specialised stack layout with a tabbar on top.
 --
 -- @author Emmanuel Lepage Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2016 Emmanuel Lepage Vallee
@@ -17,97 +13,74 @@ local margins   = require( "wibox.container.margin"          )
 local wibox     = require( "wibox"                           )
 local timer     = require( "gears.timer"                     )
 local beautiful = require( "beautiful"                       )
+local common    = require( "awful.widget.common"             )
+local button    = require( "awful.button"                    )
+local util      = require( "awful.util"                      )
 
 local fct = {}
 
--- Keep only 1 version of each tab, use it in multiple tabbar to reduce the
--- number of signals
-local tabs = setmetatable({},{__mode="k"})
-
-local connected, old_focus = false, nil
-
-local function focus_changed(c)
-    local tab = tabs[c]
-    if old_focus and tab ~= old_focus then
-        old_focus:set_bg(beautiful.bg_normal)
-        old_focus:set_fg(beautiful.fg_normal)
-    end
-
-    if tab then
-        tab:set_bg(beautiful.bg_focus)
-        tab:set_fg(beautiful.fg_focus)
-
-        old_focus = tab
-    end
-end
-
---- Create a tab widget
-local function create_tab(c)
-    if tabs[c] then return tabs[c] end
-
-    local ib = wibox.widget.imagebox(c.icon)
-    local tb = wibox.widget.textbox(c.name)
-    local l  = wibox.layout.fixed.horizontal(ib, tb)
-    local bg = wibox.container.background(l)
-    bg._tb, bg._ib = tb, ib
-    tabs[c] = bg
-
-    bg:connect_signal("button::press",function()
+local default_buttons = util.table.join(
+    button({ }, 1, function(c)
         capi.client.focus = c
         c:raise()
     end)
+)
 
-    -- Connect only once
-    if not connected then
-        connected = true
-        capi.client.connect_signal("focus", focus_changed)
-        capi.client.connect_signal("property::name", function(c2)
-            local tab = tabs[c2]
-            if tab then
-                tab._tb:set_text(c2.name)
-            end
-        end)
-    end
+local function label(c)
+    local shape = beautiful.tabbar_client_shape
+    local shape_border_width = beautiful.tabbar_client_shape_border_width
+    local shape_border_color = beautiful.tabbar_client_shape_border_color
+    local bg = capi.client.focus == c and (
+            beautiful.tabbar_client_bg_active or beautiful.bg_focus
+        ) or (
+            beautiful.tabbar_client_bg_normal or beautiful.bg_normal
+        )
 
-    if capi.client.focus == c then
-        focus_changed(c)
-    end
+    local other_args = {
+        shape              = shape,
+        shape_border_width = shape_border_width,
+        shape_border_color = shape_border_color,
+    }
 
-    return bg
+    return c.name, bg, nil, c.icon, other_args
 end
 
 local function regen_client_list(self)
     local all_widgets = self:get_all_children()
     local ret = {}
-    self._wibox.widget:reset()
+
     for _, w in ipairs(all_widgets) do
         if w._client then
-            if not tabs[w._client] then
-                create_tab(w._client)
-            end
-            self._wibox.widget:add(tabs[w._client])
+            table.insert(ret, w._client)
         end
     end
+
+    common.list_update(
+        self._wibox.widget,
+        default_buttons,
+        label,
+        self._data,
+        ret
+    )
+
 end
 
 --- Create a rudimentary tabbar widget
-local function create_tabbar(w, widgets)
+local function create_tabbar(self, widgets)
     local flex = wibox.layout.flex.horizontal()
-
-    for _, v in ipairs(widgets) do
-        if v._client then
-            flex:add(create_tab(v._client))
-        end
-    end
-
-    w:set_widget(flex)
+    flex:set_spacing(beautiful.tabbar_spacing or 0)
+    self._wibox:set_widget(flex)
+    regen_client_list(self)
 end
 
 --- Move/resize the wibox to the right spot when the layout change
 local function before_draw_child(self, context, index, child, cr, width, height) --luacheck: no unused_args
     if not self._wibox then
-        self._wibox = wibox({})
-        create_tabbar(self._wibox, self._s:get_children())
+        self._wibox = wibox {
+            bg = beautiful.tabbar_bg or beautiful.bg_normal,
+            fg = beautiful.tabbar_fg
+        }
+        create_tabbar(self, self._s:get_children())
     end
 
     local matrix = cr:get_matrix()
@@ -168,6 +141,7 @@ local function ctr(_, _)
 
     local m = margins(s)
     m._s    = s
+    m._data = {}
     s._m    = m
     m:set_top(math.ceil(beautiful.get_font_height() * 1.5))
     m:set_widget(s)
@@ -180,7 +154,7 @@ local function ctr(_, _)
     m.before_draw_child = before_draw_child
 
     -- "m" is a dumb proxy of "s", it only free the space for the tabbar
-    if #fct == 0 then
+    if #fct == 0 then --TODO this check is broken
         for k, f in pairs(s) do
             if type(f) == "function" and not m[k] then
                 fct[k] = f
