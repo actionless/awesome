@@ -445,6 +445,8 @@ end
 --   `mouse::leave` signals.
 -- @function add_to_object
 function tooltip:add_to_object(obj)
+    if not obj then return end
+
     obj:connect_signal("mouse::enter", self.show)
     obj:connect_signal("mouse::leave", self.hide)
 end
@@ -513,6 +515,11 @@ function tooltip.new(args)
         end)
 
         function self.show(other, geo)
+            -- Auto detect clients and wiboxes
+            if other.drawable or other.pid then
+                geo = other:geometry()
+            end
+
             -- Cache the geometry in case it is needed later
             self._private.widget_geometry = get_parent_geometry(other, geo)
 
@@ -528,6 +535,11 @@ function tooltip.new(args)
         end
     else
         function self.show(other, geo)
+            -- Auto detect clients and wiboxes
+            if other.drawable or other.pid then
+                geo = other:geometry()
+            end
+
             -- Cache the geometry in case it is needed later
             self._private.widget_geometry = get_parent_geometry(other, geo)
 
