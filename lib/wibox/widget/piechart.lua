@@ -139,6 +139,23 @@ end
 -- @tparam table colors A table of colors, one for each elements
 -- @see gears.color
 
+--- The border color.
+-- If none is set, it will use current foreground (text) color.
+-- @beautiful beautiful.piechart_border_color
+-- @param color
+-- @see gears.color
+
+--- The pie elements border width.
+-- @beautiful beautiful.piechart_border_width
+-- @tparam[opt=1] number border_width
+
+--- The pie chart colors.
+-- If no color is set, only the border will be drawn. If less colors than
+-- required are set, colors will be re-used in order.
+-- @beautiful beautiful.piechart_colors
+-- @tparam table colors A table of colors, one for each elements
+-- @see gears.color
+
 for _, prop in ipairs {"data", "border_color", "border_width", "colors" } do
     piechart["set_"..prop] = function(self, value)
         self._private[prop] = value
@@ -146,7 +163,7 @@ for _, prop in ipairs {"data", "border_color", "border_width", "colors" } do
         self:emit_signal("widget::redraw_needed")
     end
     piechart["get_"..prop] = function(self)
-        return self._private[prop] or beautiful["checkbox_"..prop]
+        return self._private[prop] or beautiful["piechart_"..prop]
     end
 end
 
