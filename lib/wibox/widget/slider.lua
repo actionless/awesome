@@ -26,6 +26,137 @@ local capi = {
 
 local slider = {mt={}}
 
+--- The slider handle shape.
+-- @property handle_shape
+-- @tparam[opt=gears shape rectangle] gears.shape shape
+-- @see gears.shape
+
+--- The slider handle color.
+-- @property handle_color
+-- @param color
+
+--- The slider handle margins.
+-- @property handle_margins
+-- @tparam[opt={}] table margins
+-- @tparam[opt=0] number margins.left
+-- @tparam[opt=0] number margins.right
+-- @tparam[opt=0] number margins.top
+-- @tparam[opt=0] number margins.bottom
+
+--- The slider handle width.
+-- @property handle_width
+-- @param number
+
+--- The slider handle border width.
+-- @property handler_border_width
+-- @param[opt=0] number
+
+--- The slider handle border color.
+-- @property handler_border_color
+-- @param color
+
+--- The bar (background) shape.
+-- @property bar_shape
+-- @tparam[opt=gears shape rectangle] gears.shape shape
+-- @see gears.shape
+
+--- The bar (background) height.
+-- @property bar_height
+-- @param number
+
+--- The bar (background) color.
+-- @property bar_color
+-- @param color
+
+--- The bar (background) margins.
+-- @property bar_margins
+-- @tparam[opt={}] table margins
+-- @tparam[opt=0] number margins.left
+-- @tparam[opt=0] number margins.right
+-- @tparam[opt=0] number margins.top
+-- @tparam[opt=0] number margins.bottom
+
+--- The bar (background) border width.
+-- @property bar_border_width
+-- @param[opt=0] numbergb
+
+--- The bar (background) border_color.
+-- @property bar_border_color
+-- @param color
+
+--- The slider value.
+-- @property value
+-- @param[opt=0] number
+
+--- The slider minimum value.
+-- @property minimum
+-- @param[opt=0] number
+
+--- The slider maximum value.
+-- @property maximum
+-- @param[opt=100] number
+
+--- The slider cursor.
+-- @property cursor
+-- @param[opt=fleur"] string
+
+--- The bar (background) border width.
+-- @beautiful beautiful.slider_bar_border_width
+-- @param number
+
+--- The bar (background) border color.
+-- @beautiful beautiful.slider_bar_border_color
+-- @param color
+
+--- The handle border_color.
+-- @beautiful beautiful.slider_handle_border_color
+-- @param color
+
+--- The handle border width.
+-- @beautiful beautiful.slider_handle_border_width
+-- @param number
+
+--- The handle .
+-- @beautiful beautiful.slider_handle_width
+-- @param number
+
+-- @beautiful beautiful.slider_handle_color
+-- @param color
+
+--- The handle shape.
+-- @beautiful beautiful.slider_handle_shape
+-- @tparam[opt=gears shape rectangle] gears.shape shape
+-- @see gears.shape
+
+--- The bar (background) shape.
+-- @beautiful beautiful.slider_bar_shape
+-- @tparam[opt=gears shape rectangle] gears.shape shape
+-- @see gears.shape
+
+--- The bar (background) height.
+-- @beautiful beautiful.slider_bar_height
+-- @param number
+
+--- The bar (background) margins.
+-- @beautiful beautiful.slider_bar_margins
+-- @tparam[opt={}] table margins
+-- @tparam[opt=0] number margins.left
+-- @tparam[opt=0] number margins.right
+-- @tparam[opt=0] number margins.top
+-- @tparam[opt=0] number margins.bottom
+
+--- The slider handle margins.
+-- @beautiful beautiful.slider_handle_margins
+-- @tparam[opt={}] table margins
+-- @tparam[opt=0] number margins.left
+-- @tparam[opt=0] number margins.right
+-- @tparam[opt=0] number margins.top
+-- @tparam[opt=0] number margins.bottom
+
+--- The bar (background) color.
+-- @beautiful beautiful.slider_bar_color
+-- @param color
+
 local properties = {
     -- Handle
     handle_shape         = shape.rectangle,
