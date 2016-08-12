@@ -340,6 +340,13 @@ foreach(file ${AWESOME_CONFIGURE_FILES})
 endforeach()
 #}}}
 
+# {{{ Generate some aggregated documentation from lua script
+execute_process(
+        COMMAND lua ${SOURCE_DIR}/docs/06-appearance.md.lua
+        ${BUILD_DIR}/docs/06-appearance.md
+)
+
+
 # {{{ Copy additional files
 file(GLOB awesome_md_docs RELATIVE ${SOURCE_DIR}
     ${SOURCE_DIR}/docs/*.md)
