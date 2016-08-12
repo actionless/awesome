@@ -30,7 +30,7 @@ local function draw_label(cr,angle,radius,center_x,center_y,text,src)
     cr:line_to(x+(x>center_x and radius/2 or -radius/2),y)
     local extents = cr:font_extents()
     cr:move_to(x+(x>center_x and radius/2 + 5 or (-radius/2 - cr:text_extents(text).width - 5)),y+(extents.height/4))
-    cr:show_text(text) --TODO port away from the toy API
+    cr:show_text(text) --TODO eventually port away from the toy API
     cr:stroke()
     cr:arc(center_x+(radius/2)*math.cos(angle),center_y+(radius/2)*math.sin(angle),2,0,2*math.pi)
     cr:arc(x+(x>center_x and radius/2 or -radius/2),y,2,0,2*math.pi)
@@ -118,6 +118,27 @@ local function fit(self, context, width, height)
     return width, height
 end
 
+--- The pie chart data.
+-- @property data
+-- @tparam table data Labels as keys and number as value.
+
+--- The border color.
+-- If none is set, it will use current foreground (text) color.
+-- @property border_color
+-- @param color
+-- @see gears.color
+
+--- The pie elements border width.
+-- @property border_width
+-- @tparam[opt=1] number border_width
+
+--- The pie chart colors.
+-- If no color is set, only the border will be drawn. If less colors than
+-- required are set, colors will be re-used in order.
+-- @property colors
+-- @tparam table colors A table of colors, one for each elements
+-- @see gears.color
+
 for _, prop in ipairs {"data", "border_color", "border_width", "colors" } do
     piechart["set_"..prop] = function(self, value)
         self._private[prop] = value
@@ -139,6 +160,8 @@ local function new(data)
 
     rawset(ret, "fit" , fit )
     rawset(ret, "draw", draw)
+
+    ret:set_data(data)
 
     return ret
 end
