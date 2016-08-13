@@ -13,6 +13,7 @@ wibox.widget {
     handle_shape        = gears.shape.circle,
     handle_border_color = beautiful.border_color,
     handle_border_width = 1,
+    value               = 25,
     widget              = wibox.widget.slider,
     forced_height = 50, --DOC_HIDE
     forced_width  = 100, --DOC_HIDE
