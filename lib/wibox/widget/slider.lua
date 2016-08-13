@@ -19,23 +19,32 @@ local base = require("wibox.widget.base")
 local shape = require("gears.shape")
 local gmatrix = require("gears.matrix")
 local capi = {
-    mouse = mouse,
+    mouse        = mouse,
     mousegrabber = mousegrabber,
-    root = root,
+    root         = root,
 }
 
 local slider = {mt={}}
 
 --- The slider handle shape.
+--
+--@DOC_wibox_widget_slider_handle_shape_EXAMPLE@
+--
 -- @property handle_shape
 -- @tparam[opt=gears shape rectangle] gears.shape shape
 -- @see gears.shape
 
 --- The slider handle color.
+--
+--@DOC_wibox_widget_slider_handle_color_EXAMPLE@
+--
 -- @property handle_color
 -- @param color
 
 --- The slider handle margins.
+--
+--@DOC_wibox_widget_slider_handle_margins_EXAMPLE@
+--
 -- @property handle_margins
 -- @tparam[opt={}] table margins
 -- @tparam[opt=0] number margins.left
@@ -44,31 +53,49 @@ local slider = {mt={}}
 -- @tparam[opt=0] number margins.bottom
 
 --- The slider handle width.
+--
+--@DOC_wibox_widget_slider_handle_width_EXAMPLE@
+--
 -- @property handle_width
 -- @param number
 
---- The slider handle border width.
--- @property handler_border_width
--- @param[opt=0] number
-
---- The slider handle border color.
--- @property handler_border_color
+--- The handle border_color.
+--
+--@DOC_wibox_widget_slider_handle_border_EXAMPLE@
+--
+-- @property handle_border_color
 -- @param color
 
+--- The handle border width.
+-- @property handle_border_width
+-- @param[opt=0]  number
+
 --- The bar (background) shape.
+--
+--@DOC_wibox_widget_slider_bar_shape_EXAMPLE@
+--
 -- @property bar_shape
 -- @tparam[opt=gears shape rectangle] gears.shape shape
 -- @see gears.shape
 
 --- The bar (background) height.
+--
+--@DOC_wibox_widget_slider_bar_height_EXAMPLE@
+--
 -- @property bar_height
 -- @param number
 
 --- The bar (background) color.
+--
+--@DOC_wibox_widget_slider_bar_color_EXAMPLE@
+--
 -- @property bar_color
 -- @param color
 
 --- The bar (background) margins.
+--
+--@DOC_wibox_widget_slider_bar_margins_EXAMPLE@
+--
 -- @property bar_margins
 -- @tparam[opt={}] table margins
 -- @tparam[opt=0] number margins.left
@@ -81,10 +108,16 @@ local slider = {mt={}}
 -- @param[opt=0] numbergb
 
 --- The bar (background) border_color.
+--
+--@DOC_wibox_widget_slider_bar_border_EXAMPLE@
+--
 -- @property bar_border_color
 -- @param color
 
 --- The slider value.
+--
+--@DOC_wibox_widget_slider_value_EXAMPLE@
+--
 -- @property value
 -- @param[opt=0] number
 
@@ -163,8 +196,8 @@ local properties = {
     handle_color         = false,
     handle_margins       = {},
     handle_width         = false,
-    handler_border_width = 0,
-    handler_border_color = false,
+    handle_border_width  = 0,
+    handle_border_color  = false,
 
     -- Bar
     bar_shape            = shape.rectangle,
@@ -253,9 +286,11 @@ function slider:draw(_, cr, width, height)
             x_offset, y_offset = margins, margins
             right_margin = margins
         else
-            bar_height = bar_height or (height - margins.top - margins.bottom)
-            x_offset, y_offset = margins.left, margins.top
-            right_margin = margins.right
+            bar_height = bar_height or (
+                height - (margins.top or 0) - (margins.bottom or 0)
+            )
+            x_offset, y_offset = margins.left or 0, margins.top or 0
+            right_margin = margins.right or 0
         end
     else
         bar_height = bar_height or beautiful.slider_bar_height or height
@@ -289,6 +324,8 @@ function slider:draw(_, cr, width, height)
             or beautiful.slider_bar_border_color
             or properties.bar_border_color
 
+        cr:set_line_width(bar_border_width)
+
         if bar_border_color then
             cr:save()
             cr:set_source(color(bar_border_color))
@@ -319,8 +356,8 @@ function slider:draw(_, cr, width, height)
         or properties.handle_shape
 
     -- Lets get the margins for the handle
-    local margins = self._private.bar_margins
-        or beautiful.slider_bar_margins
+    local margins = self._private.handle_margins
+        or beautiful.slider_handle_margins
 
     local x_offset, y_offset = 0, 0
 
@@ -330,9 +367,11 @@ function slider:draw(_, cr, width, height)
             handle_width  = handle_width  - 2*margins
             handle_height = handle_height - 2*margins
         else
-            x_offset, y_offset = margins.left, margins.top
-            handle_width  = handle_width  - margins.left - margins.right
-            handle_height = handle_height - margins.top  - margins.bottom
+            x_offset, y_offset = margins.left or 0, margins.top or 0
+            handle_width  = handle_width  -
+                (margins.left or 0) - (margins.right  or 0)
+            handle_height = handle_height -
+                (margins.top  or 0) - (margins.bottom or 0)
         end
     end
 
@@ -367,6 +406,7 @@ function slider:draw(_, cr, width, height)
             cr:set_source(color(handle_border_color))
         end
 
+        cr:set_line_width(handle_border_width)
         cr:stroke()
     end
 end
@@ -418,7 +458,7 @@ local function move_handle(self, x, y, geo)
         px = rect.width + px
     end
 
---     --HACK Cairo 0,0 is top left, a matrix is bottom left, funny...
+    --HACK Cairo 0,0 is top left, a matrix is bottom left, funny...
     if util.round(rem_translate:transform_point(0, 100)) ~= 0 then
         px = -(px - rect.width)
     end
