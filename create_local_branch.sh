@@ -13,7 +13,7 @@ branches=(
 	# psychon
 
 	# elv13
-	'upstream_shape_api_p4'
+	#'upstream_shape_api_p4'
 
 	# other
 	'upstream_shape_api_p4-actionless'
