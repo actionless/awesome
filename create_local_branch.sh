@@ -6,14 +6,14 @@ branches=(
 	'actionless'
 
 	# my branches
-	'rounded-naughty'
+	#'rounded-naughty'
 
 	#'hotkeys_module_instance'
 
 	# psychon
 
 	# elv13
-	'geometry_overhaul_p3.03'
+	'upstream_shape_api_p4'
 
 	# other
 )
