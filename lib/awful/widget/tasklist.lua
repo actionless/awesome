@@ -15,7 +15,6 @@ local setmetatable = setmetatable
 local table = table
 local common = require("awful.widget.common")
 local beautiful = require("beautiful")
-local client = require("awful.client")
 local util = require("awful.util")
 local tag = require("awful.tag")
 local flex = require("wibox.layout.flex")
@@ -79,7 +78,7 @@ local function tasklist_label(c, args, tb)
         else
             if c.maximized_horizontal then name = name .. maximized_horizontal end
             if c.maximized_vertical then name = name .. maximized_vertical end
-            if client.floating.get(c) then name = name .. floating end
+            if c.floating then name = name .. floating end
         end
     end
 
@@ -88,16 +87,17 @@ local function tasklist_label(c, args, tb)
     else
         name = name .. (util.escape(c.name) or util.escape("<untitled>"))
     end
+
     local focused = capi.client.focus == c
     -- Handle transient_for: the first parent that does not skip the taskbar
     -- is considered to be focused, if the real client has skip_taskbar.
     if not focused and capi.client.focus and capi.client.focus.skip_taskbar
-        and client.get_transient_for_matching(capi.client.focus,
-                                              function(cl)
-                                                  return not cl.skip_taskbar
-                                              end) == c then
+        and capi.client.focus:get_transient_for_matching(function(cl)
+                                                             return not cl.skip_taskbar
+                                                         end) == c then
         focused = true
     end
+
     if focused then
         bg = bg_focus
         text = text .. "<span color='"..fg_focus.."'>"..name.."</span>"
@@ -181,7 +181,9 @@ function tasklist.new(screen, filter, buttons, style, update_function, base_widg
         if not queued_update then
             timer.delayed_call(function()
                 queued_update = false
-                tasklist_update(screen, w, buttons, filter, data, style, uf)
+                if screen.valid then
+                    tasklist_update(screen, w, buttons, filter, data, style, uf)
+                end
             end)
             queued_update = true
         end
@@ -190,7 +192,7 @@ function tasklist.new(screen, filter, buttons, style, update_function, base_widg
         data[c] = nil
     end
     if instances == nil then
-        instances = {}
+        instances = setmetatable({}, { __mode = "k" })
         local function us(s)
             local i = instances[get_screen(s)]
             if i then
@@ -201,7 +203,9 @@ function tasklist.new(screen, filter, buttons, style, update_function, base_widg
         end
         local function u()
             for s in pairs(instances) do
-                us(s)
+                if s.valid then
+                    us(s)
+                end
             end
         end
 
@@ -238,6 +242,9 @@ function tasklist.new(screen, filter, buttons, style, update_function, base_widg
         capi.client.connect_signal("list", u)
         capi.client.connect_signal("focus", u)
         capi.client.connect_signal("unfocus", u)
+        capi.screen.connect_signal("removed", function(s)
+            instances[get_screen(s)] = nil
+        end)
     end
     w._do_tasklist_update()
     local list = instances[screen]
@@ -274,7 +281,7 @@ function tasklist.filter.currenttags(c, screen)
     if get_screen(c.screen) ~= screen then return false end
     -- Include sticky client too
     if c.sticky then return true end
-    local tags = tag.gettags(screen)
+    local tags = screen.tags
     for _, t in ipairs(tags) do
         if t.selected then
             local ctags = c:tags()
@@ -300,7 +307,7 @@ function tasklist.filter.minimizedcurrenttags(c, screen)
     if not c.minimized then return false end
     -- Include sticky client
     if c.sticky then return true end
-    local tags = tag.gettags(screen)
+    local tags = screen.tags
     for _, t in ipairs(tags) do
         -- Select only minimized clients
         if t.selected then

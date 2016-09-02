@@ -38,9 +38,13 @@ void drawin_refresh(void);
 void client_focus_refresh(void);
 void client_border_refresh(void);
 
+/* objects/screen.c */
+void screen_refresh(void);
+
 static inline int
 awesome_refresh(void)
 {
+    screen_refresh();
     luaA_emit_refresh();
     banning_refresh();
     stack_refresh();
@@ -50,6 +54,7 @@ awesome_refresh(void)
     return xcb_flush(globalconf.connection);
 }
 
+void event_init(void);
 void event_handle(xcb_generic_event_t *);
 void event_drawable_under_mouse(lua_State *, int);
 

@@ -315,18 +315,16 @@ a_dbus_convert_value(lua_State *L, int idx, DBusMessageIter *iter)
             dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &b);
         }
         break;
-#define DBUS_MSG_RETURN_HANDLE_TYPE_STRING(dbustype) \
-      case dbustype: \
-        { \
-            const char *s = lua_tostring(L, idx + 1); \
-            if(!s) \
-                s = ""; \
-            dbus_message_iter_append_basic(iter, dbustype, &s); \
-        } \
+      case DBUS_TYPE_STRING:
+        {
+            const char *s = lua_tostring(L, idx + 1);
+            if(!s || !dbus_validate_utf8(s, NULL)) {
+                luaA_warn(L, "Your D-Bus signal handling method returned an invalid string");
+                return false;
+            }
+            dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &s);
+        }
         break;
-    DBUS_MSG_RETURN_HANDLE_TYPE_STRING(DBUS_TYPE_STRING)
-    DBUS_MSG_RETURN_HANDLE_TYPE_STRING(DBUS_TYPE_BYTE)
-#undef DBUS_MSG_RETURN_HANDLE_TYPE_STRING
 #define DBUS_MSG_RETURN_HANDLE_TYPE_NUMBER(type, dbustype) \
       case dbustype: \
         { \
@@ -334,6 +332,7 @@ a_dbus_convert_value(lua_State *L, int idx, DBusMessageIter *iter)
            dbus_message_iter_append_basic(iter, dbustype, &num); \
         } \
         break;
+    DBUS_MSG_RETURN_HANDLE_TYPE_NUMBER(uint8_t, DBUS_TYPE_BYTE)
     DBUS_MSG_RETURN_HANDLE_TYPE_NUMBER(int16_t, DBUS_TYPE_INT16)
     DBUS_MSG_RETURN_HANDLE_TYPE_NUMBER(uint16_t, DBUS_TYPE_UINT16)
     DBUS_MSG_RETURN_HANDLE_TYPE_NUMBER(int32_t, DBUS_TYPE_INT32)
@@ -774,10 +773,7 @@ luaA_dbus_connect_signal(lua_State *L)
     if(sig)
         luaA_warn(L, "cannot add signal %s on D-Bus, already existing", name);
     else
-    {
-        signal_add(&dbus_signals, name);
         signal_connect(&dbus_signals, name, luaA_object_ref(L, 2));
-    }
     return 0;
 }
 
@@ -793,8 +789,8 @@ luaA_dbus_disconnect_signal(lua_State *L)
     const char *name = luaL_checkstring(L, 1);
     luaA_checkfunction(L, 2);
     const void *func = lua_topointer(L, 2);
-    signal_disconnect(&dbus_signals, name, func);
-    luaA_object_unref(L, func);
+    if (signal_disconnect(&dbus_signals, name, func))
+        luaA_object_unref(L, func);
     return 0;
 }
 

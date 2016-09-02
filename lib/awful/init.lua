@@ -29,9 +29,10 @@ util.spawn_with_shell = function(...)
    return spawn.with_shell(...)
 end
 
-util.pread = function(...)
-   util.deprecate("awful.spawn.pread")
-   return spawn.pread(...)
+util.pread = function()
+    util.deprecate("Use io.popen() directly or look at awful.spawn.easy_async() "
+            .. "for an asynchronous alternative")
+    return ""
 end
 
 return
@@ -51,11 +52,13 @@ return
     remote = require("awful.remote");
     key = require("awful.key");
     button = require("awful.button");
+    wibar = require("awful.wibar");
     wibox = require("awful.wibox");
     startup_notification = require("awful.startup_notification");
     tooltip = require("awful.tooltip");
     ewmh = require("awful.ewmh");
     titlebar = require("awful.titlebar");
+    rules = require("awful.rules");
     spawn = spawn;
 }
 

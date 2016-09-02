@@ -1,4 +1,6 @@
 ---------------------------------------------------------------------------
+--
+--@DOC_wibox_layout_defaults_flex_EXAMPLE@
 -- @author Uli Schlachter
 -- @copyright 2010 Uli Schlachter
 -- @release @AWESOME_VERSION@
@@ -14,22 +16,7 @@ local util = require("awful.util")
 
 local flex = {}
 
---- Layout a fixed layout. Each widget gets just the space it asks for.
--- @param layout The layout you are modifying.
--- @param context The context in which we are drawn.
--- @param width The available width.
--- @param height The available height.
--- @name layout
--- @class function
-
---- Get all children of this layout
--- @param layout The layout you are modifying.
--- @warning If the widget contain itself and recursive is true, this will cause
---   a stack overflow
--- @param[opt] recursive Also add all widgets of childrens
--- @return a list of all widgets
--- @name get_children
--- @class function
+--@DOC_fixed_COMMON@
 
 --- Replace the layout children
 -- @tparam table children A table composed of valid widgets
@@ -40,13 +27,6 @@ local flex = {}
 -- @param layout The layout you are modifying.
 -- @tparam widget ... Widgets that should be added (must at least be one)
 -- @name add
--- @class function
-
---- Set a widget at a specific index, replace the current one
--- @tparam number index A widget or a widget index
--- @param widget2 The widget to take the place of the first one
--- @treturn boolean If the operation is successful
--- @name set
 -- @class function
 
 --- Remove a widget from the layout
@@ -63,43 +43,6 @@ local flex = {}
 -- @name remove_widgets
 -- @class function
 
---- Fit the fixed layout into the given space
--- @param layout The layout you are modifying.
--- @param context The context in which we are fit.
--- @param orig_width The available width.
--- @param orig_height The available height.
--- @name fit
--- @class function
-
---- Reset a fixed layout. This removes all widgets from the layout.
--- @param layout The layout you are modifying.
--- @name reset
--- @class function
-
---- Replace the first instance of `widget` in the layout with `widget2`
--- @param widget The widget to replace
--- @param widget2 The widget to replace `widget` with
--- @tparam[opt=false] boolean recursive Digg in all compatible layouts to find the widget.
--- @treturn boolean If the operation is successful
--- @name replace_widget
--- @class function
-
---- Swap 2 widgets in a layout
--- @tparam number index1 The first widget index
--- @tparam number index2 The second widget index
--- @treturn boolean If the operation is successful
--- @name swap
--- @class function
-
---- Swap 2 widgets in a layout
--- If widget1 is present multiple time, only the first instance is swapped
--- @param widget1 The first widget
--- @param widget2 The second widget
--- @tparam[opt=false] boolean recursive Digg in all compatible layouts to find the widget.
--- @treturn boolean If the operation is successful
--- @name swap_widgets
--- @class function
-
 --- Insert a new widget in the layout at position `index`
 -- @tparam number index The position
 -- @param widget The widget
@@ -109,24 +52,24 @@ local flex = {}
 
 function flex:layout(_, width, height)
     local result = {}
-    local pos,spacing = 0, self._spacing
-    local num = #self.widgets
+    local pos,spacing = 0, self._private.spacing
+    local num = #self._private.widgets
     local total_spacing = (spacing*(num-1))
 
     local space_per_item
-    if self.dir == "y" then
+    if self._private.dir == "y" then
         space_per_item = height / num - total_spacing/num
     else
         space_per_item = width / num - total_spacing/num
     end
 
-    if self._max_widget_size then
-        space_per_item = math.min(space_per_item, self._max_widget_size)
+    if self._private.max_widget_size then
+        space_per_item = math.min(space_per_item, self._private.max_widget_size)
     end
 
-    for _, v in pairs(self.widgets) do
+    for _, v in pairs(self._private.widgets) do
         local x, y, w, h
-        if self.dir == "y" then
+        if self._private.dir == "y" then
             x, y = 0, util.round(pos)
             w, h = width, floor(space_per_item)
         else
@@ -138,8 +81,8 @@ function flex:layout(_, width, height)
 
         pos = pos + space_per_item + spacing
 
-        if (self.dir == "y" and pos-spacing >= height) or
-            (self.dir ~= "y" and pos-spacing >= width) then
+        if (self._private.dir == "y" and pos-spacing >= height) or
+            (self._private.dir ~= "y" and pos-spacing >= width) then
             break
         end
     end
@@ -147,7 +90,7 @@ function flex:layout(_, width, height)
     return result
 end
 
---- Fit the flex layout into the given space.
+-- Fit the flex layout into the given space.
 -- @param context The context in which we are fit.
 -- @param orig_width The available width.
 -- @param orig_height The available height.
@@ -156,39 +99,41 @@ function flex:fit(context, orig_width, orig_height)
     local used_in_other = 0
 
     -- Figure out the maximum size we can give out to sub-widgets
-    local sub_height = self.dir == "x" and orig_height or orig_height / #self.widgets
-    local sub_width  = self.dir == "y" and orig_width  or orig_width / #self.widgets
+    local sub_height = self._private.dir == "x" and orig_height or orig_height / #self._private.widgets
+    local sub_width  = self._private.dir == "y" and orig_width  or orig_width / #self._private.widgets
 
-    for _, v in pairs(self.widgets) do
+    for _, v in pairs(self._private.widgets) do
         local w, h = base.fit_widget(self, context, v, sub_width, sub_height)
 
-        local max = self.dir == "y" and w or h
+        local max = self._private.dir == "y" and w or h
         if max > used_in_other then
             used_in_other = max
         end
 
-        used_in_dir = used_in_dir + (self.dir == "y" and h or w)
+        used_in_dir = used_in_dir + (self._private.dir == "y" and h or w)
     end
 
-    if self._max_widget_size then
+    if self._private.max_widget_size then
         used_in_dir = math.min(used_in_dir,
-            #self.widgets * self._max_widget_size)
+            #self._private.widgets * self._private.max_widget_size)
     end
 
-    local spacing = self._spacing * (#self.widgets-1)
+    local spacing = self._private.spacing * (#self._private.widgets-1)
 
-    if self.dir == "y" then
+    if self._private.dir == "y" then
         return used_in_other, used_in_dir + spacing
     end
     return used_in_dir + spacing, used_in_other
 end
 
---- Set the maximum size the widgets in this layout will take (that is,
--- maximum width for horizontal and maximum height for vertical).
--- @param val The maximum size of the widget.
+--- Set the maximum size the widgets in this layout will take.
+--That is, maximum width for horizontal and maximum height for vertical.
+-- @property max_widget_size
+-- @param number
+
 function flex:set_max_widget_size(val)
-    if self._max_widget_size ~= val then
-        self._max_widget_size = val
+    if self._private.max_widget_size ~= val then
+        self._private.max_widget_size = val
         self:emit_signal("widget::layout_changed")
     end
 end
@@ -196,9 +141,9 @@ end
 local function get_layout(dir, widget1, ...)
     local ret = fixed[dir](widget1, ...)
 
-    util.table.crush(ret, flex)
+    util.table.crush(ret, flex, true)
 
-    ret.fill_space = nil
+    ret._private.fill_space = nil
 
     return ret
 end
@@ -206,6 +151,7 @@ end
 --- Returns a new horizontal flex layout. A flex layout shares the available space
 -- equally among all widgets. Widgets can be added via :add(widget).
 -- @tparam widget ... Widgets that should be added to the layout.
+-- @function wibox.layout.flex.horizontal
 function flex.horizontal(...)
     return get_layout("horizontal", ...)
 end
@@ -213,9 +159,14 @@ end
 --- Returns a new vertical flex layout. A flex layout shares the available space
 -- equally among all widgets. Widgets can be added via :add(widget).
 -- @tparam widget ... Widgets that should be added to the layout.
+-- @function wibox.layout.flex.vertical
 function flex.vertical(...)
     return get_layout("vertical", ...)
 end
+
+--@DOC_widget_COMMON@
+
+--@DOC_object_COMMON@
 
 return flex
 

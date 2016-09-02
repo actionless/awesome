@@ -21,6 +21,8 @@ topics={
     '02-contributing.md',
     '03-declarative-layout.md',
     '04-new-widgets.md',
+    '16-using-cairo.md',
+    '90-FAQ.md',
 }
 
 -- Setup @client to be an alias for "@tparam client.object"
@@ -28,8 +30,21 @@ tparam_alias('client', 'client.object')
 tparam_alias('tag', 'tag')
 -- Should be default, but is not.  Sets up "@tab" => "@tparam table".
 tparam_alias('tab', 'table')
+
+-- Hack to get the functions and method on top of the signals and properties
+new_type("function", "Functions")
+-- Documentation for objects properties
+new_type("property", "Object properties", false, "Type")
 -- New type for signals
 new_type("signal", "Signals", false, "Arguments")
+-- New type for signals connections
+new_type("signalhandler", "Request handlers", false, "Arguments")
+-- Allow objects to define a set of beautiful properties affecting them
+new_type("beautiful", "Theme variables", false, "Type")
+-- Put deprecated methods in their own section
+new_type("deprecated", "Deprecated functions", false, "param")
+-- For the legacy stateless layout related functions
+new_type("legacylayout", "Layout related functions", false, "param")
 
 -- More fitting section names
 kind_names={topic='Documentation', module='Libraries'}
@@ -52,6 +67,11 @@ file = {
     '../objects/',
     -- LUA libraries
     '../lib/',
+    -- Old APIs the user should not longer use directly
+    '../docs/aliases/awful_client.lua',
+    '../docs/aliases/awful_screen.lua',
+    '../docs/aliases/awful_tag.lua',
+    '../docs/aliases/awful_mouse.lua',
     exclude = {
         -- exclude these modules, as they do not contain any written
         -- documentation
@@ -63,10 +83,13 @@ file = {
         '../lib/gears/init.lua',
         '../lib/wibox/layout/init.lua',
         '../lib/wibox/widget/init.lua',
-        '../lib/wibox/widget/systray.lua',
+        '../lib/wibox/container/init.lua',
 
         -- Ignore some parts of the widget library
         '../lib/awful/widget/init.lua',
+
+        -- Ignore the drawing window, users should only care about wiboxes
+        '../objects/drawin.c',
 
         -- exclude layout, but we need an extra bit of documentation elsewhere.
         '../lib/awful/layout/suit/'

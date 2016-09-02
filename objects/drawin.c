@@ -34,12 +34,15 @@
 #include "drawin.h"
 #include "common/atoms.h"
 #include "common/xcursor.h"
+#include "common/xutil.h"
 #include "event.h"
 #include "ewmh.h"
 #include "objects/client.h"
 #include "objects/screen.h"
 #include "systray.h"
 #include "xwindow.h"
+
+#include "math.h"
 
 #include <cairo-xcb.h>
 #include <xcb/shape.h>
@@ -64,6 +67,50 @@
  * @table drawin
  */
 
+/**
+ * @signal property::geometry
+ */
+
+/**
+ * @signal property::shape_bounding
+ */
+
+/**
+ * @signal property::shape_clip
+ */
+
+/**
+ * @signal property::border_width
+ */
+
+/**
+ * @signal property::cursor
+ */
+
+/**
+ * @signal property::height
+ */
+
+/**
+ * @signal property::ontop
+ */
+
+/**
+ * @signal property::visible
+ */
+
+/**
+ * @signal property::width
+ */
+
+/**
+ * @signal property::x
+ */
+
+/**
+ * @signal property::y
+ */
+
 /** Get or set mouse buttons bindings to a drawin.
  *
  * @param buttons_table A table of buttons objects, or nothing.
@@ -81,6 +128,16 @@
  *
  * @return The number of drawin objects alive.
  * @function instances
+ */
+
+/** Set a __index metamethod for all drawin instances.
+ * @tparam function cb The meta-method
+ * @function set_index_miss_handler
+ */
+
+/** Set a __newindex metamethod for all drawin instances.
+ * @tparam function cb The meta-method
+ * @function set_newindex_miss_handler
  */
 
 LUA_OBJECT_FUNCS(drawin_class, drawin_t, drawin)
@@ -201,6 +258,14 @@ drawin_moveresize(lua_State *L, int udx, area_t geometry)
         luaA_object_emit_signal(L, udx, "property::width", 0);
     if (old_geometry.height != w->geometry.height)
         luaA_object_emit_signal(L, udx, "property::height", 0);
+
+    screen_t *old_screen = screen_getbycoord(old_geometry.x, old_geometry.y);
+    screen_t *new_screen = screen_getbycoord(w->geometry.x, w->geometry.y);
+    if (old_screen != new_screen && strut_has_value(&w->strut))
+    {
+        screen_update_workarea(old_screen);
+        screen_update_workarea(new_screen);
+    }
 }
 
 /** Refresh the window content by copying its pixmap data to its window.
@@ -310,9 +375,8 @@ drawin_set_visible(lua_State *L, int udx, bool v)
         luaA_object_emit_signal(L, udx, "property::visible", 0);
         if(strut_has_value(&drawin->strut))
         {
-            luaA_object_push(L, screen_getbycoord(drawin->geometry.x, drawin->geometry.y));
-            luaA_object_emit_signal(L, -1, "property::workarea", 0);
-            lua_pop(L, 1);
+            screen_update_workarea(
+                    screen_getbycoord(drawin->geometry.x, drawin->geometry.y));
         }
     }
 }
@@ -396,10 +460,10 @@ luaA_drawin_geometry(lua_State *L)
         area_t wingeom;
 
         luaA_checktable(L, 2);
-        wingeom.x = luaA_getopt_number(L, 2, "x", drawin->geometry.x);
-        wingeom.y = luaA_getopt_number(L, 2, "y", drawin->geometry.y);
-        wingeom.width = luaA_getopt_number(L, 2, "width", drawin->geometry.width);
-        wingeom.height = luaA_getopt_number(L, 2, "height", drawin->geometry.height);
+        wingeom.x = round(luaA_getopt_number_range(L, 2, "x", drawin->geometry.x, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
+        wingeom.y = round(luaA_getopt_number_range(L, 2, "y", drawin->geometry.y, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
+        wingeom.width = ceil(luaA_getopt_number_range(L, 2, "width", drawin->geometry.width, MIN_X11_SIZE, MAX_X11_SIZE));
+        wingeom.height = ceil(luaA_getopt_number_range(L, 2, "height", drawin->geometry.height, MIN_X11_SIZE, MAX_X11_SIZE));
 
         if(wingeom.width > 0 && wingeom.height > 0)
             drawin_moveresize(L, 1, wingeom);
@@ -416,7 +480,8 @@ LUA_OBJECT_EXPORT_PROPERTY(drawin, drawin_t, visible, lua_pushboolean)
 static int
 luaA_drawin_set_x(lua_State *L, drawin_t *drawin)
 {
-    drawin_moveresize(L, -3, (area_t) { .x = luaA_checkinteger(L, -1),
+    int x = round(luaA_checknumber_range(L, -1, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
+    drawin_moveresize(L, -3, (area_t) { .x = x,
                                         .y = drawin->geometry.y,
                                         .width = drawin->geometry.width,
                                         .height = drawin->geometry.height });
@@ -433,8 +498,9 @@ luaA_drawin_get_x(lua_State *L, drawin_t *drawin)
 static int
 luaA_drawin_set_y(lua_State *L, drawin_t *drawin)
 {
+    int y = round(luaA_checknumber_range(L, -1, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
     drawin_moveresize(L, -3, (area_t) { .x = drawin->geometry.x,
-                                        .y = luaA_checkinteger(L, -1),
+                                        .y = y,
                                         .width = drawin->geometry.width,
                                         .height = drawin->geometry.height });
     return 0;
@@ -450,9 +516,7 @@ luaA_drawin_get_y(lua_State *L, drawin_t *drawin)
 static int
 luaA_drawin_set_width(lua_State *L, drawin_t *drawin)
 {
-    int width = luaA_checkinteger(L, -1);
-    if(width <= 0)
-        luaL_error(L, "invalid width");
+    int width = ceil(luaA_checknumber_range(L, -1, MIN_X11_SIZE, MAX_X11_SIZE));
     drawin_moveresize(L, -3, (area_t) { .x = drawin->geometry.x,
                                         .y = drawin->geometry.y,
                                         .width = width,
@@ -470,9 +534,7 @@ luaA_drawin_get_width(lua_State *L, drawin_t *drawin)
 static int
 luaA_drawin_set_height(lua_State *L, drawin_t *drawin)
 {
-    int height = luaA_checkinteger(L, -1);
-    if(height <= 0)
-        luaL_error(L, "invalid height");
+    int height = ceil(luaA_checknumber_range(L, -1, MIN_X11_SIZE, MAX_X11_SIZE));
     drawin_moveresize(L, -3, (area_t) { .x = drawin->geometry.x,
                                        .y = drawin->geometry.y,
                                        .width = drawin->geometry.width,
@@ -697,51 +759,6 @@ drawin_class_setup(lua_State *L)
                             (lua_class_propfunc_t) luaA_drawin_set_shape_clip,
                             (lua_class_propfunc_t) luaA_drawin_get_shape_clip,
                             (lua_class_propfunc_t) luaA_drawin_set_shape_clip);
-
-    /**
-     * @signal property::geometry
-     */
-    signal_add(&drawin_class.signals, "property::geometry");
-    /**
-     * @signal property::shape_bounding
-     */
-    signal_add(&drawin_class.signals, "property::shape_bounding");
-    /**
-     * @signal property::shape_clip
-     */
-    signal_add(&drawin_class.signals, "property::shape_clip");
-    /**
-     * @signal property::border_width
-     */
-    signal_add(&drawin_class.signals, "property::border_width");
-    /**
-     * @signal property::cursor
-     */
-    signal_add(&drawin_class.signals, "property::cursor");
-    /**
-     * @signal property::height
-     */
-    signal_add(&drawin_class.signals, "property::height");
-    /**
-     * @signal property::ontop
-     */
-    signal_add(&drawin_class.signals, "property::ontop");
-    /**
-     * @signal property::visible
-     */
-    signal_add(&drawin_class.signals, "property::visible");
-    /**
-     * @signal property::width
-     */
-    signal_add(&drawin_class.signals, "property::width");
-    /**
-     * @signal property::x
-     */
-    signal_add(&drawin_class.signals, "property::x");
-    /**
-     * @signal property::y
-     */
-    signal_add(&drawin_class.signals, "property::y");
 }
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

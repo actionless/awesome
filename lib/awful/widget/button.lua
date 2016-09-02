@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------
+-- A simple button widget.
+-- @usage local button = awful.widget.button()
+-- button:buttons(awful.util.table.join(
+--     button:buttons(),
+--     awful.button({}, 1, nil, function ()
+--         print("Mouse was clicked")
+--     end)
+-- ))
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008-2009 Julien Danjou
 -- @release @AWESOME_VERSION@
@@ -39,12 +47,19 @@ function button.new(args)
     end
     w:set_image(args.image)
     w:buttons(abutton({}, 1, function () orig_set_image(w, img_press) end, function () orig_set_image(w, img_release) end))
+
+    w:connect_signal("mouse::leave", function(self) orig_set_image(self, img_release) end)
+
     return w
 end
 
 function button.mt:__call(...)
     return button.new(...)
 end
+
+--@DOC_widget_COMMON@
+
+--@DOC_object_COMMON@
 
 return setmetatable(button, button.mt)
 

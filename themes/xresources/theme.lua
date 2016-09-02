@@ -42,6 +42,9 @@ theme.border_marked = xrdb.color10
 -- Example:
 --theme.taglist_bg_focus = "#ff0000"
 
+theme.tooltip_fg = theme.fg_normal
+theme.tooltip_bg = theme.bg_normal
+
 -- Variables set for theming the menu:
 -- menu_[bg|fg]_[normal|focus]
 -- menu_[border_color|border_width]
@@ -91,9 +94,9 @@ local wallpaper_alt_fg = xrdb.color12
 if not is_dark_bg then
     wallpaper_bg, wallpaper_fg = wallpaper_fg, wallpaper_bg
 end
-theme.wallpaper = theme_assets.wallpaper(
-    wallpaper_bg, wallpaper_fg, wallpaper_alt_fg
-)
+theme.wallpaper = function(s)
+    return theme_assets.wallpaper(wallpaper_bg, wallpaper_fg, wallpaper_alt_fg, s)
+end
 
 return theme
 

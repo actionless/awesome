@@ -19,31 +19,26 @@ local color = require("gears.color")
 local object = require("gears.object")
 local surface = require("gears.surface")
 local timer = require("gears.timer")
+local grect =  require("gears.geometry").rectangle
 local matrix = require("gears.matrix")
 local hierarchy = require("wibox.hierarchy")
 local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 
 local drawables = setmetatable({}, { __mode = 'k' })
-local wallpaper = nil
-
--- This is awful.screen.getbycoord() which we sadly cannot use from here (cyclic
--- dependencies are bad!)
-local function screen_getbycoord(x, y)
-    for i = 1, screen:count() do
-        local geometry = screen[i].geometry
-        if x >= geometry.x and x < geometry.x + geometry.width
-           and y >= geometry.y and y < geometry.y + geometry.height then
-            return capi.screen[i]
-        end
-    end
-    return capi.screen[1]
-end
 
 -- Get the widget context. This should always return the same table (if
 -- possible), so that our draw and fit caches can work efficiently.
 local function get_widget_context(self)
     local geom = self.drawable:geometry()
-    local s = screen_getbycoord(geom.x, geom.y)
+
+    local sgeos = {}
+
+    for s in capi.screen do
+        sgeos[s] = s.geometry
+    end
+
+    local s = grect.get_by_coord(sgeos, geom.x, geom.y) or capi.screen.primary
+
     local context = self._widget_context
     local dpi = beautiful.xresources.get_dpi(s)
     if (not context) or context.screen ~= s or context.dpi ~= dpi then
@@ -113,9 +108,7 @@ local function do_redraw(self)
 
     if not capi.awesome.composite_manager_running then
         -- This is pseudo-transparency: We draw the wallpaper in the background
-        if not wallpaper then
-            wallpaper = surface.load_silently(capi.root.wallpaper(), false)
-        end
+        local wallpaper = surface.load_silently(capi.root.wallpaper(), false)
         if wallpaper then
             cr.operator = cairo.Operator.SOURCE
             cr:set_source_surface(wallpaper, -x, -y)
@@ -130,8 +123,11 @@ local function do_redraw(self)
     cr:set_source(self.background_color)
     cr:paint()
 
+    cr:restore()
+
     -- Paint the background image
     if self.background_image then
+        cr:save()
         if type(self.background_image) == "function" then
             self.background_image(context, cr, width, height, unpack(self.background_image_args))
         else
@@ -139,9 +135,8 @@ local function do_redraw(self)
             cr:set_source(pattern)
             cr:paint()
         end
+        cr:restore()
     end
-
-    cr:restore()
 
     -- Draw the widget
     if self._widget_hierarchy then
@@ -175,7 +170,9 @@ local function find_widgets(_drawable, result, _hierarchy, x, y)
             0, 0, width, height)
         table.insert(result, {
             x = x3, y = y3, width = w3, height = h3,
-            drawable = _drawable, widget = _hierarchy:get_widget()
+            drawable = _drawable, widget = _hierarchy:get_widget(),
+            matrix_to_device = _hierarchy:get_matrix_to_device(),
+            matrix_to_parent = _hierarchy:get_matrix_to_parent(),
         })
     end
     for _, child in ipairs(_hierarchy:get_children()) do
@@ -244,6 +241,9 @@ end
 -- as arguments. Any other arguments passed to this method will be appended.
 -- @param image A background image or a function
 function drawable:set_bgimage(image, ...)
+    if type(image) ~= "function" then
+        image = surface(image)
+    end
 
     self.background_image = image
     self.background_image_args = {...}
@@ -305,7 +305,6 @@ local function setup_signals(_drawable)
     local d = _drawable.drawable
 
     local function clone_signal(name)
-        _drawable:add_signal(name)
         -- When "name" is emitted on wibox.drawin, also emit it on wibox
         d:connect_signal(name, function(_, ...)
             _drawable:emit_signal(name, ...)
@@ -426,7 +425,6 @@ end
 
 -- Redraw all drawables when the wallpaper changes
 capi.awesome.connect_signal("wallpaper_changed", function()
-    wallpaper = nil
     for k in pairs(drawables) do
         k()
     end

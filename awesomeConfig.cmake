@@ -199,14 +199,18 @@ else()
     message(STATUS "checking for execinfo -- not found")
 endif()
 
-# __builtin_clz is available since gcc 3.4
-try_compile(HAS___BUILTIN_CLZ
-    ${CMAKE_BINARY_DIR}
-    ${CMAKE_SOURCE_DIR}/build-tests/__builtin_clz.c)
-if(HAS___BUILTIN_CLZ)
-    message(STATUS "checking for __builtin_clz -- yes")
+# Do we need libm for round()?
+check_function_exists(round HAS_ROUND_WITHOUT_LIBM)
+if(NOT HAS_ROUND_WITHOUT_LIBM)
+    SET(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} m)
+    set(AWESOME_REQUIRED_LDFLAGS ${AWESOME_REQUIRED_LDFLAGS} m)
+    check_function_exists(round HAS_ROUND_WITH_LIBM)
+    if(NOT HAS_ROUND_WITH_LIBM)
+        message(FATAL_ERROR "Did not find round()")
+    endif()
+    message(STATUS "checking for round -- in libm")
 else()
-    message(STATUS "checking for __builtin_clz -- no")
+    message(STATUS "checking for round -- builtin")
 endif()
 
 set(AWESOME_REQUIRED_LDFLAGS
@@ -295,6 +299,20 @@ set(AWESOME_ICON_PATH        ${AWESOME_DATA_PATH}/icons)
 set(AWESOME_THEMES_PATH      ${AWESOME_DATA_PATH}/themes)
 # }}}
 
+
+if(GENERATE_DOC)
+    # Load the common documentation
+    include(docs/load_ldoc.cmake)
+
+    # Use `include`, rather than `add_subdirectory`, to keep the variables
+    # The file is a valid CMakeLists.txt and can be executed directly if only
+    # the image artefacts are needed.
+    include(tests/examples/CMakeLists.txt)
+
+    # Generate the widget lists
+    include(docs/widget_lists.cmake)
+endif()
+
 # {{{ Configure files
 file(GLOB awesome_c_configure_files RELATIVE ${SOURCE_DIR}
     ${SOURCE_DIR}/*.c
@@ -331,8 +349,18 @@ set(AWESOME_ADDITIONAL_FILES
 foreach(file ${AWESOME_ADDITIONAL_FILES})
     configure_file(${SOURCE_DIR}/${file}
                    ${BUILD_DIR}/${file}
-                   COPYONLY)
+                   @ONLY)
 endforeach()
 #}}}
+
+# The examples coverage need to be done again after the configure_file has
+# inserted the additional code. Otherwise, the result will be off, rendering
+# the coverage useless as a tool to track untested code.
+if(GENERATE_DOC AND DO_COVERAGE)
+    message(STATUS "Running tests again with coverage")
+    set(USE_LCOV 1)
+
+    include(tests/examples/CMakeLists.txt)
+endif()
 
 # vim: filetype=cmake:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80:foldmethod=marker

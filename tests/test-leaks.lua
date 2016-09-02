@@ -1,5 +1,6 @@
 -- Some memory leak checks as integration tests.
 
+local runner = require("_runner")
 local awful = require("awful")
 local cairo = require("lgi").cairo
 local create_wibox = require("_wibox_helper").create_wibox
@@ -12,7 +13,10 @@ end
 
 -- Make the layoutbox in the default config GC'able
 -- luacheck: globals mywibox mylayoutbox
-mywibox[1].visible = false
+for s in screen do
+    mywibox[s]:set_widget(wibox.widget.textbox())
+    mywibox[s].visible = false
+end
 mywibox = nil
 mylayoutbox = nil
 emit_refresh()
@@ -26,6 +30,7 @@ local function collectable(a, b, c, d, e, f, g, h, last)
         prepare_for_collect()
         prepare_for_collect = nil
     end
+    collectgarbage("collect")
     collectgarbage("collect")
     collectgarbage("collect")
     -- Check if the table is now empty
@@ -58,7 +63,7 @@ collectable(wibox.layout.align.horizontal())
 -- Then some random widgets from awful
 collectable(awful.widget.launcher({ image = cairo.ImageSurface(cairo.Format.ARGB32, 20, 20), command = "bash" }))
 collectable(awful.widget.prompt())
-collectable(awful.widget.textclock())
+collectable(wibox.widget.textclock())
 collectable(awful.widget.layoutbox(1))
 
 -- Some widgets do things via timer.delayed_call
@@ -77,6 +82,6 @@ collectable(awful.widget.tasklist(1, awful.widget.tasklist.filter.currenttags))
 prepare_for_collect = emit_refresh
 collectable(create_wibox())
 
-require("_runner").run_steps({ function() return true end })
+runner.run_steps({ function() return true end })
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

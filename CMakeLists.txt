@@ -12,6 +12,8 @@ if(NOT EXISTS ${SOURCE_DIR}/awesomeConfig.cmake)
     message(FATAL_ERROR "Please provide awesomeConfig.cmake")
 endif()
 
+# Define many variables
+
 include(awesomeConfig.cmake)
 
 include_directories(
@@ -252,8 +254,10 @@ endif()
 
 # {{{ Lua API Documentation
 if(GENERATE_DOC)
+
     if(NOT BUILD_DIR STREQUAL SOURCE_DIR)
         file(MAKE_DIRECTORY ${BUILD_DIR}/lib)
+        file(MAKE_DIRECTORY ${BUILD_DIR}/doc)
     endif()
 
     file(GLOB_RECURSE AWE_LUA_FILES ${BUILD_DIR}/lib/*.lua)
@@ -261,6 +265,9 @@ if(GENERATE_DOC)
 
     # Copy the images to the build directory
     file(COPY ${SOURCE_DIR}/docs/images DESTINATION ${BUILD_DIR}/doc)
+
+    # Copy the aliases to the build directory
+    file(COPY ${SOURCE_DIR}/docs/aliases DESTINATION ${BUILD_DIR}/docs)
 
     # Run ldoc and make it fail if any warnings are generated. The
     # redirection-magic swaps stdout and stderr and awk exits with a non-zero
@@ -293,7 +300,7 @@ macro(a_icon_convert match replacement input)
         set(ALL_ICONS ${ALL_ICONS} ${output})
 
         add_custom_command(
-            COMMAND ${CONVERT_EXECUTABLE} ${input} ${ARGN} ${output}
+            COMMAND ${CONVERT_EXECUTABLE} ${input} -strip ${ARGN} ${output}
             OUTPUT  ${output}
             DEPENDS ${input}
             VERBATIM)
@@ -354,11 +361,11 @@ endif()
 # {{{ Tests
 set(CHECK_TARGETS check-integration)
 add_custom_target(check-integration
-    "${CMAKE_SOURCE_DIR}/tests/run.sh"
+    sh -c "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ${CMAKE_SOURCE_DIR}/tests/run.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running integration tests"
     VERBATIM)
-find_program(BUSTED_EXECUTABLE busted)
+a_find_program(BUSTED_EXECUTABLE busted FALSE)
 if(BUSTED_EXECUTABLE)
     # Keep the arguments in sync with the version below!
     add_custom_target(check-unit ALL
@@ -379,7 +386,7 @@ if(BUSTED_EXECUTABLE)
         COMMENT "Running unit tests under LuaCov"
         VERBATIM)
 endif()
-find_program(LUACHECK_EXECUTABLE luacheck)
+a_find_program(LUACHECK_EXECUTABLE luacheck FALSE)
 if(LUACHECK_EXECUTABLE)
     add_custom_target(luacheck
         ${LUACHECK_EXECUTABLE} lib spec tests themes awesomerc.lua
@@ -390,5 +397,7 @@ if(LUACHECK_EXECUTABLE)
 endif()
 add_custom_target(check DEPENDS ${CHECK_TARGETS})
 # }}}
+
+INCLUDE(${CMAKE_SOURCE_DIR}/Packaging.cmake)
 
 # vim: filetype=cmake:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80:foldmethod=marker

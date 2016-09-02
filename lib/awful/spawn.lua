@@ -29,6 +29,45 @@ local protected_call = require("gears.protected_call")
 local spawn = {}
 
 
+local end_of_file
+do
+    -- API changes, bug fixes and lots of fun. Figure out how a EOF is signalled.
+    local input
+    if not pcall(function()
+        -- No idea when this API changed, but some versions expect a string,
+        -- others a table with some special(?) entries
+        input = Gio.DataInputStream.new(Gio.MemoryInputStream.new_from_data(""))
+    end) then
+        input = Gio.DataInputStream.new(Gio.MemoryInputStream.new_from_data({}))
+    end
+    local line, length = input:read_line()
+    if not line then
+        -- Fixed in 2016: NULL on the C side is transformed to nil in Lua
+        end_of_file = function(arg)
+            return not arg
+        end
+    elseif tostring(line) == "" and #line ~= length then
+        -- "Historic" behaviour for end-of-file:
+        -- - NULL is turned into an empty string
+        -- - The length variable is not initialized
+        -- It's highly unlikely that the uninitialized variable has value zero.
+        -- Use this hack to detect EOF.
+        end_of_file = function(arg1, arg2)
+            return #arg1 ~= arg2
+        end
+    else
+        assert(tostring(line) == "", "Cannot determine how to detect EOF")
+        -- The above uninitialized variable was fixed and thus length is
+        -- always 0 when line is NULL in C. We cannot tell apart an empty line and
+        -- EOF in this case.
+        require("gears.debug").print_warning("Cannot reliably detect EOF on an "
+                .. "GIOInputStream with this LGI version")
+        end_of_file = function(arg)
+            return tostring(arg) == ""
+        end
+    end
+end
+
 spawn.snid_buffer = {}
 
 function spawn.on_snid_callback(c)
@@ -90,21 +129,23 @@ function spawn.with_shell(cmd)
     end
 end
 
---- Spawn a program and asynchronously and capture its output line by line.
+--- Spawn a program and asynchronously capture its output line by line.
 -- @tparam string|table cmd The command.
--- @tab callbacks Table containing callbacks that should be
---   invoked on various conditions.
--- @tparam[opt] function callbacks.stdout Function that is called with each line of
---   output on stdout, e.g. `stdout(line)`.
--- @tparam[opt] function callbacks.stderr Function that is called with each line of
---   output on stderr, e.g. `stderr(line)`.
--- @tparam[opt] function callbacks.output_done Function to call when no more output
---   is produced.
--- @tparam[opt] function callbacks.exit Function to call when the spawned process
--- exits. This function gets the exit reason and code as its argument. The
--- reason can be "exit" or "signal". For "exit", the second argument is the exit
--- code. For "signal", the second argument is the signal causing process
--- termination.
+-- @tab callbacks Table containing callbacks that should be invoked on
+--   various conditions.
+-- @tparam[opt] function callbacks.stdout Function that is called with each
+--   line of output on stdout, e.g. `stdout(line)`.
+-- @tparam[opt] function callbacks.stderr Function that is called with each
+--   line of output on stderr, e.g. `stderr(line)`.
+-- @tparam[opt] function callbacks.output_done Function to call when no more
+--   output is produced.
+-- @tparam[opt] function callbacks.exit Function to call when the spawned
+--   process exits. This function gets the exit reason and code as its
+--   arguments.
+--   The reason can be "exit" or "signal".
+--   For "exit", the second argument is the exit code.
+--   For "signal", the second argument is the signal causing process
+--   termination.
 -- @treturn[1] Integer the PID of the forked process.
 -- @treturn[2] string Error message.
 function spawn.with_line_callback(cmd, callbacks)
@@ -219,7 +260,7 @@ function spawn.read_lines(input_stream, line_callback, done_callback, close)
             -- Error
             print("Error in awful.spawn.read_lines:", tostring(length))
             done()
-        elseif #line ~= length then
+        elseif end_of_file(line, length) then
             -- End of file
             done()
         else
@@ -235,28 +276,9 @@ function spawn.read_lines(input_stream, line_callback, done_callback, close)
     start_read()
 end
 
---- Read a program output and return its output as a string.
--- @tparam string cmd The command to run.
--- @treturn string A string with the program output, or the error if one
---   occured.
-function spawn.pread(cmd)
-    if cmd and cmd ~= "" then
-        local f, err = io.popen(cmd, 'r')
-        if f then
-            local s = f:read("*all")
-            f:close()
-            return s
-        else
-            return err
-        end
-    end
-end
-
 capi.awesome.connect_signal("spawn::canceled" , spawn.on_snid_cancel   )
 capi.awesome.connect_signal("spawn::timeout"  , spawn.on_snid_cancel   )
 capi.client.connect_signal ("manage"          , spawn.on_snid_callback )
-
-capi.client.add_signal    ("spawn::completed_with_payload"            )
 
 return setmetatable(spawn, { __call = function(_, ...) return spawn.spawn(...) end })
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

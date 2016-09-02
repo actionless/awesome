@@ -24,7 +24,7 @@ function common.create_buttons(buttons, object)
         local btns = {}
         for _, b in ipairs(buttons) do
             -- Create a proxy button object: it will receive the real
-            -- press and release events, and will propagate them the the
+            -- press and release events, and will propagate them to the
             -- button object the user provided, but with the object as
             -- argument.
             local btn = capi.button { modifiers = b.modifiers, button = b.button }
@@ -60,9 +60,9 @@ function common.list_update(w, buttons, label, data, objects)
         else
             ib = wibox.widget.imagebox()
             tb = wibox.widget.textbox()
-            bgb = wibox.widget.background()
-            tbm = wibox.layout.margin(tb, dpi(4), dpi(4))
-            ibm = wibox.layout.margin(ib, dpi(4))
+            bgb = wibox.container.background()
+            tbm = wibox.container.margin(tb, dpi(4), dpi(4))
+            ibm = wibox.container.margin(ib, dpi(4))
             l = wibox.layout.fixed.horizontal()
 
             -- All of this is added in a fixed widget

@@ -47,10 +47,12 @@ function theme_assets.taglist_squares_unsel(size, fg)
 end
 
 
-function theme_assets.wallpaper(bg, fg, alt_fg)
-    local height = screen[1].workarea.height
-    local width = screen[1].workarea.width
-    local img = cairo.ImageSurface(cairo.Format.ARGB32, width, height)
+function theme_assets.wallpaper(bg, fg, alt_fg, s)
+    s = s or screen.primary
+    local height = s.workarea.height
+    local width = s.workarea.width
+    local img = cairo.RecordingSurface(cairo.Content.COLOR,
+        cairo.Rectangle { x = 0, y = 0, width = width, height = height })
     local cr = cairo.Context(img)
 
     local letter_size = height/10
@@ -156,6 +158,7 @@ end
 function theme_assets.recolor_titlebar_normal(theme, color)
     for _, titlebar_icon in ipairs({
         'titlebar_close_button_normal',
+        'titlebar_minimize_button_normal',
         'titlebar_ontop_button_normal_inactive',
         'titlebar_ontop_button_normal_active',
         'titlebar_sticky_button_normal_inactive',
@@ -164,7 +167,6 @@ function theme_assets.recolor_titlebar_normal(theme, color)
         'titlebar_floating_button_normal_active',
         'titlebar_maximized_button_normal_inactive',
         'titlebar_maximized_button_normal_active',
-        'titlebar_minimize_button_normal_inactive',
     }) do
         theme[titlebar_icon] = recolor_image(theme[titlebar_icon], color)
     end
@@ -174,6 +176,7 @@ end
 function theme_assets.recolor_titlebar_focus(theme, color)
     for _, titlebar_icon in ipairs({
         'titlebar_close_button_focus',
+        'titlebar_minimize_button_focus',
         'titlebar_ontop_button_focus_inactive',
         'titlebar_ontop_button_focus_active',
         'titlebar_sticky_button_focus_inactive',
@@ -182,7 +185,6 @@ function theme_assets.recolor_titlebar_focus(theme, color)
         'titlebar_floating_button_focus_active',
         'titlebar_maximized_button_focus_inactive',
         'titlebar_maximized_button_focus_active',
-        'titlebar_minimize_button_focus_inactive',
     }) do
         theme[titlebar_icon] = recolor_image(theme[titlebar_icon], color)
     end

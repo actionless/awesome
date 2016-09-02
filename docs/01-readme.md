@@ -12,9 +12,17 @@ After extracting the dist tarball, run:
 
 This will create a build directory, run cmake in it and build awesome.
 
-After building is finished, you can install:
+After building is finished, you can either install via `make install`:
 
     make install  # you might need root permissions
+
+or by auto-generating a .deb or .rpm package, for easy removal later on:
+
+    make package
+    
+    sudo dpkg -i awesome-x.y.z.deb
+    # or
+    sudo rpm -Uvh awesome-x.y.z.rpm
 
 ## Running awesome
 
@@ -47,11 +55,27 @@ If awesome does not start or the configuration file is not producing the
 desired results the user should examine this file to gain insight into the
 problem.
 
+### Debugging tips
+
+You can call `awesome` with `gdb` like this:
+
+    DISPLAY=:2 gdb awesome
+
+Then in gdb set any args and run it:
+
+    (gdb) set arg --replace
+    (gdb) run
+
+Inside gdb you can use the following to print the current Lua stack traceback:
+
+    (gdb) print luaL_dostring(globalconf.L.real_L_dont_use_directly, "print(debug.traceback())")
+
 ## Reporting issues
 
 Please report any issues you may find on [our bugtracker](https://github.com/awesomeWM/awesome/issues).
 You can submit pull requests on the [github repository](https://github.com/awesomeWM/awesome).
-Please read the @{02-contributing.md} guide for any coding, documentation or patch guidelines.
+Please read the [contributing guide](https://github.com/awesomeWM/awesome/blob/master/docs/02-contributing.md)
+for any coding, documentation or patch guidelines.
 
 ## Status
 [![Build Status](https://travis-ci.org/awesomeWM/awesome.svg?branch=master)](https://travis-ci.org/awesomeWM/awesome)

@@ -8,10 +8,9 @@
 ---------------------------------------------------------------------------
 
 local setmetatable = setmetatable
-local capi = { screen = screen }
+local capi = { screen = screen, tag = tag }
 local layout = require("awful.layout")
 local tooltip = require("awful.tooltip")
-local tag = require("awful.tag")
 local beautiful = require("beautiful")
 local imagebox = require("wibox.widget.imagebox")
 
@@ -31,7 +30,7 @@ local function update(w, screen)
 end
 
 local function update_from_tag(t)
-    local screen = get_screen(tag.getscreen(t))
+    local screen = get_screen(t.screen)
     local w = boxes[screen]
     if w then
         update(w, screen)
@@ -47,9 +46,9 @@ function layoutbox.new(screen)
 
     -- Do we already have the update callbacks registered?
     if boxes == nil then
-        boxes = setmetatable({}, { __mode = "v" })
-        tag.attached_connect_signal(nil, "property::selected", update_from_tag)
-        tag.attached_connect_signal(nil, "property::layout", update_from_tag)
+        boxes = setmetatable({}, { __mode = "kv" })
+        capi.tag.connect_signal("property::selected", update_from_tag)
+        capi.tag.connect_signal("property::layout", update_from_tag)
         layoutbox.boxes = boxes
     end
 
@@ -57,7 +56,7 @@ function layoutbox.new(screen)
     local w = boxes[screen]
     if not w then
         w = imagebox()
-        w._layoutbox_tooltip = tooltip({ objects = {w}, delay_show = 1 })
+        w._layoutbox_tooltip = tooltip {objects = {w}, delay_show = 1}
 
         update(w, screen)
         boxes[screen] = w

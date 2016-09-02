@@ -175,7 +175,6 @@ int luaA_object_emit_signal_simple(lua_State *);
         lua_setmetatable(L, -2);                                               \
         luaA_setuservalue(L, -2);                                              \
         lua_pushvalue(L, -1);                                                  \
-        p->signals.inherits_from = &(lua_class).signals;                       \
         luaA_class_emit_signal(L, &(lua_class), "new", 1);                     \
         return p;                                                              \
     }
@@ -191,6 +190,16 @@ int luaA_object_emit_signal_simple(lua_State *);
     static int \
     luaA_##pfx##_get_##field(lua_State *L, type *object) \
     { \
+        pusher(L, object->field); \
+        return 1; \
+    }
+
+#define LUA_OBJECT_EXPORT_OPTIONAL_PROPERTY(pfx, type, field, pusher, empty_value) \
+    static int \
+    luaA_##pfx##_get_##field(lua_State *L, type *object) \
+    { \
+        if (object->field == empty_value) \
+            return 0; \
         pusher(L, object->field); \
         return 1; \
     }

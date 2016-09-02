@@ -143,8 +143,8 @@ local suspended = false
 -- @field id Unique notification id based on a counter
 -- @table notifications
 naughty.notifications = { suspended = { } }
-for s = 1, capi.screen.count() do
-    naughty.notifications[get_screen(s)] = {
+screen.connect_for_each_screen(function(s)
+    naughty.notifications[s] = {
         top_left = {},
         top_middle = {},
         top_right = {},
@@ -152,7 +152,17 @@ for s = 1, capi.screen.count() do
         bottom_middle = {},
         bottom_right = {},
     }
-end
+end)
+
+capi.screen.connect_signal("removed", function(scr)
+    -- Destroy all notifications on this screen
+    for _, list in pairs(naughty.notifications[scr]) do
+        while #list > 0 do
+            naughty.destroy(list[1])
+        end
+    end
+    naughty.notifications[scr] = nil
+end)
 
 --- Notification state
 function naughty.is_suspended()
@@ -294,8 +304,7 @@ end
 -- @return notification object if it was found, nil otherwise
 function naughty.getById(id)
     -- iterate the notifications to get the notfications with the correct ID
-    for s = 1, capi.screen.count() do
-        s = get_screen(s)
+    for s in pairs(naughty.notifications) do
         for p in pairs(naughty.notifications[s]) do
             for _, notification in pairs(naughty.notifications[s][p]) do
                 if notification.id == id then
@@ -422,7 +431,8 @@ end
 -- @tparam[opt] table args.actions Mapping that maps a string to a callback when this
 --   action is selected.
 -- @usage naughty.notify({ title = "Achtung!", text = "You're idling", timeout = 0 })
--- @return The notification object
+-- @treturn ?table The notification object, or nil in case a notification was
+--   not displayed.
 function naughty.notify(args)
     if naughty.config.notify_callback then
         args = naughty.config.notify_callback(args)
@@ -438,6 +448,12 @@ function naughty.notify(args)
     local text = args.text or preset.text
     local title = args.title or preset.title
     local s = get_screen(args.screen or preset.screen or screen.focused())
+    if not s then
+        local err = "naughty.notify: there is no screen available to display the following notification:"
+        err = string.format("%s title='%s' text='%s'", err, tostring(title or ""), tostring(text or ""))
+        require("gears.debug").print_warning(err)
+        return
+    end
     local ontop = args.ontop or preset.ontop
     local width = args.width or preset.width
     local height = args.height or preset.height
@@ -506,7 +522,7 @@ function naughty.notify(args)
 
     -- create textbox
     local textbox = wibox.widget.textbox()
-    local marginbox = wibox.layout.margin()
+    local marginbox = wibox.container.margin()
     marginbox:set_margins(margin)
     marginbox:set_widget(textbox)
     textbox:set_valign("middle")
@@ -522,12 +538,12 @@ function naughty.notify(args)
     if actions then
         for action, callback in pairs(actions) do
             local actiontextbox = wibox.widget.textbox()
-            local actionmarginbox = wibox.layout.margin()
+            local actionmarginbox = wibox.container.margin()
             actionmarginbox:set_margins(margin)
             actionmarginbox:set_widget(actiontextbox)
             actiontextbox:set_valign("middle")
             actiontextbox:set_font(font)
-            actiontextbox:set_markup(string.format('<b>%s</b>', action))
+            actiontextbox:set_markup(string.format('☛ <u>%s</u>', action))
             -- calculate the height and width
             local w, h = actiontextbox:get_preferred_size(s)
             local action_height = h + 2 * margin
@@ -566,7 +582,7 @@ function naughty.notify(args)
         -- if we have an icon, use it
         if icon then
             iconbox = wibox.widget.imagebox()
-            iconmargin = wibox.layout.margin(iconbox, margin, margin, margin, margin)
+            iconmargin = wibox.container.margin(iconbox, margin, margin, margin, margin)
             if icon_size then
                 local scaled = cairo.ImageSurface(cairo.Format.ARGB32, icon_size, icon_size)
                 local cr = cairo.Context(scaled)

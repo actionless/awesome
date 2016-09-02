@@ -228,6 +228,12 @@ ewmh_init(void)
     luaA_class_connect_signal(L, &client_class, "property::titlebar_left" , ewmh_client_update_frame_extents);
     luaA_class_connect_signal(L, &client_class, "property::border_width" , ewmh_client_update_frame_extents);
     luaA_class_connect_signal(L, &client_class, "manage", ewmh_client_update_frame_extents);
+    /* NET_CURRENT_DESKTOP handling */
+    luaA_class_connect_signal(L, &client_class, "focus", ewmh_update_net_current_desktop);
+    luaA_class_connect_signal(L, &client_class, "unfocus", ewmh_update_net_current_desktop);
+    luaA_class_connect_signal(L, &client_class, "tagged", ewmh_update_net_current_desktop);
+    luaA_class_connect_signal(L, &client_class, "untagged", ewmh_update_net_current_desktop);
+    luaA_class_connect_signal(L, &tag_class, "property::selected", ewmh_update_net_current_desktop);
 }
 
 /** Set the client list in stacking order, bottom to top.
@@ -256,14 +262,15 @@ ewmh_update_net_numbers_of_desktop(void)
 			_NET_NUMBER_OF_DESKTOPS, XCB_ATOM_CARDINAL, 32, 1, &count);
 }
 
-void
-ewmh_update_net_current_desktop(void)
+int
+ewmh_update_net_current_desktop(lua_State *L)
 {
-    uint32_t idx = tags_get_first_selected_index();
+    uint32_t idx = tags_get_current_or_first_selected_index();
 
     xcb_change_property(globalconf.connection, XCB_PROP_MODE_REPLACE,
                         globalconf.screen->root,
                         _NET_CURRENT_DESKTOP, XCB_ATOM_CARDINAL, 32, 1, &idx);
+    return 0;
 }
 
 void
@@ -399,7 +406,7 @@ ewmh_process_desktop(client_t *c, uint32_t desktop)
     if(desktop == 0xffffffff)
     {
         luaA_object_push(L, c);
-        lua_pushnil(L);
+        lua_pushboolean(L, true);
         luaA_object_emit_signal(L, -2, "request::tag", 1);
         /* Pop the client, arguments are already popped */
         lua_pop(L, 1);
@@ -574,6 +581,7 @@ ewmh_client_check_hints(client_t *c)
     reply = xcb_get_property_reply(globalconf.connection, c2, NULL);
     if(reply && (data = xcb_get_property_value(reply)))
     {
+        c->has_NET_WM_WINDOW_TYPE = true;
         state = (xcb_atom_t *) data;
         for(int i = 0; i < xcb_get_property_value_length(reply) / ssizeof(xcb_atom_t); i++)
             if(state[i] == _NET_WM_WINDOW_TYPE_DESKTOP)
@@ -590,7 +598,8 @@ ewmh_client_check_hints(client_t *c)
                 c->type = MAX(c->type, WINDOW_TYPE_TOOLBAR);
             else if(state[i] == _NET_WM_WINDOW_TYPE_UTILITY)
                 c->type = MAX(c->type, WINDOW_TYPE_UTILITY);
-    }
+    } else
+        c->has_NET_WM_WINDOW_TYPE = false;
 
     p_delete(&reply);
 }

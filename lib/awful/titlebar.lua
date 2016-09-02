@@ -64,11 +64,18 @@ end
 
 --- Get a client's titlebar
 -- @class function
--- @param c The client for which a titlebar is wanted.
--- @param[opt] args A table with extra arguments for the titlebar. The
--- "size" is the height of the titlebar. Available "position" values are top,
--- left, right and bottom. Additionally, the foreground and background colors
--- can be configured via e.g. "bg_normal" and "bg_focus".
+-- @tparam client c The client for which a titlebar is wanted.
+-- @tparam[opt={}] table args A table with extra arguments for the titlebar. 
+-- @tparam[opt=font.height*1.5] number args.size The height of the titlebar. 
+-- @tparam[opt=top] string args.position" values are `top`,
+-- `left`, `right` and `bottom`.
+-- @tparam[opt=top] string args.bg_normal
+-- @tparam[opt=top] string args.bg_focus
+-- @tparam[opt=top] string args.bgimage_normal
+-- @tparam[opt=top] string args.bgimage_focus
+-- @tparam[opt=top] string args.fg_normal
+-- @tparam[opt=top] string args.fg_focus
+-- @tparam[opt=top] string args.font
 -- @name titlebar
 local function new(c, args)
     args = args or {}
@@ -204,8 +211,8 @@ function titlebar.widget.button(c, name, selector, action)
     local ret = imagebox()
 
     if titlebar.enable_tooltip then
-        ret.tooltip = atooltip({ objects = {ret}, delay_show = 1 })
-        ret.tooltip:set_text(name)
+        ret._private.tooltip = atooltip({ objects = {ret}, delay_show = 1 })
+        ret._private.tooltip:set_text(name)
     end
 
     local function update()
@@ -256,7 +263,7 @@ end
 --- Create a new float button for a client.
 -- @param c The client for which the button is wanted.
 function titlebar.widget.floatingbutton(c)
-    local widget = titlebar.widget.button(c, "floating", aclient.floating.get, aclient.floating.toggle)
+    local widget = titlebar.widget.button(c, "floating", aclient.object.get_floating, aclient.floating.toggle)
     c:connect_signal("property::floating", widget.update)
     return widget
 end
@@ -278,7 +285,7 @@ end
 --- Create a new minimize button for a client.
 -- @param c The client for which the button is wanted.
 function titlebar.widget.minimizebutton(c)
-    local widget = titlebar.widget.button(c, "minimize", function(cl) return cl.minimized end, function(cl) cl.minimized = not cl.minimized end)
+    local widget = titlebar.widget.button(c, "minimize", function() return "" end, function(cl) cl.minimized = not cl.minimized end)
     c:connect_signal("property::minimized", widget.update)
     return widget
 end

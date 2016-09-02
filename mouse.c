@@ -19,7 +19,42 @@
  *
  */
 
-/** awesome mouse API
+/** awesome mouse API.
+ *
+ * The mouse buttons are represented as index. The common ones are:
+ *
+ * ![Client geometry](../images/mouse.svg)
+ *
+ * It is possible to be notified of mouse events by connecting to various
+ * `client`, `widget`s and `wibox` signals:
+ *
+ *  * `mouse::enter`
+ *  * `mouse::leave`
+ *  * `mouse::press`
+ *  * `mouse::release`
+ *  * `mouse::move`
+ *
+ * It is also possible to add generic mouse button callbacks for `client`s,
+ * `wiboxe`s and the `root` window. Those are set in the default `rc.lua` as such:
+ *
+ * **root**:
+ *
+ *    root.buttons(awful.util.table.join(
+ *        awful.button({ }, 3, function () mymainmenu:toggle() end),
+ *        awful.button({ }, 4, awful.tag.viewnext),
+ *        awful.button({ }, 5, awful.tag.viewprev)
+ *    ))
+ *
+ * **client**:
+ *
+ *    clientbuttons = awful.util.table.join(
+ *        awful.button({ }, 1, function (c) client.focus = c; c:raise() end),
+ *        awful.button({ modkey }, 1, awful.mouse.client.move),
+ *        awful.button({ modkey }, 3, awful.mouse.client.resize)
+ *    )
+ *
+ * See also `mousegrabber`
+ *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
  * @release @AWESOME_VERSION@
@@ -27,24 +62,22 @@
  */
 
 #include "mouse.h"
+#include "math.h"
 #include "common/util.h"
+#include "common/xutil.h"
+#include "common/luaclass.h"
 #include "globalconf.h"
 #include "objects/client.h"
 #include "objects/drawin.h"
 #include "objects/screen.h"
 
-/** Mouse library.
- *
- * @field screen Mouse screen number.
- * @table mouse
- */
+static int miss_index_handler    = LUA_REFNIL;
+static int miss_newindex_handler = LUA_REFNIL;
 
-/** A table with X and Y coordinates.
- * @field x X coordinate.
- * @field y Y coordinate.
- * @field buttons Table containing the status of buttons, e.g. field [1] is true
- *        when button 1 is pressed.
- * @table coords_table
+/**
+ * The `screen` under the cursor
+ * @property screen
+ * @param screen
  */
 
 /** Get the pointer position.
@@ -104,10 +137,43 @@ mouse_query_pointer_root(int16_t *x, int16_t *y, xcb_window_t *child, uint16_t *
  * \param y Y-coordinate inside window.
  */
 static inline void
-mouse_warp_pointer(xcb_window_t window, int x, int y)
+mouse_warp_pointer(xcb_window_t window, int16_t x, int16_t y)
 {
     xcb_warp_pointer(globalconf.connection, XCB_NONE, window,
                      0, 0, 0, 0, x, y);
+}
+
+/**
+ * Allow the a Lua handler to be implemented for custom properties and
+ * functions.
+ * \param L A lua state
+ * \param handler A function on the LUA_REGISTRYINDEX
+ */
+static int
+luaA_mouse_call_handler(lua_State *L, int handler)
+{
+    int nargs = lua_gettop(L);
+
+    /* Push error handling function and move it before args */
+    lua_pushcfunction(L, luaA_dofunction_error);
+    lua_insert(L, - nargs - 1);
+    int error_func_pos = 1;
+
+    /* push function and move it before args */
+    lua_rawgeti(L, LUA_REGISTRYINDEX, handler);
+    lua_insert(L, - nargs - 1);
+
+    if(lua_pcall(L, nargs, LUA_MULTRET, error_func_pos))
+    {
+        warn("%s", lua_tostring(L, -1));
+        /* Remove error function and error string */
+        lua_pop(L, 2);
+        return 0;
+    }
+    /* Remove error function */
+    lua_remove(L, error_func_pos);
+
+    return lua_gettop(L);
 }
 
 /** Mouse library.
@@ -115,7 +181,7 @@ mouse_warp_pointer(xcb_window_t window, int x, int y)
  * \return The number of elements pushed on stack.
  * \luastack
  * \lfield coords Mouse coordinates.
- * \lfield screen Mouse screen number.
+ * \lfield screen Mouse screen.
  */
 static int
 luaA_mouse_index(lua_State *L)
@@ -124,8 +190,13 @@ luaA_mouse_index(lua_State *L)
     int16_t mouse_x, mouse_y;
 
     /* attr is not "screen"?! */
-    if (A_STRNEQ(attr, "screen"))
-        return luaA_default_index(L);
+    if (A_STRNEQ(attr, "screen")) {
+        if (miss_index_handler != LUA_REFNIL) {
+            return luaA_mouse_call_handler(L, miss_index_handler);
+        }
+        else
+            return luaA_default_index(L);
+    }
 
     if (!mouse_query_pointer_root(&mouse_x, &mouse_y, NULL, NULL))
     {
@@ -133,13 +204,13 @@ luaA_mouse_index(lua_State *L)
          * having lots of lua errors in this case.
          */
         if (globalconf.focus.client)
-            luaA_pushscreen(L, globalconf.focus.client->screen);
+            luaA_object_push(L, globalconf.focus.client->screen);
         else
-            luaA_pushscreen(L, screen_get_primary());
+            luaA_object_push(L, screen_get_primary());
         return 1;
     }
 
-    luaA_pushscreen(L, screen_getbycoord(mouse_x, mouse_y));
+    luaA_object_push(L, screen_getbycoord(mouse_x, mouse_y));
     return 1;
 }
 
@@ -153,8 +224,14 @@ luaA_mouse_newindex(lua_State *L)
     const char *attr = luaL_checkstring(L, 2);
     screen_t *screen;
 
-    if (A_STRNEQ(attr, "screen"))
-        return luaA_default_newindex(L);
+    if (A_STRNEQ(attr, "screen")) {
+        /* Call the lua mouse property handler */
+        if (miss_newindex_handler != LUA_REFNIL) {
+            return luaA_mouse_call_handler(L, miss_newindex_handler);
+        }
+        else
+            return luaA_default_newindex(L);
+    }
 
     screen = luaA_checkscreen(L, 3);
     mouse_warp_pointer(globalconf.screen->root, screen->geometry.x, screen->geometry.y);
@@ -192,15 +269,7 @@ luaA_mouse_pushstatus(lua_State *L, int x, int y, uint16_t mask)
     return 1;
 }
 
-/** Get or set the mouse coords.
- *
- * @tparam coords_table coords_table None or a table with x and y keys as mouse
- *  coordinates.
- * @tparam boolean silent Disable mouse::enter or mouse::leave events that
- *  could be triggered by the pointer when moving.
- * @treturn coords_table A table with mouse coordinates.
- * @function coords
- */
+/* documented in lib/awful/mouse/init.lua */
 static int
 luaA_mouse_coords(lua_State *L)
 {
@@ -216,8 +285,8 @@ luaA_mouse_coords(lua_State *L)
         if(!mouse_query_pointer_root(&mouse_x, &mouse_y, NULL, &mask))
             return 0;
 
-        x = luaA_getopt_number(L, 1, "x", mouse_x);
-        y = luaA_getopt_number(L, 1, "y", mouse_y);
+        x = round(luaA_getopt_number_range(L, 1, "x", mouse_x, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
+        y = round(luaA_getopt_number_range(L, 1, "y", mouse_y, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
 
         if(ignore_enter_notify)
             client_ignore_enterleave_events();
@@ -262,12 +331,32 @@ luaA_mouse_object_under_pointer(lua_State *L)
     return 0;
 }
 
+/**
+ * Add a custom property handler (getter).
+ */
+static int
+luaA_mouse_set_index_miss_handler(lua_State *L)
+{
+    return luaA_registerfct(L, 1, &miss_index_handler);
+}
+
+/**
+ * Add a custom property handler (setter).
+ */
+static int
+luaA_mouse_set_newindex_miss_handler(lua_State *L)
+{
+    return luaA_registerfct(L, 1, &miss_newindex_handler);
+}
+
 const struct luaL_Reg awesome_mouse_methods[] =
 {
     { "__index", luaA_mouse_index },
     { "__newindex", luaA_mouse_newindex },
     { "coords", luaA_mouse_coords },
     { "object_under_pointer", luaA_mouse_object_under_pointer },
+    { "set_index_miss_handler", luaA_mouse_set_index_miss_handler},
+    { "set_newindex_miss_handler", luaA_mouse_set_newindex_miss_handler},
     { NULL, NULL }
 };
 const struct luaL_Reg awesome_mouse_meta[] =

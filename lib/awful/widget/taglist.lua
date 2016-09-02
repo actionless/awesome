@@ -111,8 +111,8 @@ function taglist.taglist_label(t, args)
         text = text .. "</span>"
     end
     if not taglist_disable_icon then
-        if tag.geticon(t) then
-            icon = surface.load(tag.geticon(t))
+        if t.icon then
+            icon = surface.load(t.icon)
         end
     end
 
@@ -121,7 +121,7 @@ end
 
 local function taglist_update(s, w, buttons, filter, data, style, update_function)
     local tags = {}
-    for _, t in ipairs(tag.gettags(s)) do
+    for _, t in ipairs(s.tags) do
         if not tag.getproperty(t, "hide") and filter(t) then
             table.insert(tags, t)
         end
@@ -168,14 +168,16 @@ function taglist.new(screen, filter, buttons, style, update_function, base_widge
         -- Add a delayed callback for the first update.
         if not queued_update[screen] then
             timer.delayed_call(function()
-                taglist_update(screen, w, buttons, filter, data, style, uf)
+                if screen.valid then
+                    taglist_update(screen, w, buttons, filter, data, style, uf)
+                end
                 queued_update[screen] = false
             end)
             queued_update[screen] = true
         end
     end
     if instances == nil then
-        instances = {}
+        instances = setmetatable({}, { __mode = "k" })
         local function u(s)
             local i = instances[get_screen(s)]
             if i then
@@ -185,7 +187,7 @@ function taglist.new(screen, filter, buttons, style, update_function, base_widge
             end
         end
         local uc = function (c) return u(c.screen) end
-        local ut = function (t) return u(tag.getscreen(t)) end
+        local ut = function (t) return u(t.screen) end
         capi.client.connect_signal("focus", uc)
         capi.client.connect_signal("unfocus", uc)
         tag.attached_connect_signal(nil, "property::selected", ut)
@@ -203,6 +205,9 @@ function taglist.new(screen, filter, buttons, style, update_function, base_widge
         capi.client.connect_signal("tagged", uc)
         capi.client.connect_signal("untagged", uc)
         capi.client.connect_signal("unmanage", uc)
+        capi.screen.connect_signal("removed", function(s)
+            instances[get_screen(s)] = nil
+        end)
     end
     w._do_taglist_update()
     local list = instances[screen]

@@ -9,26 +9,16 @@ local cairo = require("lgi").cairo
 local color = require("gears.color")
 local surface = require("gears.surface")
 local timer = require("gears.timer")
+local root = root
 
 local wallpaper = { mt = {} }
 
--- The size of the root window
-local root_geom
-do
-    local geom = screen[1].geometry
-    root_geom = {
-        x = 0, y = 0,
-        width = geom.x + geom.width,
-        height = geom.y + geom.height
-    }
-    for s = 1, screen.count() do
-        local g = screen[s].geometry
-        root_geom.width = math.max(root_geom.width, g.x + g.width)
-        root_geom.height = math.max(root_geom.height, g.y + g.height)
-    end
+local function root_geometry()
+    local width, height = root.size()
+    return { x = 0, y = 0, width = width, height = height }
 end
 
--- A cairo surface that we still want to set as the wallpaper
+-- Information about a pending wallpaper change, see prepare_context()
 local pending_wallpaper = nil
 
 --- Prepare the needed state for setting a wallpaper.
@@ -39,34 +29,48 @@ local pending_wallpaper = nil
 -- @return[1] The available geometry (table with entries width and height)
 -- @return[1] A cairo context that the wallpaper should be drawn to
 function wallpaper.prepare_context(s)
-    local geom = s and screen[s].geometry or root_geom
-    local cr
+    local root_width, root_height = root.size()
+    local geom = s and screen[s].geometry or root_geometry()
+    local source, target, cr
 
     if not pending_wallpaper then
         -- Prepare a pending wallpaper
-        local wp = surface(root.wallpaper())
-
-        pending_wallpaper = wp:create_similar(cairo.Content.COLOR, root_geom.width, root_geom.height)
-
-        -- Copy the old wallpaper to the new one
-        cr = cairo.Context(pending_wallpaper)
-        cr:save()
-        cr.operator = cairo.Operator.SOURCE
-        cr:set_source_surface(wp, 0, 0)
-        cr:paint()
-        cr:restore()
+        source = surface(root.wallpaper())
+        target = source:create_similar(cairo.Content.COLOR, root_width, root_height)
 
         -- Set the wallpaper (delayed)
         timer.delayed_call(function()
             local paper = pending_wallpaper
             pending_wallpaper = nil
-            wallpaper.set(paper)
-            paper:finish()
+            wallpaper.set(paper.surface)
+            paper.surface:finish()
         end)
+    elseif root_width > pending_wallpaper.width or root_height > pending_wallpaper.height then
+        -- The root window was resized while a wallpaper is pending
+        source = pending_wallpaper.surface
+        target = source:create_similar(cairo.Content.COLOR, root_width, root_height)
     else
         -- Draw to the already-pending wallpaper
-        cr = cairo.Context(pending_wallpaper)
+        source = nil
+        target = pending_wallpaper.surface
     end
+
+    cr = cairo.Context(target)
+
+    if source then
+        -- Copy the old wallpaper to the new one
+        cr:save()
+        cr.operator = cairo.Operator.SOURCE
+        cr:set_source_surface(source, 0, 0)
+        cr:paint()
+        cr:restore()
+    end
+
+    pending_wallpaper = {
+        surface = target,
+        width = root_width,
+        height = root_height
+    }
 
     -- Only draw to the selected area
     cr:translate(geom.x, geom.y)

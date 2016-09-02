@@ -82,8 +82,6 @@ typedef struct
     screen_array_t screens;
     /** The primary screen, access through screen_get_primary() */
     screen_t *primary_screen;
-    /** Do we have RandR 1.3 or newer? */
-    bool have_randr_13;
     /** Root window key bindings */
     key_array_t keys;
     /** Root window mouse bindings */
@@ -92,10 +90,19 @@ typedef struct
     xcb_atom_t selection_atom;
     /** Window owning the WM_Sn selection */
     xcb_window_t selection_owner_window;
+    /** Do we have RandR 1.3 or newer? */
+    bool have_randr_13;
+    /** Do we have RandR 1.5 or newer? */
+    bool have_randr_15;
+    /** Do we have a RandR screen update pending? */
+    bool screen_need_refresh;
     /** Check for XTest extension */
     bool have_xtest;
     /** Check for SHAPE extension */
     bool have_shape;
+    uint8_t event_base_shape;
+    uint8_t event_base_xkb;
+    uint8_t event_base_randr;
     /** Clients list */
     client_array_t clients;
     /** Embedded windows */
@@ -171,6 +178,8 @@ typedef struct
     struct xkb_state *xkb_state;
     /** The preferred size of client icons for this screen */
     uint32_t preferred_icon_size;
+    /** Cached wallpaper information */
+    cairo_surface_t *wallpaper;
 } awesome_t;
 
 extern awesome_t globalconf;
@@ -181,6 +190,9 @@ extern awesome_t globalconf;
 static inline lua_State *globalconf_get_lua_State(void) {
     return globalconf.L.real_L_dont_use_directly;
 }
+
+/* Defined in root.c */
+void root_update_wallpaper(void);
 
 #endif
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

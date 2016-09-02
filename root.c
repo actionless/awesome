@@ -30,8 +30,11 @@
 
 #include "common/atoms.h"
 #include "common/xcursor.h"
+#include "common/xutil.h"
 #include "objects/button.h"
 #include "xwindow.h"
+
+#include "math.h"
 
 #include <xcb/xtest.h>
 #include <xcb/xcb_aux.h>
@@ -74,6 +77,7 @@ root_set_wallpaper_pixmap(xcb_connection_t *c, xcb_pixmap_t p)
 static bool
 root_set_wallpaper(cairo_pattern_t *pattern)
 {
+    lua_State *L = globalconf_get_lua_State();
     xcb_connection_t *c = xcb_connect(NULL, NULL);
     xcb_pixmap_t p = xcb_generate_id(c);
     /* globalconf.connection should be connected to the same X11 server, so we
@@ -107,20 +111,87 @@ root_set_wallpaper(cairo_pattern_t *pattern)
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
     cairo_paint(cr);
     cairo_destroy(cr);
-    cairo_surface_finish(surface);
-    cairo_surface_destroy(surface);
+    cairo_surface_flush(surface);
     xcb_aux_sync(globalconf.connection);
 
+    /* Change the wallpaper, without sending us a PropertyNotify event */
+    xcb_grab_server(globalconf.connection);
+    xcb_change_window_attributes(globalconf.connection,
+                                 globalconf.screen->root,
+                                 XCB_CW_EVENT_MASK,
+                                 (uint32_t[]) { 0 });
     root_set_wallpaper_pixmap(c, p);
+    xcb_change_window_attributes(globalconf.connection,
+                                 globalconf.screen->root,
+                                 XCB_CW_EVENT_MASK,
+                                 ROOT_WINDOW_EVENT_MASK);
+    xcb_ungrab_server(globalconf.connection);
 
     /* Make sure our pixmap is not destroyed when we disconnect. */
     xcb_set_close_down_mode(c, XCB_CLOSE_DOWN_RETAIN_PERMANENT);
+
+    /* Tell Lua that the wallpaper changed */
+    cairo_surface_destroy(globalconf.wallpaper);
+    globalconf.wallpaper = surface;
+    signal_object_emit(L, &global_signals, "wallpaper_changed", 0);
 
     result = true;
 disconnect:
     xcb_flush(c);
     xcb_disconnect(c);
     return result;
+}
+
+void
+root_update_wallpaper(void)
+{
+    xcb_get_property_cookie_t prop_c;
+    xcb_get_property_reply_t *prop_r;
+    xcb_get_geometry_cookie_t geom_c;
+    xcb_get_geometry_reply_t *geom_r;
+    xcb_pixmap_t *rootpix;
+
+    cairo_surface_destroy(globalconf.wallpaper);
+    globalconf.wallpaper = NULL;
+
+    prop_c = xcb_get_property_unchecked(globalconf.connection, false,
+            globalconf.screen->root, _XROOTPMAP_ID, XCB_ATOM_PIXMAP, 0, 1);
+    prop_r = xcb_get_property_reply(globalconf.connection, prop_c, NULL);
+
+    if (!prop_r || !prop_r->value_len)
+    {
+        p_delete(&prop_r);
+        return;
+    }
+
+    rootpix = xcb_get_property_value(prop_r);
+    if (!rootpix)
+    {
+        p_delete(&prop_r);
+        return;
+    }
+
+    geom_c = xcb_get_geometry_unchecked(globalconf.connection, *rootpix);
+    geom_r = xcb_get_geometry_reply(globalconf.connection, geom_c, NULL);
+    if (!geom_r)
+    {
+        p_delete(&prop_r);
+        return;
+    }
+
+    /* Only the default visual makes sense, so just the default depth */
+    if (geom_r->depth != draw_visual_depth(globalconf.screen, globalconf.default_visual->visual_id))
+        warn("Got a pixmap with depth %d, but the default depth is %d, continuing anyway",
+                geom_r->depth, draw_visual_depth(globalconf.screen, globalconf.default_visual->visual_id));
+
+    globalconf.wallpaper = cairo_xcb_surface_create(globalconf.connection,
+                                                    *rootpix,
+                                                    globalconf.default_visual,
+                                                    geom_r->width,
+                                                    geom_r->height);
+
+    p_delete(&prop_r);
+    p_delete(&geom_r);
 }
 
 static xcb_keycode_t
@@ -197,8 +268,8 @@ luaA_root_fake_input(lua_State *L)
     {
         type = XCB_MOTION_NOTIFY;
         detail = luaA_checkboolean(L, 2); /* relative to the current position or not */
-        x = luaL_checkinteger(L, 3);
-        y = luaL_checkinteger(L, 4);
+        x = round(luaA_checknumber_range(L, 3, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
+        y = round(luaA_checknumber_range(L, 4, MIN_X11_COORDINATE, MAX_X11_COORDINATE));
     }
     else
         return 0;
@@ -344,13 +415,6 @@ luaA_root_drawins(lua_State *L)
 static int
 luaA_root_wallpaper(lua_State *L)
 {
-    xcb_get_property_cookie_t prop_c;
-    xcb_get_property_reply_t *prop_r;
-    xcb_get_geometry_cookie_t geom_c;
-    xcb_get_geometry_reply_t *geom_r;
-    xcb_pixmap_t *rootpix;
-    cairo_surface_t *surface;
-
     if(lua_gettop(L) == 1)
     {
         cairo_pattern_t *pattern = (cairo_pattern_t *)lua_touserdata(L, -1);
@@ -359,44 +423,26 @@ luaA_root_wallpaper(lua_State *L)
         return 1;
     }
 
-    prop_c = xcb_get_property_unchecked(globalconf.connection, false,
-            globalconf.screen->root, _XROOTPMAP_ID, XCB_ATOM_PIXMAP, 0, 1);
-    prop_r = xcb_get_property_reply(globalconf.connection, prop_c, NULL);
-
-    if (!prop_r || !prop_r->value_len)
-    {
-        p_delete(&prop_r);
+    if(globalconf.wallpaper == NULL)
         return 0;
-    }
-
-    rootpix = xcb_get_property_value(prop_r);
-    if (!rootpix)
-    {
-        p_delete(&prop_r);
-        return 0;
-    }
-
-    geom_c = xcb_get_geometry_unchecked(globalconf.connection, *rootpix);
-    geom_r = xcb_get_geometry_reply(globalconf.connection, geom_c, NULL);
-    if (!geom_r)
-    {
-        p_delete(&prop_r);
-        return 0;
-    }
-
-    /* Only the default visual makes sense, so just the default depth */
-    if (geom_r->depth != draw_visual_depth(globalconf.screen, globalconf.default_visual->visual_id))
-        warn("Got a pixmap with depth %d, but the default depth is %d, continuing anyway",
-                geom_r->depth, draw_visual_depth(globalconf.screen, globalconf.default_visual->visual_id));
-
-    surface = cairo_xcb_surface_create(globalconf.connection, *rootpix, globalconf.default_visual,
-                                       geom_r->width, geom_r->height);
 
     /* lua has to make sure this surface gets destroyed */
-    lua_pushlightuserdata(L, surface);
-    p_delete(&prop_r);
-    p_delete(&geom_r);
+    lua_pushlightuserdata(L, cairo_surface_reference(globalconf.wallpaper));
     return 1;
+}
+
+/** Get the size of the root window.
+ *
+ * @return Width of the root window.
+ * @return height of the root window.
+ * @function size
+ */
+static int
+luaA_root_size(lua_State *L)
+{
+    lua_pushinteger(L, globalconf.screen->width_in_pixels);
+    lua_pushinteger(L, globalconf.screen->height_in_pixels);
+    return 2;
 }
 
 /** Get the attached tags.
@@ -424,6 +470,7 @@ const struct luaL_Reg awesome_root_lib[] =
     { "fake_input", luaA_root_fake_input },
     { "drawins", luaA_root_drawins },
     { "wallpaper", luaA_root_wallpaper },
+    { "size", luaA_root_size },
     { "tags", luaA_root_tags },
     { "__index", luaA_default_index },
     { "__newindex", luaA_default_newindex },
