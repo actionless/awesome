@@ -13,10 +13,13 @@ branches=(
 	# psychon
 
 	# elv13
-	#'upstream_shape_api_p4'
+    'upstream_shape_api_p4'
 
 	# other
-	'upstream_shape_api_p4-actionless'
+	#'upstream_shape_api_p4-actionless'
+
+    # PR
+    'pr/1066'
 )
 
 cd ~/projects
