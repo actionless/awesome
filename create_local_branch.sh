@@ -14,13 +14,13 @@ branches=(
 
 	# elv13
     #'upstream_shape_api_p4'
-    #'pr/1044'
+    'pr/1044'
 
 	# other
 	#'upstream_shape_api_p4-actionless'
 
     # PR
-    'pr/596'
+    #'pr/596'
 )
 
 cd ~/projects
