@@ -13,13 +13,14 @@ branches=(
 	# psychon
 
 	# elv13
-    'upstream_shape_api_p4'
+    #'upstream_shape_api_p4'
+    #'pr/1044'
 
 	# other
 	#'upstream_shape_api_p4-actionless'
 
     # PR
-    'pr/1066'
+    'pr/596'
 )
 
 cd ~/projects
@@ -40,6 +41,8 @@ git checkout -b local
 for branch in ${branches[@]}; do
 	echo "======================"
 	echo " merge $branch "
+    git checkout $branch
+    git checkout local
 	git merge $branch -m "merge $branch"
 done
 
