@@ -42,6 +42,14 @@ a_find_program(LDOC_EXECUTABLE ldoc FALSE)
 if(NOT LDOC_EXECUTABLE)
     a_find_program(LDOC_EXECUTABLE ldoc.lua FALSE)
 endif()
+if(LDOC_EXECUTABLE)
+    execute_process(COMMAND sh -c "${LDOC_EXECUTABLE} --sadly-ldoc-has-no-version-option 2>&1  | grep ' vs 1.4.4'"
+                    OUTPUT_VARIABLE LDOC_VERSION_RESULT)
+    if(NOT LDOC_VERSION_RESULT STREQUAL "")
+        message(WARNING "Ignoring LDoc, because version 1.4.4 is known to be broken")
+        unset(LDOC_EXECUTABLE)
+    endif()
+endif()
 # theme graphics
 a_find_program(CONVERT_EXECUTABLE convert TRUE)
 # pkg-config
