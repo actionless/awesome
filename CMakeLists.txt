@@ -277,7 +277,7 @@ if(GENERATE_DOC)
     # status if it sees at least one line of input.
     # All together, this fails as soon as ldoc prints on stderr.
     add_custom_target(ldoc ALL
-        COMMAND ${LDOC_EXECUTABLE} . 3>&1 1>&2 2>&3 | awk "{ fail=1 \; print } END { exit fail }"
+        COMMAND ${LDOC_EXECUTABLE} .
         WORKING_DIRECTORY ${AWE_DOC_DIR}
         DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES} ${BUILD_DIR}/docs/06-appearance.md
         ${BUILD_DIR}/docs/05-awesomerc.md
