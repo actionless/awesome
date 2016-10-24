@@ -11,10 +11,12 @@ branches=(
 	#'hotkeys_module_instance'
 
 	# psychon
+    'pr/1161'
 
 	# elv13
     #'upstream_shape_api_p4'
     #'pr/1044'
+    'pr/1153'
 
 	# other
 	#'upstream_shape_api_p4-actionless'
@@ -23,7 +25,7 @@ branches=(
     #'pr/596'
 
     'rounded-naughty-2'
-    "cmake-fix"
+    #"cmake-fix"
 )
 
 cd ~/projects
