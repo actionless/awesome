@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @classmod awful.widget.prompt
 ---------------------------------------------------------------------------
 
@@ -21,13 +20,15 @@ local widgetprompt = { mt = {} }
 --
 -- @param promptbox The promptbox to run.
 local function run(promptbox)
-    return prompt.run({ prompt = promptbox.prompt },
-                      promptbox.widget,
-                      function (...)
-                          promptbox:spawn_and_handle_error(...)
-                      end,
-                      completion.shell,
-                      util.get_cache_dir() .. "/history")
+    return prompt.run {
+        prompt              = promptbox.prompt,
+        textbox             = promptbox.widget,
+        completion_callback = completion.shell,
+        history_path        = util.get_cache_dir() .. "/history",
+        exe_callback        = function (...)
+            promptbox:spawn_and_handle_error(...)
+        end,
+    }
 end
 
 local function spawn_and_handle_error(self, ...)

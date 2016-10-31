@@ -3,13 +3,11 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module awful.util
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
 local os = os
-local io = io
 local assert = assert
 local load = loadstring or load -- luacheck: globals loadstring (compatibility with Lua 5.1)
 local loadfile = loadfile
@@ -256,17 +254,11 @@ end
 -- @param filename The file path.
 -- @return True if file exists and is readable.
 function util.file_readable(filename)
-    local file = io.open(filename)
-    if file then
-        local _, _, code = file:read(1)
-        io.close(file)
-        if code == 21 then
-            -- "Is a directory".
-            return false
-        end
-        return true
-    end
-    return false
+    local gfile = Gio.File.new_for_path(filename)
+    local gfileinfo = gfile:query_info("standard::type,access::can-read",
+                                       Gio.FileQueryInfoFlags.NONE)
+    return gfileinfo and gfileinfo:get_file_type() ~= "DIRECTORY" and
+        gfileinfo:get_attribute_boolean("access::can-read")
 end
 
 --- Check if a path exists, is readable and is a directory.

@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Uli Schlachter
 -- @copyright 2010 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @classmod wibox
 ---------------------------------------------------------------------------
 
@@ -158,11 +157,8 @@ local function new(args)
     local ret = object()
     local w = capi.drawin(args)
 
-    -- lua 5.1 and luajit have issues with self referencing loops
-    local avoid_leak = setmetatable({ret},{__mode="v"})
-
     function w.get_wibox()
-        return avoid_leak[1]
+        return ret
     end
 
     ret.drawin = w

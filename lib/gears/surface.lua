@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Uli Schlachter
 -- @copyright 2012 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @module gears.surface
 ---------------------------------------------------------------------------
 
@@ -210,15 +209,9 @@ end
 local function no_op() end
 
 local function run_in_hierarchy(self, cr, width, height)
-
-    local function redraw(h)
-        h:draw({dpi=96}, cr)
-    end
-
-    local h = hierarchy.new({dpi=96}, self, width, height, redraw, no_op, {})
-
-    redraw(h)
-
+    local context = {dpi=96}
+    local h = hierarchy.new(context, self, width, height, no_op, no_op, {})
+    h:draw(context, cr)
     return h
 end
 

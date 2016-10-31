@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Aleksey Fedotov &lt;lexa@cfotr.com&gt;
 -- @copyright 2015 Aleksey Fedotov
--- @release @AWESOME_VERSION@
 -- @classmod wibox.widget.keyboardlayout
 ---------------------------------------------------------------------------
 
@@ -11,6 +10,7 @@ local textbox = require("wibox.widget.textbox")
 local button = require("awful.button")
 local util = require("awful.util")
 local widget_base = require("wibox.widget.base")
+local gdebug = require("gears.debug")
 
 --- Keyboard Layout widget.
 -- awful.widget.keyboardlayout
@@ -234,8 +234,8 @@ local function update_layout(self)
     self._layout = {};
     local layouts = keyboardlayout.get_groups_from_group_names(awesome.xkb_get_group_names())
     if layouts == nil or layouts[1] == nil then
-        error("Failed to get list of keyboard groups")
-        return;
+        gdebug.print_error("Failed to get list of keyboard groups")
+        return
     end
     if #layouts == 1 then
         layouts[1].group_idx = 0

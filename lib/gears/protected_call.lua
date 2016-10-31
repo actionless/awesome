@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Uli Schlachter
 -- @copyright 2016 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @module gears.protected_call
 ---------------------------------------------------------------------------
 
@@ -14,7 +13,7 @@ local xpcall = xpcall
 local protected_call = {}
 
 local function error_handler(err)
-    gdebug.print_error(traceback("Error during a protected call: " .. tostring(err)))
+    gdebug.print_error(traceback("Error during a protected call: " .. tostring(err), 2))
 end
 
 local function handle_result(success, ...)

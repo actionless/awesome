@@ -16,7 +16,6 @@
 --
 -- @author Alexander Yakushev &lt;yakushev.alex@gmail.com&gt;
 -- @copyright 2011-2012 Alexander Yakushev
--- @release @AWESOME_VERSION@
 -- @module menubar
 ---------------------------------------------------------------------------
 
@@ -441,15 +440,18 @@ function menubar.show(scr)
     menulist_update(nil, scr)
 
     local prompt_args = menubar.prompt_args or {}
-    prompt_args.prompt = "Run: "
-    awful.prompt.run(prompt_args, instance.prompt.widget,
-                function() end,            -- exe_callback function set to do nothing
-                awful.completion.shell,     -- completion_callback
-                awful.util.get_cache_dir() .. "/history_menu",
-                nil,
-                menubar.hide, function(query) menulist_update(query, scr) end,
-                prompt_keypressed_callback
-                )
+
+    awful.prompt.run(setmetatable({
+        prompt              = "Run: ",
+        textbox             = instance.prompt.widget,
+        exe_callback        = function() end,
+        completion_callback = awful.completion.shell,
+        history_path        = awful.util.get_cache_dir() .. "/history_menu",
+        done_callback       = menubar.hide,
+        changed_callback    = function(query) menulist_update(query, scr) end,
+        keypressed_callback = prompt_keypressed_callback
+    }, {__index=prompt_args}))
+
     instance.wibox.visible = true
 end
 

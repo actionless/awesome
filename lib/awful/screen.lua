@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module screen
 ---------------------------------------------------------------------------
 
@@ -30,8 +29,6 @@ local screen = {object={}}
 
 local data = {}
 data.padding = {}
-
-screen.mouse_per_screen = setmetatable({}, {__mode="k"})
 
 --- Take an input geometry and substract/add a delta.
 -- @tparam table geo A geometry (width, height, x, y) table.
@@ -99,7 +96,7 @@ function screen.focus(_screen)
     local s = get_screen(capi.mouse.screen)
     local pos
 
-    if not screen.mouse_per_screen[_screen] then
+    if not _screen.mouse_per_screen then
         -- This is the first time we enter this screen,
         -- keep relative mouse position on the new screen.
         pos = capi.mouse.coords()
@@ -110,11 +107,11 @@ function screen.focus(_screen)
         pos.y = _screen.geometry.y + rely * _screen.geometry.height
     else
         -- restore mouse position
-        pos = screen.mouse_per_screen[_screen]
+        pos = _screen.mouse_per_screen
     end
 
     -- save pointer position of current screen
-    screen.mouse_per_screen[s] = capi.mouse.coords()
+    s.mouse_per_screen = capi.mouse.coords()
 
    -- move cursor without triggering signals mouse::enter and mouse::leave
     capi.mouse.coords(pos, true)

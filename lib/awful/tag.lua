@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module tag
 ---------------------------------------------------------------------------
 
@@ -35,8 +34,6 @@ local tag = {object = {},  mt = {} }
 -- Private data
 local data = {}
 data.history = {}
-data.dynamic_cache = setmetatable({}, { __mode = 'k' })
-data.tags = setmetatable({}, { __mode = 'k' })
 
 -- History functions
 tag.history = {}
@@ -217,7 +214,7 @@ function tag.add(name, props)
     local newtag = capi.tag{ name = name }
 
     -- Start with a fresh property table to avoid collisions with unsupported data
-    data.tags[newtag] = {screen=properties.screen, index=properties.index}
+    newtag.data.awful_tag_properties = {screen=properties.screen, index=properties.index}
 
     newtag.activated = true
 
@@ -323,7 +320,7 @@ function tag.object.delete(self, fallback_tag, force)
     end
 
     -- delete the tag
-    data.tags[self].screen = nil
+    self.data.awful_tag_properties.screen = nil
     self.activated = false
 
     -- Update all indexes
@@ -531,7 +528,7 @@ end
 -- @param[opt] t tag object
 -- @return Screen number
 function tag.getscreen(t)
-    util.deprecate("Use t.screen instead of awful.tag.setscreen(t, s)")
+    util.deprecate("Use t.screen instead of awful.tag.getscreen(t)")
 
     -- A new getter is not required
 
@@ -710,11 +707,11 @@ function tag.object.set_layout(t, layout)
         and getmetatable(layout)
         and getmetatable(layout).__call
     ) then
-        if not data.dynamic_cache[t] then
-            data.dynamic_cache[t] = {}
+        if not t.dynamic_layout_cache then
+            t.dynamic_layout_cache = {}
         end
 
-        local instance = data.dynamic_cache[t][layout] or layout(t)
+        local instance = t.dynamic_layout_cache[layout] or layout(t)
 
         -- Always make sure the layout is notified it is enabled
         if tag.getproperty(t, "screen").selected_tag == t and instance.wake_up then
@@ -723,7 +720,7 @@ function tag.object.set_layout(t, layout)
 
         -- Avoid creating the same layout twice, use layout:reset() to reset
         if instance.is_dynamic then
-            data.dynamic_cache[t][layout] = instance
+            t.dynamic_layout_cache[layout] = instance
         end
 
         layout = instance
@@ -865,9 +862,15 @@ function tag.object.set_gap_single_client(t, gap_single_client)
 end
 
 function tag.object.get_gap_single_client(t)
-    return tag.getproperty(t, "gap_single_client")
-        or beautiful.gap_single_client
-        or defaults.gap_single_client
+    local val = tag.getproperty(t, "gap_single_client")
+    if val ~= nil then
+        return val
+    end
+    val = beautiful.gap_single_client
+    if val ~= nil then
+        return val
+    end
+    return defaults.gap_single_client
 end
 
 --- Get the spacing between clients.
@@ -1278,7 +1281,7 @@ end
 -- @tparam tag _tag The tag.
 -- @return The data table.
 function tag.getdata(_tag)
-    return data.tags[_tag]
+    return _tag.data.awful_tag_properties
 end
 
 --- Get a tag property.
@@ -1290,8 +1293,9 @@ end
 -- @tparam string prop The property name.
 -- @return The property.
 function tag.getproperty(_tag, prop)
-    if data.tags[_tag] then
-        return data.tags[_tag][prop]
+    if not _tag then return end -- FIXME: Turn this into an error?
+    if _tag.data.awful_tag_properties then
+       return _tag.data.awful_tag_properties[prop]
     end
 end
 
@@ -1306,12 +1310,12 @@ end
 -- @param prop The property name.
 -- @param value The value.
 function tag.setproperty(_tag, prop, value)
-    if not data.tags[_tag] then
-        data.tags[_tag] = {}
+    if not _tag.data.awful_tag_properties then
+        _tag.data.awful_tag_properties = {}
     end
 
-    if data.tags[_tag][prop] ~= value then
-        data.tags[_tag][prop] = value
+    if _tag.data.awful_tag_properties[prop] ~= value then
+        _tag.data.awful_tag_properties[prop] = value
         _tag:emit_signal("property::" .. prop)
     end
 end
@@ -1463,8 +1467,8 @@ capi.screen.connect_signal("removed", function(s)
     for _, t in pairs(s.tags) do
         t.activated = false
 
-        if data.tags[t] then
-            data.tags[t].screen = nil
+        if t.data.awful_tag_properties then
+            t.data.awful_tag_properties.screen = nil
         end
     end
 end)

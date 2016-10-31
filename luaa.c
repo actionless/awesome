@@ -23,7 +23,6 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @module awesome
  */
 
@@ -156,11 +155,14 @@ composite_manager_running(void)
 }
 
 /** Quit awesome.
+ * @tparam[opt=0] integer code The exit code to use when exiting.
  * @function quit
  */
 static int
 luaA_quit(lua_State *L)
 {
+    if (!lua_isnoneornil(L, 1))
+        globalconf.exit_code = luaL_checkinteger(L, 1);
     if (globalconf.loop == NULL)
         globalconf.loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_quit(globalconf.loop);
@@ -783,6 +785,7 @@ luaA_loadrc(const char *confpath, bool run)
         const char *err = lua_tostring(L, -1);
         luaA_startup_error(err);
         fprintf(stderr, "%s\n", err);
+        lua_pop(L, 1);
         return false;
     }
 

@@ -81,7 +81,6 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @classmod client
  */
 
@@ -1219,6 +1218,25 @@ client_refresh(void)
     client_focus_refresh();
 }
 
+void
+client_destroy_later(void)
+{
+    bool ignored_enterleave = false;
+    foreach(window, globalconf.destroy_later_windows)
+    {
+        if (!ignored_enterleave) {
+            client_ignore_enterleave_events();
+            ignored_enterleave = true;
+        }
+        xcb_destroy_window(globalconf.connection, *window);
+    }
+    if (ignored_enterleave)
+        client_restore_enterleave_events();
+
+    /* Everything's done, clear the list */
+    globalconf.destroy_later_windows.len = 0;
+}
+
 static void
 border_width_callback(client_t *c, uint16_t old_width, uint16_t new_width)
 {
@@ -2088,12 +2106,9 @@ client_unmanage(client_t *c, bool window_valid)
                 c->geometry.x, c->geometry.y);
     }
 
-    /* Ignore all spurious enter/leave notify events */
-    client_ignore_enterleave_events();
     if (c->nofocus_window != XCB_NONE)
-        xcb_destroy_window(globalconf.connection, c->nofocus_window);
-    xcb_destroy_window(globalconf.connection, c->frame_window);
-    client_restore_enterleave_events();
+        window_array_append(&globalconf.destroy_later_windows, c->nofocus_window);
+    window_array_append(&globalconf.destroy_later_windows, c->frame_window);
 
     if(window_valid)
     {
