@@ -281,7 +281,7 @@ if(GENERATE_DOC)
     file(COPY ${SOURCE_DIR}/docs/aliases DESTINATION ${BUILD_DIR}/docs)
 
     add_custom_target(ldoc ALL
-        COMMAND ${LDOC_EXECUTABLE} .
+        COMMAND ${LDOC_EXECUTABLE} . || true
         WORKING_DIRECTORY ${AWE_DOC_DIR}
         DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES}
     )
