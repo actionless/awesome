@@ -11,20 +11,22 @@ branches=(
 	#'hotkeys_module_instance'
 
 	# psychon
-    'pr/1161'
 
 	# elv13
-    #'upstream_shape_api_p4'
-    #'pr/1044'
-    'pr/1153'
+    #'pr/644'
+
+    # blueyed
 
 	# other
-	#'upstream_shape_api_p4-actionless'
 
     # PR
     #'pr/596'
 
+
+    #'wibox-shape-take-3'
+    'pr/1198'
     'rounded-naughty-2'
+
     #"cmake-fix"
 )
 
@@ -37,6 +39,7 @@ cp awesome/awesome_no_argb ~/build/awesome-git/
 cd tmp-awesome/awesome
 git reset --hard
 
+git fetch upstream
 git checkout master
 git pull upstream master
 
