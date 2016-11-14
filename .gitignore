@@ -4,3 +4,5 @@
 build
 .build*
 /awesome
+*.diff
+*.patch
