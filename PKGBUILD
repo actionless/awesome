@@ -17,7 +17,7 @@ arch=('i686' 'x86_64')
 url='http://awesome.naquadah.org/'
 license=('GPL2')
 depends=('cairo' 'dbus' 'gdk-pixbuf2' 'imlib2' 'libxdg-basedir' 'libxkbcommon-x11'
-         'lua' 'lua-lgi-git' 'pango' 'startup-notification' 'xcb-util-cursor'
+         'lua' 'lua-lgi' 'pango' 'startup-notification' 'xcb-util-cursor'
          'xcb-util-keysyms' 'xcb-util-wm' 'xcb-util-xrm' 'xorg-xmessage')
 makedepends=('asciidoc' 'cmake' 'docbook-xsl' 'doxygen' 'imagemagick' 'ldoc' 'xmlto')
 optdepends=('rlwrap: readline support for awesome-client'
