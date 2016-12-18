@@ -3,14 +3,15 @@
 --   by Yauhen Kirylau                    --
 ---------------------------------------------
 
-local xresources = require("beautiful").xresources
-local xrdb = xresources.get_current_theme()
+local theme_assets = require("beautiful.theme_assets")
+local xresources = require("beautiful.xresources")
 local dpi = xresources.apply_dpi
+
+local xrdb = xresources.get_current_theme()
 
 -- inherit default theme
 local theme = dofile("@AWESOME_THEMES_PATH@/default/theme.lua")
 -- load vector assets' generators for this theme
-local theme_assets = dofile("@AWESOME_THEMES_PATH@/xresources/assets.lua")
 
 theme.font          = "sans 8"
 
