@@ -58,6 +58,6 @@ done
 git push origin local -f
 
 cd ~/build/awesome-git
-makepkg -fi
+makepkg -fi --syncdeps
 
 cd ~/projects/awesome
