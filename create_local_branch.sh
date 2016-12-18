@@ -7,7 +7,8 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-    'dpi-in-default-theme'
+    #'dpi-in-default-theme'
+    'dpi-in-default-theme-2'
 
 	#'hotkeys_module_instance'
 
@@ -52,7 +53,7 @@ for branch in ${branches[@]}; do
 	echo " merge $branch "
     git checkout $branch
     git checkout local
-	git merge $branch -m "merge $branch"
+	git merge upstream/$branch -m "merge $branch" || git merge $branch -m "merge $branch"
 done
 
 git push origin local -f
