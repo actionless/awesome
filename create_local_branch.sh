@@ -8,7 +8,7 @@ branches=(
 	# my branches
 	#'rounded-naughty'
     #'dpi-in-default-theme'
-    'dpi-in-default-theme-2'
+    'dpi-in-default-theme'
 
 	#'hotkeys_module_instance'
 
@@ -25,8 +25,7 @@ branches=(
     #'pr/596'
 
 
-    #'wibox-shape-take-3'
-    'pr/1198'
+    'wibox-shape-take-4'
     'rounded-naughty-2'
 
     #"cmake-fix"
