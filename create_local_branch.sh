@@ -7,7 +7,7 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-	'dpi-in-default-theme'
+    'dpi-in-default-theme'
 
 	#'hotkeys_module_instance'
 
@@ -38,7 +38,7 @@ cp awesome/awesome_no_argb ~/build/awesome-git/
 cd tmp-awesome/awesome
 git reset --hard
 
-git fetch upstream
+git fetch --all
 git checkout master
 git pull upstream master
 
