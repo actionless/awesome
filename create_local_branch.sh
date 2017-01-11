@@ -7,15 +7,11 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-    'dpi-in-default-theme'
-    #'dpi-in-default-theme-2'
-    'wibox-shape-take-4'
-    'rounded-naughty-2'
+	'dpi-in-default-theme'
 
 	#'hotkeys_module_instance'
 
 	# psychon
-    #'wibox-shape'
 
 	# elv13
     #'pr/644'
@@ -28,8 +24,8 @@ branches=(
     #'pr/596'
 
 
-    #'pr/1198'
-
+    'wibox-shape-take-4'
+    'rounded-naughty-2'
     #"cmake-fix"
 )
 
