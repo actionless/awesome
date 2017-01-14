@@ -7,7 +7,7 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-    'dpi-in-default-theme'
+    #'dpi-in-default-theme'
 
 	#'hotkeys_module_instance'
 
