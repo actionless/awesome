@@ -7,26 +7,19 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-    #'dpi-in-default-theme'
-
-	#'hotkeys_module_instance'
+    'wibox-shape-take-4'
+    'rounded-naughty-2'
 
 	# psychon
 
 	# elv13
-    #'pr/644'
 
     # blueyed
 
 	# other
 
     # PR
-    #'pr/596'
 
-
-    'wibox-shape-take-4'
-    'rounded-naughty-2'
-    #"cmake-fix"
 )
 
 cd ~/projects
