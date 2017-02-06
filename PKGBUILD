@@ -1,53 +1,55 @@
-# Maintainer: Oleg Shparber <trollixx+aur@gmail.com>
-# Contributor: Bartłomiej Piotrowski <bpiotrowski@archlinux.org>
-# Contributor: Andrea Scarpino <andrea@archlinux.org>
-# Contributor: Sébastien Luttringer
-# Contributor: xduugu
-# Contributor: Ronald van Haren <ronald.archlinux.org>
-# Contributor: Vesa Kaihlavirta
-# URL: https://github.com/trollixx/aur-packages
-# Upstream: https://projects.archlinux.org/svntogit/community.git/tree/trunk?h=packages/awesome
+# Maintainer: Daniel Hahler <archlinux+aur@thequod.de>
+# Contributor: noonov <noonov@gmail.com>
+# Contributor: wtchappell <wtchappell@gmail.com>
 
 _pkgname=awesome
-pkgname=${_pkgname}-git
-pkgver=4.0.57.g5e1b88cb
+pkgname=awesome-luajit-git
+pkgver=4.0.190.g1385243
 pkgrel=1
-pkgdesc='Highly configurable framework window manager'
+pkgdesc="awesome window manager built with luajit"
 arch=('i686' 'x86_64')
 url='http://awesome.naquadah.org/'
 license=('GPL2')
-depends=('cairo' 'dbus' 'gdk-pixbuf2' 'imlib2' 'libxdg-basedir' 'libxkbcommon-x11'
-         'lua' 'lua-lgi' 'pango' 'startup-notification' 'xcb-util-cursor'
-         'xcb-util-keysyms' 'xcb-util-wm' 'xcb-util-xrm' 'xorg-xmessage')
-makedepends=('asciidoc' 'cmake' 'docbook-xsl' 'doxygen' 'imagemagick' 'ldoc' 'xmlto')
+depends=('cairo' 'dbus' 'gdk-pixbuf2' 'libxdg-basedir' 'libxkbcommon-x11'
+         'luajit' 'luajit-lgi' 'pango' 'startup-notification' 'xcb-util-cursor'
+         'xcb-util-keysyms' 'xcb-util-xrm' 'xcb-util-wm')
+makedepends=('asciidoc' 'cmake' 'docbook-xsl' 'git' 'imagemagick' 'ldoc'
+             'xmlto')
 optdepends=('rlwrap: readline support for awesome-client'
             'dex: autostart your desktop files'
             'vicious: widgets for the Awesome window manager')
 provides=('notification-daemon' 'awesome')
 conflicts=('awesome')
 backup=('etc/xdg/awesome/rc.lua')
-#source=("$pkgname::git://github.com/awesomeWM/awesome.git")
-#source=("$pkgname::git://github.com/actionless/awesome.git#branch=grow-master")
-#source=("$pkgname::git://github.com/actionless/awesome.git#branch=xresources-theme-refinements")
-source=("$pkgname::git://github.com/actionless/awesome.git#branch=local")
-md5sums=('SKIP')
+source=("$pkgname::git+https://github.com/actionless/awesome.git#branch=local"
+        awesome.desktop
+        awesomeksm.desktop)
+sha256sums=('SKIP'
+            '5c5437448cc9f01be6ccbb298f5c86d0f8c4bcae23a22e6af699aff0d10f642f'
+            '8f25957ef5453f825e05a63a74e24843aad945af86ddffcc0a84084ca2cf9928')
 
-pkgver() {
-  cd $pkgname
-  git describe | sed 's/^v//;s/-/./g'
-}
+#pkgver() {
+  #cd $pkgname
+  #git describe | sed 's/^v//;s/-/./g'
+#}
 
 prepare() {
-  mkdir -p build
+  cd $pkgname
+  sed -i 's/^lua\b/luajit/' build-utils/lgi-check.sh
+  sed -i 's/COMMAND lua\b/COMMAND luajit/' awesomeConfig.cmake tests/examples/CMakeLists.txt
+  sed -i 's/LUA_COV_RUNNER lua\b/LUA_COV_RUNNER luajit/' tests/examples/CMakeLists.txt
 }
 
 build() {
+  mkdir -p build
   cd build
+
   cmake ../$pkgname \
     -DCMAKE_BUILD_TYPE=RELEASE \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DSYSCONFDIR=/etc \
-    -DLUA_LIBRARY=/usr/lib/liblua.so.5.3
+    -DLUA_INCLUDE_DIR=/usr/include/luajit-2.0 \
+    -DLUA_LIBRARY=/usr/lib/libluajit-5.1.so
   make
 }
 
@@ -61,4 +63,7 @@ package() {
 
   install -Dm644 "$srcdir"/$pkgname/awesome.desktop \
     "$pkgdir/usr/share/xsessions/awesome.desktop"
+
+  install -Dm644 "$srcdir"/awesomeksm.desktop \
+    "$pkgdir/usr/share/apps/ksmserver/windowmanagers/awesome.desktop"
 }

@@ -7,8 +7,8 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-    'wibox-shape-take-4'
     'rounded-naughty-2'
+    'awful-hotkeys-refactor'
 
 	# psychon
 
@@ -50,7 +50,9 @@ done
 
 git push origin local -f
 
-cd ~/build/awesome-git
-makepkg -fi --syncdeps
+if [[ ${1-a} = '-b' ]]; then
+    cd ~/build/awesome-git
+    makepkg -fi --syncdeps
+fi
 
 cd ~/projects/awesome
