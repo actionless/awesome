@@ -6,8 +6,6 @@ branches=(
 	'actionless'
 
 	# my branches
-	#'rounded-naughty'
-    'wibox-shape-take-4'
     'rounded-naughty-2'
 
 	# psychon
@@ -20,7 +18,6 @@ branches=(
 	# other
 
     # PR
-    #'pr/596'
 
 )
 
