@@ -1,6 +1,7 @@
 local test_client = require("_client")
 local placement = require("awful.placement")
 local amouse = require("awful.mouse")
+local rounded_rect = require("gears.shape").rounded_rect
 
 local steps = {}
 
@@ -8,7 +9,6 @@ table.insert(steps, function(count)
     if count == 1 then  -- Setup.
         test_client("foobar", "foobar")
     elseif #client.get() > 0 then
-
         client.get()[1] : geometry {
             x      = 200,
             y      = 200,
@@ -16,28 +16,30 @@ table.insert(steps, function(count)
             height = 300,
         }
 
+        client.get()[1].shape = rounded_rect
+
         return true
     end
 end)
 
 table.insert(steps, function()
-    -- The mousegrabber expect a button to be pressed.
-    root.fake_input("button_press",1)
-    local c = client.get()[1]
+-- The mousegrabber expect a button to be pressed.
+root.fake_input("button_press",1)
+local c = client.get()[1]
 
-    -- Just in case there is an accidental delayed geometry callback
-    assert(c:geometry().x      == 200)
-    assert(c:geometry().y      == 200)
-    assert(c:geometry().width  == 300)
-    assert(c:geometry().height == 300)
+-- Just in case there is an accidental delayed geometry callback
+assert(c:geometry().x      == 200)
+assert(c:geometry().y      == 200)
+assert(c:geometry().width  == 300)
+assert(c:geometry().height == 300)
 
-    mouse.coords {x = 500+2*c.border_width, y= 500+2*c.border_width}
+mouse.coords {x = 500+2*c.border_width, y= 500+2*c.border_width}
 
-    local corner = amouse.client.resize(c)
+local corner = amouse.client.resize(c)
 
-    assert(corner == "bottom_right")
+assert(corner == "bottom_right")
 
-    return true
+return true
 end)
 
 -- The geometry should remain the same, as the cursor is placed at the end of
@@ -108,8 +110,8 @@ table.insert(steps, function()
 
     assert(c:geometry().x == 100)
     assert(c:geometry().y == 200)
---     assert(c:geometry().width == 200-2*c.border_width) --FIXME off by border width...
---     assert(c:geometry().height == 200-2*c.border_width) --FIXME off by border width...
+    --     assert(c:geometry().width == 200-2*c.border_width) --FIXME off by border width...
+    --     assert(c:geometry().height == 200-2*c.border_width) --FIXME off by border width...
 
     mouse.coords {x = 300, y= 200}
 
@@ -120,9 +122,9 @@ end)
 table.insert(steps, function()
     root.fake_input("button_release",1)
 
---     if not mousegrabber.isrunning then --FIXME it should work, but doesn't
---         return true
---     end
+    --     if not mousegrabber.isrunning then --FIXME it should work, but doesn't
+    --         return true
+    --     end
 
     mousegrabber.stop()
 
@@ -143,7 +145,7 @@ table.insert(steps, function()
     placement.bottom_right(c)
 
     mouse.coords {x = c.screen.geometry.width -150,
-                  y = c.screen.geometry.height-150}
+    y = c.screen.geometry.height-150}
 
 
     return true
@@ -439,4 +441,37 @@ table.insert(steps, function()
     return true
 end)
 
+table.insert(steps, function()
+    for _, c in pairs(client.get()) do
+        c:kill()
+    end
+    if #client.get() == 0 then
+        test_client(nil, nil, nil, nil, true)
+        return true
+    end
+end)
+
+table.insert(steps, function()
+    if #client.get() ~= 1 then
+        return
+    end
+
+    local c = client.get()[1]
+    local geo = c:geometry()
+    local hints = c.size_hints
+    assert(hints.height_inc == 200)
+    assert(hints.width_inc == 200)
+    assert(c:apply_size_hints(1, 1) == 0)
+
+    c:geometry { width = 1, height = 50 }
+
+    -- The above should be rejected, because it would make us resize the
+    -- window size 0x0.
+    assert(c:geometry().width == geo.width)
+    assert(c:geometry().height == geo.height)
+    return true
+end)
+
 require("_runner").run_steps(steps)
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

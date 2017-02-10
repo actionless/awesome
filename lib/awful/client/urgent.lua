@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @submodule client
 ---------------------------------------------------------------------------
 
@@ -87,3 +86,5 @@ capi.client.connect_signal("focus", urgent.delete)
 capi.client.connect_signal("unmanage", urgent.delete)
 
 return urgent
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

@@ -4,30 +4,13 @@
 --
 -- @author Emmanuel Lepage-Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2016 Emmanuel Lepage-Vallee
--- @release @AWESOME_VERSION@
 -- @module gears.object.properties
 ---------------------------------------------------------------------------
 
 local object = {}
 
-local properties = setmetatable({}, { __mode = 'k' })
 
-local function cobj_register(cobj)
-    local fallback = {}
-
-    function fallback:rawset(_, prop, val)
-        fallback[prop] = val
-    end
-
-    function fallback:rawget(_, prop)
-        return fallback[prop]
-    end
-
-    properties[cobj] = fallback
-    return fallback
-end
-
---- Add the missing properties handler to a CAPI object such as client/tag/screen
+--- Add the missing properties handler to a CAPI object such as client/tag/screen.
 -- Valid args:
 --
 -- * **getter**: A smart getter (handle property getter itself)
@@ -66,10 +49,8 @@ function object.capi_index_fallback(class, args)
             return args.getter_fallback(cobj, prop)
         end
 
-        local fallback = properties[cobj] or cobj_register(cobj)
-
         -- Use the fallback property table
-        return fallback[prop]
+        return cobj.data[prop]
     end
 
     local setter = args.setter or function(cobj, prop, value)
@@ -88,10 +69,8 @@ function object.capi_index_fallback(class, args)
             return
         end
 
-        local fallback = properties[cobj] or cobj_register(cobj)
-
         -- Use the fallback property table
-        fallback[prop] = value
+        cobj.data[prop] = value
 
         -- Emit the signal
         if args.auto_emit then

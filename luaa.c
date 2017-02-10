@@ -23,7 +23,6 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @module awesome
  */
 
@@ -55,6 +54,7 @@
 #include <basedir_fs.h>
 
 #include <xcb/xcb_atom.h>
+#include <xcb/xcb_aux.h>
 
 #include <unistd.h> /* for gethostname() */
 
@@ -67,51 +67,94 @@ extern const struct luaL_Reg awesome_root_lib[];
 extern const struct luaL_Reg awesome_mouse_methods[];
 extern const struct luaL_Reg awesome_mouse_meta[];
 
-/** A call into the lua code aborted with an error
+/** A call into the Lua code aborted with an error.
+ *
+ * This signal is used in the example configuration, @{05-awesomerc.md},
+ * to let a notification box pop up.
+ * @param err Table with the error object, can be converted to a string with
+ * `tostring(err)`.
  * @signal debug::error
  */
 
-/** A deprecated lua function was called
+/** A deprecated Lua function was called.
+ *
+ * @param hint String with a hint on what to use instead of the
+ * deprecated functionality.
  * @signal debug::deprecation
  */
 
-/** An invalid key was read from an object (e.g. c.foo)
+/** An invalid key was read from an object.
+ *
+ * This can happen if `foo` in an `c.foo` access does not exist.
+ * @param unknown1 Class?
+ * @param unknown2 Key?
  * @signal debug::index::miss
  */
 
-/** An invalid key was written to an object (e.g. c.foo = "bar")
+/** An invalid key was written to an object.
+ *
+ * This can happen if `foo` in an `c.foo = "bar"` assignment doesn't exist.
+ * @param unknown1 Class?
+ * @param unknown2 Key?
+ * @param unknown3 Value?
  * @signal debug::newindex::miss
  */
 
-/**
+/** The systray should be updated.
+ *
+ * This signal is used in `wibox.widget.systray`.
  * @signal systray::update
  */
 
-/**
+/** The wallpaper has just been changed. This signal is used for
+ *
+ * pseudo-transparency in `wibox.drawable` if no composite manager is
+ * running.
  * @signal wallpaper_changed
  */
 
-/**
+/** Keyboard map has changed.
+ *
+ * This signal is sent after the new keymap has been loaded. It is used in
+ * `awful.widget.keyboardlayout` to redraw the layout.
  * @signal xkb::map_changed
  */
 
-/**
- * @signal xkb::group_changed
+/** Keyboard group has changed.
+ *
+ * It's used in `awful.widget.keyboardlayout` to redraw the layout.
+ * @param group Integer containing the changed group
+ * @signal xkb::group_changed.
  */
 
-/**
+/** Refresh.
+ *
+ * This signal is emitted as a kind of idle signal in the event loop.
+ * One example usage is in `gears.timer` to executed delayed calls.
  * @signal refresh
  */
 
-/**
+/** Awesome is about to enter the event loop.
+ *
+ * This means all initialization has been done.
  * @signal startup
  */
 
-/**
+/** Awesome is exiting / about to restart.
+ *
+ * This signal is emitted in the `atexit` handler as well when awesome
+ * restarts.
+ * @param reason_restart Boolean value is true if the signal was sent
+ * because of a restart.
  * @signal exit
  */
 
-/**
+/** The output status of a screen has changed.
+ *
+ * @param output String containing which output has changed.
+ * @param connection_state String containing the connection status of
+ * the output: It will be either "Connected", "Disconnected" or
+ * "Unknown".
  * @signal screen::change
  */
 
@@ -156,11 +199,14 @@ composite_manager_running(void)
 }
 
 /** Quit awesome.
+ * @tparam[opt=0] integer code The exit code to use when exiting.
  * @function quit
  */
 static int
 luaA_quit(lua_State *L)
 {
+    if (!lua_isnoneornil(L, 1))
+        globalconf.exit_code = luaL_checkinteger(L, 1);
     if (globalconf.loop == NULL)
         globalconf.loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_quit(globalconf.loop);
@@ -210,6 +256,17 @@ luaA_kill(lua_State *L)
     int result = kill(pid, sig);
     lua_pushboolean(L, result == 0);
     return 1;
+}
+
+/** Synchronize with the X11 server. This is needed in the test suite to avoid
+ * some race conditions. You should never need to use this function.
+ * @function sync
+ */
+static int
+luaA_sync(lua_State *L)
+{
+    xcb_aux_sync(globalconf.connection);
+    return 0;
 }
 
 /** Load an image from a given path.
@@ -296,18 +353,58 @@ luaA_fixups(lua_State *L)
     lua_setglobal(L, "selection");
 }
 
-/** awesome global table.
- * @field version The version of awesome.
- * @field release The release name of awesome.
- * @field conffile The configuration file which has been loaded.
- * @field startup True if we are still in startup, false otherwise.
- * @field startup_errors Error message for errors that occured during
- *  startup.
- * @field composite_manager_running True if a composite manager is running.
- * @field unix_signal Table mapping between signal numbers and signal identifiers.
- * @field hostname The hostname of the computer on which we are running.
- * @table awesome
+
+/**
+ * The version of awesome.
+ * @tfield string version
  */
+
+/**
+ * The release name of awesome.
+ * @tfield string release
+ */
+
+/**
+ * The configuration file which has been loaded.
+ * @tfield string conffile
+ */
+
+/**
+ * True if we are still in startup, false otherwise.
+ * @tfield boolean startup
+ */
+
+/**
+ * Error message for errors that occured during
+ *  startup.
+ * @tfield string startup_errors
+ */
+
+/**
+ * True if a composite manager is running.
+ * @tfield boolean composite_manager_running
+ */
+
+/**
+ * Table mapping between signal numbers and signal identifiers.
+ * @tfield table unix_signal
+ */
+
+/**
+ * The hostname of the computer on which we are running.
+ * @tfield string hostname
+ */
+
+/**
+ * The path where themes were installed to.
+ * @tfield string themes_path
+ */
+
+/**
+ * The path where icons were installed to.
+ * @tfield string icon_path
+ */
+
 static int
 luaA_awesome_index(lua_State *L)
 {
@@ -362,6 +459,18 @@ luaA_awesome_index(lua_State *L)
         hostname[countof(hostname) - 1] = '\0';
 
         lua_pushstring(L, hostname);
+        return 1;
+    }
+
+    if(A_STREQ(buf, "themes_path"))
+    {
+        lua_pushliteral(L, AWESOME_THEMES_PATH);
+        return 1;
+    }
+
+    if(A_STREQ(buf, "icon_path"))
+    {
+        lua_pushliteral(L, AWESOME_ICON_PATH);
         return 1;
     }
 
@@ -568,7 +677,10 @@ setup_awesome_signals(lua_State *L)
 
     /* POSIX.1-2001, according to man 7 signal */
     SETUP_SIGNAL(SIGBUS);
+    /* Some Operating Systems doesn't have SIGPOLL (e.g. FreeBSD) */
+#ifdef SIGPOLL
     SETUP_SIGNAL(SIGPOLL);
+#endif
     SETUP_SIGNAL(SIGPROF);
     SETUP_SIGNAL(SIGSYS);
     SETUP_SIGNAL(SIGTRAP);
@@ -584,6 +696,54 @@ setup_awesome_signals(lua_State *L)
 
     /* Pop "awesome" */
     lua_pop(L, 1);
+}
+
+/* Add things to the string on top of the stack */
+static void
+add_to_search_path(lua_State *L, string_array_t *searchpath, bool for_lua)
+{
+    if (LUA_TSTRING != lua_type(L, -1))
+    {
+        warn("package.path is not a string");
+        return;
+    }
+
+    foreach(entry, *searchpath)
+    {
+        int components;
+        size_t len = a_strlen(*entry);
+        lua_pushliteral(L, ";");
+        lua_pushlstring(L, *entry, len);
+        if (for_lua)
+            lua_pushliteral(L, "/?.lua");
+        else
+            lua_pushliteral(L, "/?.so");
+        lua_concat(L, 3);
+
+        if (for_lua)
+        {
+            lua_pushliteral(L, ";");
+            lua_pushlstring(L, *entry, len);
+            lua_pushliteral(L, "/?/init.lua");
+            lua_concat(L, 3);
+
+            components = 2;
+        } else {
+            components = 1;
+        }
+        lua_concat(L, components + 1); /* concatenate with string on top of the stack */
+    }
+
+    /* add Lua lib path (/usr/share/awesome/lib by default) */
+    if (for_lua)
+    {
+        lua_pushliteral(L, ";" AWESOME_LUA_LIB_PATH "/?.lua");
+        lua_pushliteral(L, ";" AWESOME_LUA_LIB_PATH "/?/init.lua");
+        lua_concat(L, 3); /* concatenate with thing on top of the stack when we were called */
+    } else {
+        lua_pushliteral(L, ";" AWESOME_LUA_LIB_PATH "/?.so");
+        lua_concat(L, 2); /* concatenate with thing on top of the stack when we were called */
+    }
 }
 
 /** Initialize the Lua VM
@@ -615,6 +775,7 @@ luaA_init(xdgHandle* xdg, string_array_t *searchpath)
         { "xkb_get_group_names", luaA_xkb_get_group_names},
         { "xrdb_get_value", luaA_xrdb_get_value},
         { "kill", luaA_kill},
+        { "sync", luaA_sync},
         { NULL, NULL }
     };
 
@@ -681,19 +842,6 @@ luaA_init(xdgHandle* xdg, string_array_t *searchpath)
     /* Export keys */
     key_class_setup(L);
 
-    /* add XDG_CONFIG_DIR as include path */
-    const char * const *xdgconfigdirs = xdgSearchableConfigDirectories(xdg);
-    for(; *xdgconfigdirs; xdgconfigdirs++)
-    {
-        /* Append /awesome to *xdgconfigdirs */
-        const char *suffix = "/awesome";
-        size_t len = a_strlen(*xdgconfigdirs) + a_strlen(suffix) + 1;
-        char *entry = p_new(char, len);
-        a_strcat(entry, len, *xdgconfigdirs);
-        a_strcat(entry, len, suffix);
-        string_array_append(searchpath, entry);
-    }
-
     /* add Lua search paths */
     lua_getglobal(L, "package");
     if (LUA_TTABLE != lua_type(L, 1))
@@ -702,38 +850,14 @@ luaA_init(xdgHandle* xdg, string_array_t *searchpath)
         return;
     }
     lua_getfield(L, 1, "path");
-    if (LUA_TSTRING != lua_type(L, 2))
-    {
-        warn("package.path is not a string");
-        lua_pop(L, 1);
-        return;
-    }
-
-    foreach(entry, *searchpath)
-    {
-        size_t len = a_strlen(*entry);
-        lua_pushliteral(L, ";");
-        lua_pushlstring(L, *entry, len);
-        lua_pushliteral(L, "/?.lua");
-        lua_concat(L, 3);
-
-        lua_pushliteral(L, ";");
-        lua_pushlstring(L, *entry, len);
-        lua_pushliteral(L, "/?/init.lua");
-        lua_concat(L, 3);
-
-        lua_concat(L, 3); /* concatenate with package.path */
-    }
-
-    /* add Lua lib path (/usr/share/awesome/lib by default) */
-    lua_pushliteral(L, ";" AWESOME_LUA_LIB_PATH "/?.lua");
-    lua_pushliteral(L, ";" AWESOME_LUA_LIB_PATH "/?/init.lua");
-    lua_concat(L, 3); /* concatenate with package.path */
+    add_to_search_path(L, searchpath, true);
     lua_setfield(L, 1, "path"); /* package.path = "concatenated string" */
 
-    lua_getfield(L, 1, "loaded");
+    lua_getfield(L, 1, "cpath");
+    add_to_search_path(L, searchpath, false);
+    lua_setfield(L, 1, "cpath"); /* package.cpath = "concatenated string" */
 
-    lua_pop(L, 2); /* pop "package" and "package.loaded" */
+    lua_pop(L, 1); /* pop "package" */
 }
 
 static void
@@ -745,7 +869,7 @@ luaA_startup_error(const char *err)
 }
 
 static bool
-luaA_loadrc(const char *confpath, bool run)
+luaA_loadrc(const char *confpath)
 {
     lua_State *L = globalconf_get_lua_State();
     if(luaL_loadfile(L, confpath))
@@ -753,13 +877,8 @@ luaA_loadrc(const char *confpath, bool run)
         const char *err = lua_tostring(L, -1);
         luaA_startup_error(err);
         fprintf(stderr, "%s\n", err);
-        return false;
-    }
-
-    if(!run)
-    {
         lua_pop(L, 1);
-        return true;
+        return false;
     }
 
     /* Set the conffile right now so it can be used inside the
@@ -792,21 +911,28 @@ luaA_loadrc(const char *confpath, bool run)
  * \param run Run the configuration file.
  */
 bool
-luaA_parserc(xdgHandle* xdg, const char *confpatharg, bool run)
+luaA_parserc(xdgHandle* xdg, const char *confpatharg)
+{
+    const char *confpath = luaA_find_config(xdg, confpatharg, luaA_loadrc);
+    bool ret = confpath != NULL;
+    p_delete(&confpath);
+
+    return ret;
+}
+
+/** Find a config file for which the given callback returns true.
+ * \param xdg An xdg handle to use to get XDG basedir.
+ * \param confpatharg The configuration file to load.
+ * \param callback The callback to call.
+ */
+const char *
+luaA_find_config(xdgHandle* xdg, const char *confpatharg, luaA_config_callback *callback)
 {
     char *confpath = NULL;
-    bool ret = false;
 
-    /* try to load, return if it's ok */
-    if(confpatharg)
+    if(confpatharg && callback(confpatharg))
     {
-        if(luaA_loadrc(confpatharg, run))
-        {
-            ret = true;
-            goto bailout;
-        }
-        else if(!run)
-            goto bailout;
+        return a_strdup(confpatharg);
     }
 
     confpath = xdgConfigFind("awesome/rc.lua", xdg);
@@ -816,21 +942,22 @@ luaA_parserc(xdgHandle* xdg, const char *confpatharg, bool run)
     /* confpath is "string1\0string2\0string3\0\0" */
     while(*tmp)
     {
-        if(luaA_loadrc(tmp, run))
+        if(callback(tmp))
         {
-            ret = true;
-            goto bailout;
+            const char *ret = a_strdup(tmp);
+            p_delete(&confpath);
+            return ret;
         }
-        else if(!run)
-            goto bailout;
         tmp += a_strlen(tmp) + 1;
     }
-
-bailout:
-
     p_delete(&confpath);
 
-    return ret;
+    if(callback(AWESOME_DEFAULT_CONF))
+    {
+        return a_strdup(AWESOME_DEFAULT_CONF);
+    }
+
+    return NULL;
 }
 
 int

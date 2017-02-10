@@ -3,96 +3,67 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module awful.ewmh
 ---------------------------------------------------------------------------
 
-local setmetatable = setmetatable
 local client = client
 local screen = screen
 local ipairs = ipairs
-local math = math
 local util = require("awful.util")
 local aclient = require("awful.client")
 local aplace = require("awful.placement")
 local asuit = require("awful.layout.suit")
+local beautiful = require("beautiful")
 
-local ewmh = {}
+local ewmh = {
+    generic_activate_filters    = {},
+    contextual_activate_filters = {},
+}
 
-local data = setmetatable({}, { __mode = 'k' })
+--- Honor the screen padding when maximizing.
+-- @beautiful beautiful.maximized_honor_padding
+-- @tparam[opt=true] boolean maximized_honor_padding
 
-local function screen_change(window)
-    if data[window] then
-        for _, reqtype in ipairs({ "maximized_vertical", "maximized_horizontal", "fullscreen" }) do
-            if data[window][reqtype] then
-                if data[window][reqtype].width then
-                    data[window][reqtype].width = math.min(data[window][reqtype].width,
-                                                           screen[window.screen].workarea.width)
-                    if reqtype == "maximized_horizontal" then
-                        local bw = window.border_width or 0
-                        data[window][reqtype].width = data[window][reqtype].width - 2*bw
-                    end
-                end
-                if data[window][reqtype].height then
-                    data[window][reqtype].height = math.min(data[window][reqtype].height,
-                                                             screen[window.screen].workarea.height)
-                    if reqtype == "maximized_vertical" then
-                        local bw = window.border_width or 0
-                        data[window][reqtype].height = data[window][reqtype].height - 2*bw
-                    end
-                end
-                if data[window][reqtype].screen then
-                    local from = screen[data[window][reqtype].screen].workarea
-                    local to = screen[window.screen].workarea
-                    local new_x, new_y
-                    if data[window][reqtype].x then
-                        new_x = to.x + data[window][reqtype].x - from.x
-                        if new_x > to.x + to.width then new_x = to.x end
-                        -- Move window if it overlaps the new area to the right.
-                        if new_x + data[window][reqtype].width > to.x + to.width then
-                            new_x = to.x + to.width - data[window][reqtype].width
-                        end
-                        if new_x < to.x then new_x = to.x end
-                        data[window][reqtype].x = new_x
-                    end
-                    if data[window][reqtype].y then
-                        new_y = to.y + data[window][reqtype].y - from.y
-                        if new_y > to.y + to.width then new_y = to.y end
-                        -- Move window if it overlaps the new area to the bottom.
-                        if new_y + data[window][reqtype].height > to.y + to.height then
-                            new_y = to.y + to.height - data[window][reqtype].height
-                        end
-                        if new_y < to.y then new_y = to.y end
-                        data[window][reqtype].y = new_y
-                    end
-                end
-            end
-        end
-    end
-end
+--- Hide the border on fullscreen clients.
+-- @beautiful beautiful.fullscreen_hide_border
+-- @tparam[opt=true] boolean fullscreen_hide_border
+
+--- The list of all registered generic request::activate (focus stealing)
+-- filters. If a filter is added to only one context, it will be in
+-- `ewmh.contextual_activate_filters`["context_name"].
+-- @table[opt={}] generic_activate_filters
+-- @see ewmh.activate
+-- @see ewmh.add_activate_filter
+-- @see ewmh.remove_activate_filter
+
+--- The list of all registered contextual request::activate (focus stealing)
+-- filters. If a filter is added to only one context, it will be in
+-- `ewmh.generic_activate_filters`.
+-- @table[opt={}] contextual_activate_filters
+-- @see ewmh.activate
+-- @see ewmh.add_activate_filter
+-- @see ewmh.remove_activate_filter
 
 --- Update a client's settings when its geometry changes, skipping signals
 -- resulting from calls within.
-local geometry_change_lock = false
-local function geometry_change(window)
-    if geometry_change_lock then return end
-    geometry_change_lock = true
+local repair_geometry_lock = false
+local function repair_geometry(window)
+    if repair_geometry_lock then return end
+    repair_geometry_lock = true
 
-    -- Fix up the geometry in case this window needs to cover the whole screen.
-    local bw = window.border_width or 0
-    local g = screen[window.screen].workarea
-    if window.maximized_vertical then
-        window:geometry { height = g.height - 2*bw, y = g.y }
-    end
-    if window.maximized_horizontal then
-        window:geometry { width = g.width - 2*bw, x = g.x }
-    end
-    if window.fullscreen then
-        window.border_width = 0
-        window:geometry(screen[window.screen].geometry)
+    -- Re-apply the geometry locking properties to what they should be.
+    for _, prop in ipairs {
+        "fullscreen", "maximized", "maximized_vertical", "maximized_horizontal"
+    } do
+        if window[prop] then
+            window:emit_signal("request::geometry", prop, {
+                store_geometry = false
+            })
+            break
+        end
     end
 
-    geometry_change_lock = false
+    repair_geometry_lock = false
 end
 
 --- Activate a window.
@@ -111,9 +82,27 @@ function ewmh.activate(c, context, hints) -- luacheck: no unused args
 
     if c.focusable == false and not hints.force then return end
 
-    if c:isvisible() then
-        client.focus = c
+    local found, ret = false
+
+    -- Execute the filters until something handle the request
+    for _, tab in ipairs {
+        ewmh.contextual_activate_filters[context] or {},
+        ewmh.generic_activate_filters
+    } do
+        for i=#tab, 1, -1 do
+            ret = tab[i](c, context, hints)
+            if ret ~= nil then found=true; break end
+        end
+
+        if found then break end
     end
+
+    if ret ~= false and c:isvisible() then
+        client.focus = c
+    elseif ret == false and not hints.force then
+        return
+    end
+
     if hints and hints.raise then
         c:raise()
         if not awesome.startup and not c:isvisible() then
@@ -122,20 +111,104 @@ function ewmh.activate(c, context, hints) -- luacheck: no unused args
     end
 end
 
+--- Add an activate (focus stealing) filter function.
+--
+-- The callback takes the following parameters:
+--
+-- * **c** (*client*) The client requesting the activation
+-- * **context** (*string*) The activation context.
+-- * **hints** (*table*) Some additional hints (depending on the context)
+--
+-- If the callback returns `true`, the client will be activated unless the `force`
+-- hint is set. If the callback returns `false`, the activation request is
+-- cancelled. If the callback returns `nil`, the previous callback will be
+-- executed. This will continue until either a callback handles the request or
+-- when it runs out of callbacks. In that case, the request will be granted if
+-- the client is visible.
+--
+-- For example, to block Firefox from stealing the focus, use:
+--
+--    awful.ewmh.add_activate_filter(function(c, "ewmh")
+--        if c.class == "Firefox" then return false end
+--    end)
+--
+-- @tparam function f The callback
+-- @tparam[opt] string context The `request::activate` context
+-- @see generic_activate_filters
+-- @see contextual_activate_filters
+-- @see remove_activate_filter
+function ewmh.add_activate_filter(f, context)
+    if not context then
+        table.insert(ewmh.generic_activate_filters, f)
+    else
+        ewmh.contextual_activate_filters[context] =
+            ewmh.contextual_activate_filters[context] or {}
+
+        table.insert(ewmh.contextual_activate_filters[context], f)
+    end
+end
+
+--- Remove an activate (focus stealing) filter function.
+-- This is an helper to avoid dealing with `ewmh.add_activate_filter` directly.
+-- @tparam function f The callback
+-- @tparam[opt] string context The `request::activate` context
+-- @treturn boolean If the callback existed
+-- @see generic_activate_filters
+-- @see contextual_activate_filters
+-- @see add_activate_filter
+function ewmh.remove_activate_filter(f, context)
+    local tab = context and (ewmh.contextual_activate_filters[context] or {})
+        or ewmh.generic_activate_filters
+
+    for k, v in ipairs(tab) do
+        if v == f then
+            table.remove(tab, k)
+
+            -- In case the callback is there multiple time.
+            ewmh.remove_activate_filter(f, context)
+
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Get tags that are on the same screen as the client. This should _almost_
+-- always return the same content as c:tags().
+local function get_valid_tags(c, s)
+    local tags, new_tags = c:tags(), {}
+
+    for _, t in ipairs(tags) do
+        if s == t.screen then
+            table.insert(new_tags, t)
+        end
+    end
+
+    return new_tags
+end
+
 --- Tag a window with its requested tag.
 --
 -- It is the default signal handler for `request::tag` on a `client`.
 --
 -- @signalhandler awful.ewmh.tag
 -- @client c A client to tag
--- @tag[opt] t A tag to use. If omitted, then the client is made sticky.
+-- @tparam[opt] tag|boolean t A tag to use. If true, then the client is made sticky.
 -- @tparam[opt={}] table hints Extra information
 function ewmh.tag(c, t, hints) --luacheck: no unused
     -- There is nothing to do
-    if not t and #c:tags() > 0 then return end
+    if not t and #get_valid_tags(c, c.screen) > 0 then return end
 
     if not t then
-        c:to_selected_tags()
+        if c.transient_for and not (hints and hints.reason == "screen") then
+            c.screen = c.transient_for.screen
+            if not c.sticky then
+                c:tags(c.transient_for:tags())
+            end
+        else
+            c:to_selected_tags()
+        end
     elseif type(t) == "boolean" and t then
         c.sticky = true
     else
@@ -144,6 +217,10 @@ function ewmh.tag(c, t, hints) --luacheck: no unused
     end
 end
 
+--- Handle client urgent request
+-- @signalhandler awful.ewmh.urgent
+-- @client c A client
+-- @tparam boolean urgent If the client should be urgent
 function ewmh.urgent(c, urgent)
     if c ~= client.focus and not aclient.property.get(c,"ignore_urgent") then
         c.urgent = urgent
@@ -154,6 +231,7 @@ end
 local context_mapper = {
     maximized_vertical   = "maximize_vertically",
     maximized_horizontal = "maximize_horizontally",
+    maximized            = "maximize",
     fullscreen           = "maximize"
 }
 
@@ -194,7 +272,10 @@ function ewmh.geometry(c, context, hints)
         -- If the property is boolean and it correspond to the undo operation,
         -- restore the stored geometry.
         if state == false then
+            local original = repair_geometry_lock
+            repair_geometry_lock = true
             aplace.restore(c,{context=context})
+            repair_geometry_lock = original
             return
         end
 
@@ -204,7 +285,23 @@ function ewmh.geometry(c, context, hints)
             props.honor_workarea = honor_default
         end
 
+        if props.honor_padding == nil and props.honor_workarea and context:match("maximize") then
+            props.honor_padding = beautiful.maximized_honor_padding ~= false
+        end
+
+        if original_context == "fullscreen" and beautiful.fullscreen_hide_border ~= false then
+            props.ignore_border_width = true
+        end
+
         aplace[context](c, props)
+
+        -- Remove the border to get a "real" fullscreen.
+        if original_context == "fullscreen" and beautiful.fullscreen_hide_border ~= false then
+            local original = repair_geometry_lock
+            repair_geometry_lock = true
+            c.border_width = 0
+            repair_geometry_lock = original
+        end
     end
 end
 
@@ -212,12 +309,11 @@ client.connect_signal("request::activate", ewmh.activate)
 client.connect_signal("request::tag", ewmh.tag)
 client.connect_signal("request::urgent", ewmh.urgent)
 client.connect_signal("request::geometry", ewmh.geometry)
-client.connect_signal("property::screen", screen_change)
-client.connect_signal("property::border_width", geometry_change)
-client.connect_signal("property::geometry", geometry_change)
+client.connect_signal("property::border_width", repair_geometry)
+client.connect_signal("property::screen", repair_geometry)
 screen.connect_signal("property::workarea", function(s)
     for _, c in pairs(client.get(s)) do
-        geometry_change(c)
+        repair_geometry(c)
     end
 end)
 

@@ -16,7 +16,6 @@
 --
 -- @author Alexander Yakushev &lt;yakushev.alex@gmail.com&gt;
 -- @copyright 2011-2012 Alexander Yakushev
--- @release @AWESOME_VERSION@
 -- @module menubar
 ---------------------------------------------------------------------------
 
@@ -46,34 +45,47 @@ local compute_text_width = menubar.utils.compute_text_width
 --- When true the .desktop files will be reparsed only when the
 -- extension is initialized. Use this if menubar takes much time to
 -- open.
+-- @tfield[opt=true] boolean cache_entries
 menubar.cache_entries = true
 
 --- When true the categories will be shown alongside application
 -- entries.
+-- @tfield[opt=true] boolean show_categories
 menubar.show_categories = true
 
 --- Specifies the geometry of the menubar. This is a table with the keys
 -- x, y, width and height. Missing values are replaced via the screen's
 -- geometry. However, missing height is replaced by the font size.
+-- @table geometry
+-- @tfield number geometry.x A forced horizontal position
+-- @tfield number geometry.y A forced vertical position
+-- @tfield number geometry.width A forced width
+-- @tfield number geometry.height A forced height
 menubar.geometry = { width = nil,
                      height = nil,
                      x = nil,
                      y = nil }
+
 --- Width of blank space left in the right side.
+-- @tfield number right_margin
 menubar.right_margin = theme.xresources.apply_dpi(8)
 
 --- Label used for "Next page", default "▶▶".
+-- @tfield[opt="▶▶"] string right_label
 menubar.right_label = "▶▶"
 
 --- Label used for "Previous page", default "◀◀".
+-- @tfield[opt="◀◀"] string left_label
 menubar.left_label = "◀◀"
 
 -- awful.widget.common.list_update adds three times a margin of dpi(4)
 -- for each item:
+-- @tfield number list_interspace
 local list_interspace = theme.xresources.apply_dpi(4) * 3
 
 --- Allows user to specify custom parameters for prompt.run function
 -- (like colors).
+-- @see awful.prompt
 menubar.prompt_args = {}
 
 -- Private section
@@ -81,9 +93,7 @@ local current_item = 1
 local previous_item = nil
 local current_category = nil
 local shownitems = nil
-local instance = { prompt = nil,
-                   widget = nil,
-                   wibox = nil }
+local instance = nil
 
 local common_args = { w = wibox.layout.fixed.horizontal(),
                       data = setmetatable({}, { __mode = 'kv' }) }
@@ -113,7 +123,7 @@ local function load_count_table()
     local count_file = io.open (count_file_name, "r")
     local count_table = {}
 
-    -- read count file
+    -- read weight file
     if count_file then
         io.input (count_file)
         for line in io.lines() do
@@ -135,7 +145,7 @@ local function write_count_table(count_table)
     if count_file then
         io.output (count_file)
 
-        for name,count in pairs(count_table) do
+        for name, count in pairs(count_table) do
             local str = string.format("%s;%d\n", name, count)
             io.write(str)
         end
@@ -225,44 +235,46 @@ local function menulist_update(query, scr)
     query = query or ""
     shownitems = {}
     local pattern = awful.util.query_to_pattern(query)
-    local match_inside = {}
 
-    -- First we add entries which names match the command from the
-    -- beginning to the table shownitems, and the ones that contain
-    -- command in the middle to the table match_inside.
+    -- All entries are added to a list that will be sorted
+    -- according to the priority (first) and weight (second) of its
+    -- entries.
+    -- If categories are used in the menu, we add the entries matching
+    -- the current query with high priority as to ensure they are
+    -- displayed first. Afterwards the non-category entries are added.
+    -- All entries are weighted according to the number of times they
+    -- have been executed previously (stored in count_table).
+
+    local count_table = load_count_table()
+    local command_list = {}
+
+    local PRIO_NONE = 0
+    local PRIO_CATEGORY_MATCH = 2
 
     -- Add the categories
     if menubar.show_categories then
         for _, v in pairs(menubar.menu_gen.all_categories) do
             v.focused = false
             if not current_category and v.use then
+
+                -- check if current query matches a category
                 if string.match(v.name, pattern) then
-                    if string.match(v.name, "^" .. pattern) then
-                        table.insert(shownitems, v)
-                    else
-                        table.insert(match_inside, v)
-                    end
-                end
-            end
-        end
-    end
 
-    local count_table = load_count_table()
-    local command_list = {}
+                    v.weight = 0
+                    v.prio = PRIO_CATEGORY_MATCH
 
-    -- Add the applications according to their name and cmdline
-    for _, v in ipairs(menubar.menu_entries) do
-        v.focused = false
-        if not current_category or v.category == current_category then
-            if string.match(v.name, pattern)
-                or string.match(v.cmdline, pattern) then
-                if string.match(v.name, "^" .. pattern)
-                    or string.match(v.cmdline, "^" .. pattern) then
-
-                    v.count = 0
-                    -- use count from count_table if present
+                    -- get use count from count_table if present
+                    -- and use it as weight
                     if string.len(pattern) > 0 and count_table[v.name] ~= nil then
-                        v.count = tonumber(count_table[v.name])
+                        v.weight = tonumber(count_table[v.name])
+                    end
+
+                    -- check for prefix match
+                    if string.match(v.name, "^" .. pattern) then
+                        -- increase default priority
+                        v.prio = PRIO_CATEGORY_MATCH + 1
+                    else
+                        v.prio = PRIO_CATEGORY_MATCH
                     end
 
                     table.insert (command_list, v)
@@ -271,11 +283,47 @@ local function menulist_update(query, scr)
         end
     end
 
-    local function compare_counts(a,b)
-        return a.count > b.count
+    -- Add the applications according to their name and cmdline
+    for _, v in ipairs(menubar.menu_entries) do
+        v.focused = false
+        if not current_category or v.category == current_category then
+
+            -- check if the query matches either the name or the commandline
+            -- of some entry
+            if string.match(v.name, pattern)
+                or string.match(v.cmdline, pattern) then
+
+                v.weight = 0
+                v.prio = PRIO_NONE
+
+                -- get use count from count_table if present
+                -- and use it as weight
+                if string.len(pattern) > 0 and count_table[v.name] ~= nil then
+                    v.weight = tonumber(count_table[v.name])
+                end
+
+                -- check for prefix match
+                if string.match(v.name, "^" .. pattern)
+                    or string.match(v.cmdline, "^" .. pattern) then
+                    -- increase default priority
+                    v.prio = PRIO_NONE + 1
+                else
+                    v.prio = PRIO_NONE
+                end
+
+                table.insert (command_list, v)
+            end
+        end
     end
 
-    -- sort command_list by count (highest first)
+    local function compare_counts(a, b)
+        if a.prio == b.prio then
+            return a.weight > b.weight
+        end
+        return a.prio > b.prio
+    end
+
+    -- sort command_list by weight (highest first)
     table.sort(command_list, compare_counts)
     -- copy into showitems
     shownitems = command_list
@@ -297,25 +345,14 @@ local function menulist_update(query, scr)
                        get_current_page(shownitems, query, scr))
 end
 
---- Create the menubar wibox and widgets.
--- @tparam[opt] screen scr Screen.
-local function initialize(scr)
-    instance.wibox = wibox({})
-    instance.widget = menubar.get(scr)
-    instance.wibox.ontop = true
-    instance.prompt = awful.widget.prompt()
-    local layout = wibox.layout.fixed.horizontal()
-    layout:add(instance.prompt)
-    layout:add(instance.widget)
-    instance.wibox:set_widget(layout)
-end
-
 --- Refresh menubar's cache by reloading .desktop files.
 -- @tparam[opt] screen scr Screen.
 function menubar.refresh(scr)
     menubar.menu_gen.generate(function(entries)
         menubar.menu_entries = entries
-        menulist_update(nil, scr)
+        if instance then
+            menulist_update(instance.query, scr)
+        end
     end)
 end
 
@@ -366,9 +403,20 @@ end
 --- Show the menubar on the given screen.
 -- @param scr Screen.
 function menubar.show(scr)
-    if not instance.wibox then
-        initialize(scr)
-    elseif instance.wibox.visible then -- Menu already shown, exit
+    if not instance then
+        instance = {
+            wibox = wibox({ ontop = true }),
+            widget = menubar.get(scr),
+            prompt = awful.widget.prompt(),
+            query = nil,
+        }
+        local layout = wibox.layout.fixed.horizontal()
+        layout:add(instance.prompt)
+        layout:add(instance.widget)
+        instance.wibox:set_widget(layout)
+    end
+
+    if instance.wibox.visible then -- Menu already shown, exit
         return
     elseif not menubar.cache_entries then
         menubar.refresh(scr)
@@ -377,7 +425,7 @@ function menubar.show(scr)
     -- Set position and size
     scr = scr or awful.screen.focused() or 1
     scr = get_screen(scr)
-    local scrgeom = capi.screen[scr].workarea
+    local scrgeom = scr.workarea
     local geometry = menubar.geometry
     instance.geometry = {x = geometry.x or scrgeom.x,
                              y = geometry.y or scrgeom.y,
@@ -387,24 +435,31 @@ function menubar.show(scr)
 
     current_item = 1
     current_category = nil
-    menulist_update(nil, scr)
+    menulist_update(instance.query, scr)
 
     local prompt_args = menubar.prompt_args or {}
-    prompt_args.prompt = "Run: "
-    awful.prompt.run(prompt_args, instance.prompt.widget,
-                function() end,            -- exe_callback function set to do nothing
-                awful.completion.shell,     -- completion_callback
-                awful.util.get_cache_dir() .. "/history_menu",
-                nil,
-                menubar.hide, function(query) menulist_update(query, scr) end,
-                prompt_keypressed_callback
-                )
+
+    awful.prompt.run(setmetatable({
+        prompt              = "Run: ",
+        textbox             = instance.prompt.widget,
+        completion_callback = awful.completion.shell,
+        history_path        = awful.util.get_cache_dir() .. "/history_menu",
+        done_callback       = menubar.hide,
+        changed_callback    = function(query)
+            instance.query = query
+            menulist_update(query, scr)
+        end,
+        keypressed_callback = prompt_keypressed_callback
+    }, {__index=prompt_args}))
+
     instance.wibox.visible = true
 end
 
 --- Hide the menubar.
 function menubar.hide()
-    instance.wibox.visible = false
+    if instance then
+        instance.wibox.visible = false
+    end
 end
 
 --- Get a menubar wibox.

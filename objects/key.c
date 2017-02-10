@@ -31,7 +31,6 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @classmod key
  */
 
@@ -39,7 +38,7 @@
 #include "common/xutil.h"
 #include "xkb.h"
 
-/* XStringToKeysym() and XKeysymToString */
+/* XStringToKeysym() */
 #include <X11/Xlib.h>
 #include <xkbcommon/xkbcommon.h>
 #include <glib.h>

@@ -1,11 +1,113 @@
 ---------------------------------------------------------------------------
---- Prompt module for awful
+--- Prompt module for awful.
+--
+-- **Keyboard navigation**:
+--
+-- The following readline keyboard shortcuts are implemented as expected:
+-- <table class='widget_list' border=1>
+--   <tr><th>Name</th><th>Usage</th></tr>
+--   <tr><td><kbd>CTRL+A</kbd></td><td>beginning-of-line</td></tr>
+--   <tr><td><kbd>CTRL+B</kbd></td><td>backward-char</td></tr>
+--   <tr><td><kbd>CTRL+C</kbd></td><td>cancel</td></tr>
+--   <tr><td><kbd>CTRL+D</kbd></td><td>delete-char</td></tr>
+--   <tr><td><kbd>CTRL+E</kbd></td><td>end-of-line</td></tr>
+--   <tr><td><kbd>CTRL+J</kbd></td><td>accept-line</td></tr>
+--   <tr><td><kbd>CTRL+M</kbd></td><td>accept-line</td></tr>
+--   <tr><td><kbd>CTRL+F</kbd></td><td>move-cursor-right</td></tr>
+--   <tr><td><kbd>CTRL+H</kbd></td><td>backward-delete-char</td></tr>
+--   <tr><td><kbd>CTRL+K</kbd></td><td>kill-line</td></tr>
+--   <tr><td><kbd>CTRL+U</kbd></td><td>unix-line-discard</td></tr>
+--   <tr><td><kbd>CTRL+W</kbd></td><td>unix-word-rubout</td></tr>
+--   <tr><td><kbd>CTRL+BACKSPACE</kbd></td><td>unix-word-rubout</td></tr>
+--   <tr><td><kbd>SHIFT+INSERT</kbd></td><td>paste</td></tr>
+--   <tr><td><kbd>HOME</kbd></td><td>beginning-of-line</td></tr>
+--   <tr><td><kbd>END</kbd></td><td>end-of-line</td></tr>
+-- </table>
+--
+-- The following shortcuts implement additional history manipulation commands
+-- where the search term is defined as the substring of the command from first
+-- character to cursor position.
+--
+-- * <kbd>CTRL+R</kbd>: reverse history search, matches any history entry
+-- containing search term.
+-- * <kbd>CTRL+S</kbd>: forward history search, matches any history entry
+-- containing search term.
+-- * <kbd>CTRL+UP</kbd>: ZSH up line or search, matches any history entry
+-- starting with search term.
+-- * <kbd>CTRL+DOWN</kbd>: ZSH down line or search, matches any history
+-- entry starting with search term.
+-- * <kbd>CTRL+DELETE</kbd>: delete the currently visible history entry from
+-- history file. This does not delete new commands or history entries under
+-- user editing.
+--
+-- **Basic usage**:
+--
+-- By default, `rc.lua` will create one `awful.widget.prompt` per screen called
+-- `mypromptbox`. It is used for both the command execution (`mod4+r`) and
+-- Lua prompt (`mod4+x`). It can be re-used for random inputs using:
+--
+-- @DOC_wibox_awidget_prompt_simple_EXAMPLE@
+--
+--     -- Then **IN THE globalkeys TABLE** add a new shortcut
+--     awful.key({ modkey }, "e", echo_test,
+--         {description = "Echo a string", group = "custom"}),
+--
+-- Note that this assumes an `rc.lua` file based on the default one. The way
+-- to access the screen prompt may vary.
+--
+-- **Extra key hooks**:
+--
+-- The Awesome prompt also supports adding custom extensions to specific
+-- keyboard keybindings. Those keybindings have precedence over the built-in
+-- ones. Therefor, they can be used to override the default ones.
+--
+-- *[Example one] Adding pre-configured `awful.spawn` commands:*
+--
+-- @DOC_wibox_awidget_prompt_hooks_EXAMPLE@
+--
+-- *[Example two] Modifying the command (+ vi like input)*:
+--
+-- The hook system also allows to modify the command before interpreting it in
+-- the `exe_callback`.
+--
+-- @DOC_wibox_awidget_prompt_vilike_EXAMPLE@
+--
+-- *[Example three] Key listener*:
+--
+-- The 2 previous examples were focused on changing the prompt behavior. This
+-- one explains how to "spy" on the prompt events. This can be used for
+--
+-- * Implementing more complex mutator
+-- * Synchronising other widgets
+-- * Showing extra tips to the user
+--
+-- @DOC_wibox_awidget_prompt_keypress_EXAMPLE@
+--
+-- **highlighting**:
+--
+-- The prompt also support custom highlighters:
+--
+-- @DOC_wibox_awidget_prompt_highlight_EXAMPLE@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module awful.prompt
 ---------------------------------------------------------------------------
+
+--- The prompt cursor foreground color.
+-- @beautiful beautiful.prompt_fg_cursor
+-- @param color
+-- @see gears.color
+
+--- The prompt cursor background color.
+-- @beautiful beautiful.prompt_bg_cursor
+-- @param color
+-- @see gears.color
+
+--- The prompt text font.
+-- @beautiful beautiful.prompt_font
+-- @param string
+-- @see string
 
 -- Grab environment we need
 local assert = assert
@@ -32,37 +134,35 @@ data.history = {}
 
 local search_term = nil
 local function itera (inc,a, i)
-	i = i + inc
-	local v = a[i]
-	if v then return i,v end
+    i = i + inc
+    local v = a[i]
+    if v then return i,v end
 end
 
 --- Load history file in history table
 -- @param id The data.history identifier which is the path to the filename.
 -- @param[opt] max The maximum number of entries in file.
 local function history_check_load(id, max)
-    if id and id ~= ""
-        and not data.history[id] then
-	data.history[id] = { max = 50, table = {} }
+    if id and id ~= "" and not data.history[id] then
+        data.history[id] = { max = 50, table = {} }
 
-	if max then
+        if max then
             data.history[id].max = max
-	end
+        end
 
-	local f = io.open(id, "r")
+        local f = io.open(id, "r")
+        if not f then return end
 
-	-- Read history file
-	if f then
-            for line in f:lines() do
-                if util.table.hasitem(data.history[id].table, line) == nil then
-                        table.insert(data.history[id].table, line)
-                        if #data.history[id].table >= data.history[id].max then
-                           break
-                        end
+        -- Read history file
+        for line in f:lines() do
+            if util.table.hasitem(data.history[id].table, line) == nil then
+                table.insert(data.history[id].table, line)
+                if #data.history[id].table >= data.history[id].max then
+                    break
                 end
             end
-            f:close()
-	end
+        end
+        f:close()
     end
 end
 
@@ -115,7 +215,7 @@ local function history_save(id)
             util.mkdir(id:sub(1, i - 1))
             f = assert(io.open(id, "w"))
         end
-	for i = 1, math.min(#data.history[id].table, data.history[id].max) do
+        for i = 1, math.min(#data.history[id].table, data.history[id].max) do
             f:write(data.history[id].table[i] .. "\n")
         end
        f:close()
@@ -194,39 +294,127 @@ local function prompt_text_with_cursor(args)
     local cursor_color = util.ensure_pango_color(args.cursor_color)
     local text_color = util.ensure_pango_color(args.text_color)
 
+    if args.highlighter then
+        text_start, text_end = args.highlighter(text_start, text_end)
+    end
+
     ret = _prompt .. text_start .. "<span background=\"" .. cursor_color ..
         "\" foreground=\"" .. text_color .. "\" underline=\"" .. underline ..
         "\">" .. char .. "</span>" .. text_end .. spacer
     return ret
 end
 
+--- The callback function to call with command as argument when finished.
+-- @usage local function my_exe_cb(command)
+--    -- do something
+-- end
+-- @callback exe_callback
+-- @tparam string command The command (as entered).
+
+--- The callback function to call to get completion.
+-- @usage local function my_completion_cb(command_before_comp, cur_pos_before_comp, ncomp)
+--    return command_before_comp.."foo", cur_pos_before_comp+3, 1
+-- end
+--
+-- @callback completion_callback
+-- @tparam string command_before_comp The current command.
+-- @tparam number cur_pos_before_comp The current cursor position.
+-- @tparam number ncomp The number of completion elements.
+-- @treturn string command
+-- @treturn number cur_pos
+-- @treturn number matches
+
+--- The callback function to always call without arguments, regardless of
+-- whether the prompt was cancelled.
+-- @usage local function my_done_cb()
+--    -- do something
+-- end
+-- @callback done_callback
+
+---  The callback function to call with command as argument when a command was
+-- changed.
+-- @usage local function my_changed_cb(command)
+--    -- do something
+-- end
+-- @callback changed_callback
+-- @tparam string command The current command.
+
+--- The callback function to call with mod table, key and command as arguments
+-- when a key was pressed.
+-- @usage local function my_keypressed_cb(mod, key, command)
+--    -- do something
+-- end
+-- @callback keypressed_callback
+-- @tparam table mod The current modifiers (like "Control" or "Shift").
+-- @tparam string key The key name.
+-- @tparam string command The current command.
+
+--- The callback function to call with mod table, key and command as arguments
+-- when a key was released.
+-- @usage local function my_keyreleased_cb(mod, key, command)
+--    -- do something
+-- end
+-- @callback keyreleased_callback
+-- @tparam table mod The current modifiers (like "Control" or "Shift").
+-- @tparam string key The key name.
+-- @tparam string command The current command.
+
+--- A function to add syntax highlighting to the command.
+-- @usage local function my_highlighter(before_cursor, after_cursor)
+--    -- do something
+--    return before_cursor, after_cursor
+-- end
+-- @callback highlighter
+-- @tparam string before_cursor
+-- @tparam string after_cursor
+
+--- A callback when a key combination is triggered.
+-- This callback can return many things:
+--
+-- * a modified command
+-- * `true` If the command is successful (then it won't exit)
+-- * nothing or `nil` to execute the `exe_callback` and `done_callback` and exit
+--
+-- An optional second return value controls if the prompt should exit or simply
+-- update the command (from the first return value) and keep going. The default
+-- is to execute the `exe_callback` and `done_callback` before exiting.
+--
+-- @usage local function my_hook(command)
+--    return command.."foo", false
+-- end
+--
+-- @callback hook
+-- @tparam string command The current command.
+
 --- Run a prompt in a box.
 --
--- The following readline keyboard shortcuts are implemented as expected:
--- <kbd>CTRL+A</kbd>, <kbd>CTRL+B</kbd>, <kbd>CTRL+C</kbd>, <kbd>CTRL+D</kbd>,
--- <kbd>CTRL+E</kbd>, <kbd>CTRL+J</kbd>, <kbd>CTRL+M</kbd>, <kbd>CTRL+F</kbd>,
--- <kbd>CTRL+H</kbd>, <kbd>CTRL+K</kbd>, <kbd>CTRL+U</kbd>, <kbd>CTRL+W</kbd>,
--- <kbd>CTRL+BACKSPACE</kbd>, <kbd>SHIFT+INSERT</kbd>, <kbd>HOME</kbd>,
--- <kbd>END</kbd> and arrow keys.
---
--- The following shortcuts implement additional history manipulation commands
--- where the search term is defined as the substring of the command from first
--- character to cursor position.
---
--- * <kbd>CTRL+R</kbd>: reverse history search, matches any history entry
--- containing search term.
--- * <kbd>CTRL+S</kbd>: forward history search, matches any history entry
--- containing search term.
--- * <kbd>CTRL+UP</kbd>: ZSH up line or search, matches any history entry
--- starting with search term.
--- * <kbd>CTRL+DOWN</kbd>: ZSH down line or search, matches any history
--- entry starting with search term.
--- * <kbd>CTRL+DELETE</kbd>: delete the currently visible history entry from
--- history file. This does not delete new commands or history entries under
--- user editing.
---
--- @tparam table args A table with optional arguments: `fg_cursor`, `bg_cursor`,
---   `ul_cursor`, `prompt`, `text`, `selectall`, `font`, `autoexec`, `hooks`.
+-- @tparam[opt={}] table args A table with optional arguments
+-- @tparam[opt] gears.color args.fg_cursor
+-- @tparam[opt] gears.color args.bg_cursor
+-- @tparam[opt] gears.color args.ul_cursor
+-- @tparam[opt] widget args.prompt
+-- @tparam[opt] string args.text
+-- @tparam[opt] boolean args.selectall
+-- @tparam[opt] string args.font
+-- @tparam[opt] boolean args.autoexec
+-- @tparam widget args.textbox The textbox to use for the prompt.
+-- @tparam[opt] function args.highlighter A function to add syntax highlighting to
+--  the command.
+-- @tparam function args.exe_callback The callback function to call with command as argument
+-- when finished.
+-- @tparam function args.completion_callback The callback function to call to get completion.
+-- @tparam[opt] string args.history_path File path where the history should be
+-- saved, set nil to disable history
+-- @tparam[opt] function args.history_max Set the maximum entries in history
+-- file, 50 by default
+-- @tparam[opt] function args.done_callback The callback function to always call
+-- without arguments, regardless of whether the prompt was cancelled.
+-- @tparam[opt] function args.changed_callback The callback function to call
+-- with command as argument when a command was changed.
+-- @tparam[opt] function args.keypressed_callback The callback function to call
+--   with mod table, key and command as arguments when a key was pressed.
+-- @tparam[opt] function args.keyreleased_callback The callback function to call
+--   with mod table, key and command as arguments when a key was pressed.
 -- @tparam[opt] table args.hooks The "hooks" argument uses a syntax similar to
 --   `awful.key`.  It will call a function for the matching modifiers + key.
 --   It receives the command (widget text/input) as an argument.
@@ -236,7 +424,7 @@ end
 --     hooks = {
 --       -- Apply startup notification properties with Shift-Return.
 --       {{"Shift"  }, "Return", function(command)
---         mypromptbox[awful.screen.focused()]:spawn_and_handle_error(
+--         awful.screen.focused().mypromptbox:spawn_and_handle_error(
 --           command, {floating=true})
 --       end},
 --       -- Override default behavior of "Return": launch commands prefixed
@@ -248,20 +436,24 @@ end
 --         return command
 --       end}
 --     }
--- @param textbox The textbox to use for the prompt.
+-- @param textbox The textbox to use for the prompt. [**DEPRECATED**]
 -- @param exe_callback The callback function to call with command as argument
--- when finished.
+-- when finished. [**DEPRECATED**]
 -- @param completion_callback The callback function to call to get completion.
+--   [**DEPRECATED**]
 -- @param[opt] history_path File path where the history should be
--- saved, set nil to disable history
+-- saved, set nil to disable history [**DEPRECATED**]
 -- @param[opt] history_max Set the maximum entries in history
--- file, 50 by default
+-- file, 50 by default [**DEPRECATED**]
 -- @param[opt] done_callback The callback function to always call
 -- without arguments, regardless of whether the prompt was cancelled.
+--  [**DEPRECATED**]
 -- @param[opt] changed_callback The callback function to call
--- with command as argument when a command was changed.
+-- with command as argument when a command was changed. [**DEPRECATED**]
 -- @param[opt] keypressed_callback The callback function to call
 --   with mod table, key and command as arguments when a key was pressed.
+--   [**DEPRECATED**]
+-- @see gears.color
 function prompt.run(args, textbox, exe_callback, completion_callback,
                     history_path, history_max, done_callback,
                     changed_callback, keypressed_callback)
@@ -272,13 +464,65 @@ function prompt.run(args, textbox, exe_callback, completion_callback,
     local command_before_comp
     local cur_pos_before_comp
     local prettyprompt = args.prompt or ""
-    local inv_col = args.fg_cursor or theme.fg_focus or "black"
-    local cur_col = args.bg_cursor or theme.bg_focus or "white"
+    local inv_col = args.fg_cursor or theme.prompt_fg_cursor or theme.fg_focus or "black"
+    local cur_col = args.bg_cursor or theme.prompt_bg_cursor or theme.bg_focus or "white"
     local cur_ul = args.ul_cursor
     local text = args.text or ""
-    local font = args.font or theme.font
+    local font = args.font or theme.prompt_font or theme.font
     local selectall = args.selectall
+    local highlighter = args.highlighter
     local hooks = {}
+
+    -- A function with 9 parameters deserve to die
+    if textbox then
+        util.deprecate("Use args.textbox instead of the textbox parameter")
+    end
+    if exe_callback then
+        util.deprecate(
+            "Use args.exe_callback instead of the exe_callback parameter"
+        )
+    end
+    if completion_callback then
+        util.deprecate(
+            "Use args.completion_callback instead of the completion_callback parameter"
+        )
+    end
+    if history_path then
+        util.deprecate(
+            "Use args.history_path instead of the history_path parameter"
+        )
+    end
+    if history_max then
+        util.deprecate(
+            "Use args.history_max instead of the history_max parameter"
+        )
+    end
+    if done_callback then
+        util.deprecate(
+            "Use args.done_callback instead of the done_callback parameter"
+        )
+    end
+    if changed_callback then
+        util.deprecate(
+            "Use args.changed_callback instead of the changed_callback parameter"
+        )
+    end
+    if keypressed_callback then
+        util.deprecate(
+            "Use args.keypressed_callback instead of the keypressed_callback parameter"
+        )
+    end
+
+    -- This function has already an absurd number of parameters, allow them
+    -- to be set using the args to avoid a "nil, nil, nil, nil, foo" scenario
+    keypressed_callback = keypressed_callback or args.keypressed_callback
+    changed_callback    = changed_callback    or args.changed_callback
+    done_callback       = done_callback       or args.done_callback
+    history_max         = history_max         or args.history_max
+    history_path        = history_path        or args.history_path
+    completion_callback = completion_callback or args.completion_callback
+    exe_callback        = exe_callback        or args.exe_callback
+    textbox             = textbox             or args.textbox
 
     search_term=nil
 
@@ -288,7 +532,7 @@ function prompt.run(args, textbox, exe_callback, completion_callback,
     local cur_pos = (selectall and 1) or text:wlen() + 1
     -- The completion element to use on completion request.
     local ncomp = 1
-    if not textbox or not (exe_callback or args.hooks) then
+    if not textbox then
         return
     end
 
@@ -311,13 +555,13 @@ function prompt.run(args, textbox, exe_callback, completion_callback,
     textbox:set_markup(prompt_text_with_cursor{
         text = text, text_color = inv_col, cursor_color = cur_col,
         cursor_pos = cur_pos, cursor_ul = cur_ul, selectall = selectall,
-        prompt = prettyprompt })
+        prompt = prettyprompt, highlighter =  highlighter})
 
-    local function exec(cb)
+    local function exec(cb, command_to_history)
         textbox:set_markup("")
-        history_add(history_path, command)
+        history_add(history_path, command_to_history)
         keygrabber.stop(grabber)
-        cb(command)
+        if cb then cb(command) end
         if done_callback then done_callback() end
     end
 
@@ -327,15 +571,22 @@ function prompt.run(args, textbox, exe_callback, completion_callback,
         textbox:set_markup(prompt_text_with_cursor{
                                text = command, text_color = inv_col, cursor_color = cur_col,
                                cursor_pos = cur_pos, cursor_ul = cur_ul, selectall = selectall,
-                               prompt = prettyprompt })
+                               prompt = prettyprompt, highlighter =  highlighter })
     end
 
     grabber = keygrabber.run(
     function (modifiers, key, event)
-        if event ~= "press" then return end
         -- Convert index array to hash table
         local mod = {}
         for _, v in ipairs(modifiers) do mod[v] = true end
+
+        if event ~= "press" then
+            if args.keyreleased_callback then
+                args.keyreleased_callback(mod, key, command)
+            end
+
+            return
+        end
 
         -- Call the user specified callback. If it returns true as
         -- the first result then return from the function. Treat the
@@ -378,17 +629,35 @@ function prompt.run(args, textbox, exe_callback, completion_callback,
                     for _,v2 in ipairs(v[1]) do
                         match = match and mod[v2]
                     end
-                    if match or #filtered_modifiers == 0 then
+                    if match then
                         local cb
-                        local ret = v[3](command)
-                        if ret then
-                            command = ret
+                        local ret, quit = v[3](command)
+                        local original_command = command
+
+                        -- Support both a "simple" and a "complex" way to
+                        -- control if the prompt should quit.
+                        quit = quit == nil and (ret ~= true) or (quit~=false)
+
+                        -- Allow the callback to change the command
+                        command = (ret ~= true) and ret or command
+
+                        -- Quit by default, but allow it to be disabled
+                        if ret and type(ret) ~= "boolean" then
                             cb = exe_callback
-                        else
+                            if not quit then
+                                cur_pos = ret:wlen() + 1
+                                update()
+                            end
+                        elseif quit then
                             -- No callback.
                             cb = function() end
                         end
-                        exec(cb)
+
+                        -- Execute the callback
+                        if cb then
+                            exec(cb, original_command)
+                        end
+
                         return
                     end
                 end
@@ -406,7 +675,7 @@ function prompt.run(args, textbox, exe_callback, completion_callback,
         elseif (mod.Control and (key == "j" or key == "m"))
             or (not mod.Control and key == "Return")
             or (not mod.Control and key == "KP_Enter") then
-            exec(exe_callback)
+            exec(exe_callback, command)
             -- We already unregistered ourselves so we don't want to return
             -- true, otherwise we may unregister someone else.
             return

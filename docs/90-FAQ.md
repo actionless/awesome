@@ -145,7 +145,7 @@ You can use a `clientkeys` binding.:
 Add the following key binding to your `globalkeys`:
 
     awful.key({ modkey }, "b", function ()
-        mywibox[mouse.screen].visible = not mywibox[mouse.screen].visible
+        mouse.screen.mywibox.visible = not mouse.screen.mywibox.visible
     end),
 
 ### How to toggle clients floating state?
@@ -304,10 +304,10 @@ the upper right corner of the screen.
 ### How to restart or quit awesome?
 
 You can use the keybinding "Mod4+Ctrl+r" or by selecting restart in the menu.
-You could call `awesome.restart` either from the Lua prompt widget, or by
-passing it to `awesome-client`:
+You could call `awesome.restart` either from the Lua prompt widget, or via
+`awesome-client`:
 
-    $ echo 'awesome.restart()' | awesome-client
+    $ awesome-client 'awesome.restart()'
 
 You can also send the `SIGHUP` signal to the awesome process. Find the PID using
 `ps`, `pgrep` or use `pkill`:
@@ -370,6 +370,37 @@ xkb keyboard description xkb_symbols line.
     xkb_geometry  { include "pc(pc104)"};
     };
     EOF
+
+### I upgraded from Awesome 3 to Awesome 4 and multiscreen broke. Why is that?
+
+Awesome 4.0+ support dynamic screen plugging and unplugging without restarting.
+
+This avoids losing your tags, layout and focus history. Olders `rc.lua` were not
+designed to support such changes and assumed Awesome would restart. To add
+multi-screen support to existing configs, see how
+`awful.screen.connect_for_each_screen` is used in the new `rc.lua` or rebuild
+your config on a newer revision of `rc.lua`.
+
+### Can I have a client or the system tray on multiple screens at once?
+
+No. This is an X11 limitation and there is no sane way to work around it.
+
+### Can a client be tagged on different screens at once?
+
+While it is not impossible to partially implement support for this, many
+Awesome components frequently query the client's screen.
+Since a client can only be in one screen at once, this will cause side effects.
+So by default Awesome avoids, but does not prevent, having clients in multiple
+tags that are not on the same screen.
+
+### Can a tag be on multiple screens?
+
+No. See the previous two questions. However, it is possible to swap tags across
+screens using `t:swap(t2)` (assuming `t` and `t2` are valid `tag` objects).
+
+This can be used to emulate a tag being on multiple screens. Note that this will
+break support for multi-tagged clients. For this reason it isn't implemented by
+default.
 
 ## Development
 

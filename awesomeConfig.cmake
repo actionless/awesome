@@ -4,16 +4,17 @@ set(PROJECT_AWE_NAME awesome)
 # `git describe` later.
 set(VERSION devel)
 
-set(CODENAME "The Fox")
+set(CODENAME "Harder, Better, Faster, Stronger")
 
 project(${PROJECT_AWE_NAME} C)
-
-set(CMAKE_BUILD_TYPE RELEASE)
 
 option(WITH_DBUS "build with D-BUS" ON)
 option(GENERATE_MANPAGES "generate manpages" ON)
 option(COMPRESS_MANPAGES "compress manpages" ON)
 option(GENERATE_DOC "generate API documentation" ON)
+if (GENERATE_DOC AND ENV{DO_COVERAGE})
+    message(STATUS "Not generating API documentation with DO_COVERAGE")
+endif()
 
 # {{{ Endianness
 include(TestBigEndian)
@@ -39,10 +40,26 @@ a_find_program(GIT_EXECUTABLE git FALSE)
 a_find_program(ASCIIDOC_EXECUTABLE asciidoc FALSE)
 a_find_program(XMLTO_EXECUTABLE xmlto FALSE)
 a_find_program(GZIP_EXECUTABLE gzip FALSE)
-# lua documentation
-a_find_program(LDOC_EXECUTABLE ldoc FALSE)
-if(NOT LDOC_EXECUTABLE)
-    a_find_program(LDOC_EXECUTABLE ldoc.lua FALSE)
+# Lua documentation
+if(GENERATE_DOC)
+    a_find_program(LDOC_EXECUTABLE ldoc FALSE)
+    if(NOT LDOC_EXECUTABLE)
+        a_find_program(LDOC_EXECUTABLE ldoc.lua FALSE)
+    endif()
+    if(LDOC_EXECUTABLE)
+        execute_process(COMMAND sh -c "${LDOC_EXECUTABLE} --sadly-ldoc-has-no-version-option 2>&1  | grep ' vs 1.4.5'"
+                        OUTPUT_VARIABLE LDOC_VERSION_RESULT)
+        if(NOT LDOC_VERSION_RESULT STREQUAL "")
+            message(WARNING "Ignoring LDoc, because version 1.4.5 is known to be broken")
+            unset(LDOC_EXECUTABLE CACHE)
+        endif()
+    endif()
+    if(NOT LDOC_EXECUTABLE)
+        message(STATUS "Not generating API documentation. Missing: ldoc.")
+        set(GENERATE_DOC OFF)
+    endif()
+else()
+    message(STATUS "Not generating API documentation.")
 endif()
 # theme graphics
 a_find_program(CONVERT_EXECUTABLE convert TRUE)
@@ -69,19 +86,13 @@ if(GENERATE_MANPAGES)
         set(GENERATE_MANPAGES OFF)
     endif()
 endif()
-
-if(GENERATE_DOC)
-    if(NOT LDOC_EXECUTABLE)
-        message(STATUS "Not generating API documentation. Missing: ldoc")
-        set(GENERATE_DOC OFF)
-    endif()
-endif()
 # }}}
 
 # {{{ Version stamp
 if(OVERRIDE_VERSION)
     set(VERSION ${OVERRIDE_VERSION})
-elseif(EXISTS ${SOURCE_DIR}/.git/HEAD AND GIT_EXECUTABLE)
+    message(STATUS "Using version from OVERRIDE_VERSION: ${VERSION}")
+elseif(EXISTS ${SOURCE_DIR}/.git AND GIT_EXECUTABLE)
     # get current version
     execute_process(
         COMMAND ${GIT_EXECUTABLE} describe --dirty
@@ -93,9 +104,11 @@ elseif(EXISTS ${SOURCE_DIR}/.git/HEAD AND GIT_EXECUTABLE)
     file(WRITE ${VERSION_STAMP_FILE} ${VERSION})
     # create a version_stamp target later
     set(BUILD_FROM_GIT TRUE)
+    message(STATUS "Using version from git: ${VERSION}")
 elseif( EXISTS ${SOURCE_DIR}/.version_stamp )
     # get version from version stamp
     file(READ ${SOURCE_DIR}/.version_stamp VERSION)
+    message(STATUS "Using version from ${SOURCE_DIR}/.version_stamp: ${VERSION}")
 endif()
 # }}}
 
@@ -109,12 +122,11 @@ endif()
 pkg_check_modules(AWESOME_COMMON_REQUIRED REQUIRED
     xcb>=1.6)
 
-pkg_check_modules(AWESOME_REQUIRED REQUIRED
+set(AWESOME_DEPENDENCIES
     glib-2.0
     gdk-pixbuf-2.0
     cairo
     x11
-    x11-xcb
     xcb-cursor
     xcb-randr
     xcb-xtest
@@ -131,11 +143,22 @@ pkg_check_modules(AWESOME_REQUIRED REQUIRED
     cairo-xcb
     libstartup-notification-1.0>=0.10
     xproto>=7.0.15
-    libxdg-basedir>=1.0.0)
+    libxdg-basedir>=1.0.0
+    xcb-xrm
+)
 
-if(NOT AWESOME_REQUIRED_FOUND OR NOT AWESOME_COMMON_REQUIRED_FOUND)
-    message(FATAL_ERROR)
-endif()
+# Check the deps one by one
+foreach(dependency ${AWESOME_DEPENDENCIES})
+    unset(TMP_DEP_FOUND CACHE)
+    pkg_check_modules(TMP_DEP REQUIRED ${dependency})
+
+    if(NOT TMP_DEP_FOUND)
+        message(FATAL_ERROR)
+    endif()
+endforeach()
+
+# Do it again, but this time with the CFLAGS/LDFLAGS
+pkg_check_modules(AWESOME_REQUIRED REQUIRED ${AWESOME_DEPENDENCIES})
 
 # On Mac OS X, the executable of Awesome has to be linked against libiconv
 # explicitly.  Unfortunately, libiconv doesn't have its pkg-config file,
@@ -299,7 +322,6 @@ set(AWESOME_ICON_PATH        ${AWESOME_DATA_PATH}/icons)
 set(AWESOME_THEMES_PATH      ${AWESOME_DATA_PATH}/themes)
 # }}}
 
-
 if(GENERATE_DOC)
     # Load the common documentation
     include(docs/load_ldoc.cmake)
@@ -314,22 +336,27 @@ if(GENERATE_DOC)
 endif()
 
 # {{{ Configure files
-file(GLOB awesome_c_configure_files RELATIVE ${SOURCE_DIR}
+file(GLOB awesome_base_c_configure_files RELATIVE ${SOURCE_DIR}
     ${SOURCE_DIR}/*.c
-    ${SOURCE_DIR}/*.h
+    ${SOURCE_DIR}/*.h)
+
+file(GLOB awesome_c_configure_files RELATIVE ${SOURCE_DIR}
     ${SOURCE_DIR}/common/*.c
     ${SOURCE_DIR}/common/*.h
     ${SOURCE_DIR}/objects/*.c
     ${SOURCE_DIR}/objects/*.h)
+
 file(GLOB_RECURSE awesome_lua_configure_files RELATIVE ${SOURCE_DIR}
-    ${SOURCE_DIR}/lib/*.lua
+    ${SOURCE_DIR}/lib/*.lua)
+
+file(GLOB_RECURSE awesome_theme_configure_files RELATIVE ${SOURCE_DIR}
     ${SOURCE_DIR}/themes/*/*.lua)
+
 set(AWESOME_CONFIGURE_FILES
-    ${awesome_c_configure_files}
-    ${awesome_lua_configure_files}
+    ${awesome_base_c_configure_files}
+    ${awesome_theme_configure_files}
     config.h
     docs/config.ld
-    awesomerc.lua
     awesome-version-internal.h)
 
 foreach(file ${AWESOME_CONFIGURE_FILES})
@@ -338,6 +365,48 @@ foreach(file ${AWESOME_CONFIGURE_FILES})
                    ESCAPE_QUOTES
                    @ONLY)
 endforeach()
+
+set(AWESOME_CONFIGURE_COPYONLY_WITHCOV_FILES
+    ${awesome_c_configure_files}
+    ${awesome_lua_configure_files}
+)
+
+if(DO_COVERAGE)
+    foreach(file ${AWESOME_CONFIGURE_COPYONLY_WITHCOV_FILES})
+        configure_file(${SOURCE_DIR}/${file}
+                    ${BUILD_DIR}/${file}
+                    COPYONLY)
+    endforeach()
+else()
+    foreach(file ${AWESOME_CONFIGURE_COPYONLY_WITHCOV_FILES})
+        configure_file(${SOURCE_DIR}/${file}
+                    ${BUILD_DIR}/${file}
+                    ESCAPE_QUOTES
+                    @ONLY)
+    endforeach()
+endif()
+
+#}}}
+
+# {{{ Generate some aggregated documentation from lua script
+add_custom_command(
+        OUTPUT ${BUILD_DIR}/docs/06-appearance.md
+        COMMAND lua ${SOURCE_DIR}/docs/06-appearance.md.lua
+        ${BUILD_DIR}/docs/06-appearance.md
+        DEPENDS lgi-check
+)
+
+add_custom_command(
+        OUTPUT ${BUILD_DIR}/awesomerc.lua ${BUILD_DIR}/docs/05-awesomerc.md
+        COMMAND lua ${SOURCE_DIR}/docs/05-awesomerc.md.lua
+        ${BUILD_DIR}/docs/05-awesomerc.md ${SOURCE_DIR}/awesomerc.lua
+        ${BUILD_DIR}/awesomerc.lua
+)
+
+# Create a target for the auto-generated awesomerc.lua
+add_custom_target(generate_awesomerc DEPENDS ${BUILD_DIR}/awesomerc.lua)
+
+
 #}}}
 
 # {{{ Copy additional files
@@ -352,15 +421,5 @@ foreach(file ${AWESOME_ADDITIONAL_FILES})
                    @ONLY)
 endforeach()
 #}}}
-
-# The examples coverage need to be done again after the configure_file has
-# inserted the additional code. Otherwise, the result will be off, rendering
-# the coverage useless as a tool to track untested code.
-if(GENERATE_DOC AND DO_COVERAGE)
-    message(STATUS "Running tests again with coverage")
-    set(USE_LCOV 1)
-
-    include(tests/examples/CMakeLists.txt)
-endif()
 
 # vim: filetype=cmake:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80:foldmethod=marker

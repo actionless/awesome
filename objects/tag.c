@@ -26,17 +26,163 @@
  *
  * ![Client geometry](../images/tag_props.svg)
  *
+ * **Creating tags**:
+ *
+ * The default config initializes tags like this:
+ *
+ *    awful.tag(
+ *      { "1", "2", "3", "4", "5", "6", "7", "8", "9" },
+ *      s,
+ *      awful.layout.layouts[1]
+ *    )
+ *
+ * If you wish to have tags with different properties, then `awful.tag.add` is
+ * a better choice:
+ *
+ *    awful.tag.add("First tag", {
+ *        icon               = "/path/to/icon1.png",
+ *        layout             = awful.layout.suit.tile,
+ *        master_fill_policy = "master_width_factor",
+ *        gap_single_client  = true,
+ *        gap                = 15,
+ *        screen             = s,
+ *        selected           = true,
+ *    })
+ *
+ *    awful.tag.add("Second tag", {
+ *        icon = "/path/to/icon2.png",
+ *        layout = awful.layout.suit.max,
+ *        screen = s,
+ *    })
+ *
+ * Note: the example above sets "First tag" to be selected explicitly,
+ * because otherwise you will find yourself without any selected tag.
+ *
+ * **Accessing tags**:
+ *
+ * To access the "current tags", use
+ *
+ *    local tags = awful.screen.focused().selected_tags
+ *
+ * See: `awful.screen.focused`
+ *
+ * See: `screen.selected_tags`
+ *
+ * To ignore the corner case where multiple tags are selected:
+ *
+ *    local t = awful.screen.focused().selected_tag
+ *
+ * See: `screen.selected_tag`
+ *
+ * To get all tags for the focused screen:
+ *
+ *    local tags = awful.screen.focused().tags
+ *
+ * See: `screen.tags`
+ *
+ * To get all tags:
+ *
+ *    local tags = root.tags()
+ *
+ * To get the current tag of the focused client:
+ *
+ *    local t = client.focus and client.focus.first_tag or nil
+ *
+ * See: `client.focus`
+ * See: `client.first_tag`
+ *
+ * To get a tag from its name:
+ *
+ *    local t = awful.tag.find_by_name(awful.screen.focused(), "name")
+ *
+ * **Common shortcuts**:
+ *
+ * Here is a few useful shortcuts not part of the default `rc.lua`. Add these
+ * functions above `-- {{{ Key bindings`:
+ *
+ * Delete the current tag
+ *
+ *    local function delete_tag()
+ *        local t = awful.screen.focused().selected_tag
+ *        if not t then return end
+ *        t:delete()
+ *    end
+ *
+ * Create a new tag at the end of the list
+ *
+ *    local function add_tag()
+ *        awful.tag.add("NewTag",{screen= awful.screen.focused() }):view_only()
+ *    end
+ *
+ * Rename the current tag
+ *
+ *    local function rename_tag()
+ *        awful.prompt.run {
+ *            prompt       = "New tag name: ",
+ *            textbox      = awful.screen.focused().mypromptbox.widget,
+ *            exe_callback = function(new_name)
+ *                if not new_name or #new_name == 0 then return end
+ *
+ *                local t = awful.screen.focused().selected_tag
+ *                if t then
+ *                    t.name = new_name
+ *                end
+ *            end
+ *        }
+ *    end
+ *
+ * Move the focused client to a new tag
+ *
+ *    local function move_to_new_tag()
+ *        local c = client.focus
+ *        if not c then return end
+ *
+ *        local t = awful.tag.add(c.class,{screen= c.screen })
+ *        c:tags({t})
+ *        t:view_only()
+ *    end
+ *
+ * Copy the current tag at the end of the list
+ *
+ *    local function copy_tag()
+ *        local t = awful.screen.focused().selected_tag
+ *        if not t then return end
+ *
+ *        local clients = t:clients()
+ *        local t2 = awful.tag.add(t.name, awful.tag.getdata(t))
+ *        t2:clients(clients)
+ *        t2:view_only()
+ *    end
+ *
+ * And, in the `globalkeys` table:
+ *
+ *    awful.key({ modkey,           }, "a", add_tag,
+ *              {description = "add a tag", group = "tag"}),
+ *    awful.key({ modkey, "Shift"   }, "a", delete_tag,
+ *              {description = "delete the current tag", group = "tag"}),
+ *    awful.key({ modkey, "Control"   }, "a", move_to_new_tag,
+ *              {description = "add a tag with the focused client", group = "tag"}),
+ *    awful.key({ modkey, "Mod1"   }, "a", copy_tag,
+ *              {description = "create a copy of the current tag", group = "tag"}),
+ *    awful.key({ modkey, "Shift"   }, "r", rename_tag,
+ *              {description = "rename the current tag", group = "tag"}),
+ *
+ * See the
+ * <a href="../documentation/05-awesomerc.md.html#global_keybindings">
+ *   global keybindings
+ * </a> for more information about the keybindings.
+ *
  * Some signal names are starting with a dot. These dots are artefacts from
  * the documentation generation, you get the real signal name by
  * removing the starting dot.
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @classmod tag
  */
 
 #include "tag.h"
+#include "screen.h"
 #include "banning.h"
 #include "client.h"
 #include "ewmh.h"
@@ -68,7 +214,7 @@
  */
 
 /**
- * True if the tag is selected to be viewed
+ * True if the tag is selected to be viewed.
  *
  * **Signal:**
  *
@@ -136,6 +282,8 @@ tag_view(lua_State *L, int udx, bool view)
     {
         tag->selected = view;
         banning_need_update();
+        foreach(screen, globalconf.screens)
+            screen_update_workarea(*screen);
 
         luaA_object_emit_signal(L, udx, "property::selected", 0);
     }
@@ -177,6 +325,7 @@ tag_client(lua_State *L, client_t *c)
     client_array_append(&t->clients, c);
     ewmh_client_update_desktop(c);
     banning_need_update();
+    screen_update_workarea(c->screen);
 
     tag_client_emit_signal(t, c, "tagged");
 }
@@ -195,6 +344,7 @@ untag_client(client_t *c, tag_t *t)
             client_array_take(&t->clients, i);
             banning_need_update();
             ewmh_client_update_desktop(c);
+            screen_update_workarea(c->screen);
             tag_client_emit_signal(t, c, "untagged");
             luaA_object_unref(L, t);
             return;

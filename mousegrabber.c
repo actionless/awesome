@@ -22,7 +22,6 @@
 /** awesome mousegrabber API
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @module mousegrabber
  */
 
@@ -82,6 +81,11 @@ mousegrabber_handleevent(lua_State *L, int x, int y, uint16_t mask)
  * continue grabbing, false to stop.
  * The function is called with one argument:
  * a table containing modifiers pointer coordinates.
+ *
+ * The list of valid cusrors are:
+ *
+ *@DOC_cursor_c_COMMON@
+ *
  *
  * @param func A callback function as described above.
  * @param cursor The name of a X cursor to use while grabbing.

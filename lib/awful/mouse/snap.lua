@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @submodule mouse
 ---------------------------------------------------------------------------
 
@@ -203,8 +202,8 @@ function module.snap(c, snap, x, y, fixed_x, fixed_y)
     geom.x = x or geom.x
     geom.y = y or geom.y
 
-    geom, edge = snap_inside(geom, capi.screen[c.screen].geometry, snap)
-    geom = snap_inside(geom, capi.screen[c.screen].workarea, snap)
+    geom, edge = snap_inside(geom, c.screen.geometry, snap)
+    geom = snap_inside(geom, c.screen.workarea, snap)
 
     -- Allow certain windows to snap to the edge of the workarea.
     -- Only allow docking to workarea for consistency/to avoid problems.
@@ -265,3 +264,5 @@ resize.add_leave_callback(function(c, _, args)
 end, "mouse.move")
 
 return setmetatable(module, {__call = function(_, ...) return module.snap(...) end})
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

@@ -3,7 +3,6 @@
 --
 -- @author Uli Schlachter
 -- @copyright 2012 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @classmod wibox.drawable
 ---------------------------------------------------------------------------
 
@@ -24,20 +23,23 @@ local matrix = require("gears.matrix")
 local hierarchy = require("wibox.hierarchy")
 local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 
-local drawables = setmetatable({}, { __mode = 'k' })
+local visible_drawables = {}
 
 -- Get the widget context. This should always return the same table (if
 -- possible), so that our draw and fit caches can work efficiently.
 local function get_widget_context(self)
     local geom = self.drawable:geometry()
 
-    local sgeos = {}
+    local s = self._forced_screen
+    if not s then
+        local sgeos = {}
 
-    for s in capi.screen do
-        sgeos[s] = s.geometry
+        for scr in capi.screen do
+            sgeos[scr] = scr.geometry
+        end
+
+        s = grect.get_by_coord(sgeos, geom.x, geom.y) or capi.screen.primary
     end
-
-    local s = grect.get_by_coord(sgeos, geom.x, geom.y) or capi.screen.primary
 
     local context = self._widget_context
     local dpi = beautiful.xresources.get_dpi(s)
@@ -46,19 +48,22 @@ local function get_widget_context(self)
             screen = s,
             dpi = dpi,
             drawable = self,
-            widget_at = function(_, ...)
-                self:widget_at(...)
-            end
         }
         for k, v in pairs(self._widget_context_skeleton) do
             context[k] = v
         end
         self._widget_context = context
+
+        -- Give widgets a chance to react to the new context
+        self._need_complete_repaint = true
     end
     return context
 end
 
 local function do_redraw(self)
+    if not self.drawable.valid then return end
+    if self._forced_screen and not self._forced_screen.valid then return end
+
     local surf = surface.load_silently(self.drawable.surface, false)
     -- The surface can be nil if the drawable's parent was already finalized
     if not surf then return end
@@ -109,11 +114,13 @@ local function do_redraw(self)
     if not capi.awesome.composite_manager_running then
         -- This is pseudo-transparency: We draw the wallpaper in the background
         local wallpaper = surface.load_silently(capi.root.wallpaper(), false)
+        cr.operator = cairo.Operator.SOURCE
         if wallpaper then
-            cr.operator = cairo.Operator.SOURCE
             cr:set_source_surface(wallpaper, -x, -y)
-            cr:paint()
+        else
+            cr:set_source_rgb(0, 0, 0)
         end
+        cr:paint()
         cr.operator = cairo.Operator.OVER
     else
         -- This is true transparency: We draw a translucent background
@@ -170,9 +177,11 @@ local function find_widgets(_drawable, result, _hierarchy, x, y)
             0, 0, width, height)
         table.insert(result, {
             x = x3, y = y3, width = w3, height = h3,
-            drawable = _drawable, widget = _hierarchy:get_widget(),
-            matrix_to_device = _hierarchy:get_matrix_to_device(),
-            matrix_to_parent = _hierarchy:get_matrix_to_parent(),
+            widget_width = width,
+            widget_height = height,
+            drawable = _drawable,
+            widget = _hierarchy:get_widget(),
+            hierarchy = _hierarchy
         })
     end
     for _, child in ipairs(_hierarchy:get_children()) do
@@ -184,8 +193,14 @@ end
 -- The drawable must have drawn itself at least once for this to work.
 -- @param x X coordinate of the point
 -- @param y Y coordinate of the point
--- @return A sorted table with all widgets that contain the given point. The
---   widgets are sorted by relevance.
+-- @treturn table A table containing a description of all the widgets that
+-- contain the given point. Each entry is a table containing this drawable as
+-- its `.drawable` entry, the widget under `.widget` and the instance of
+-- `wibox.hierarchy` describing the size and position of the widget under
+-- `.hierarchy`. For convenience, `.x`, `.y`, `.width` and `.height` contain an
+-- approximation of the widget's extents on the surface. `widget_width` and
+-- `widget_height` contain the exact size of the widget in its own, local
+-- coordinate system (which may e.g. be rotated and scaled).
 function drawable:find_widgets(x, y)
     local result = {}
     if self._widget_hierarchy then
@@ -207,6 +222,7 @@ end
 --- Set the background of the drawable
 -- @param c The background to use. This must either be a cairo pattern object,
 --   nil or a string that gears.color() understands.
+-- @see gears.color
 function drawable:set_bg(c)
     c = c or "#000000"
     local t = type(c)
@@ -254,6 +270,7 @@ end
 --- Set the foreground of the drawable
 -- @param c The foreground to use. This must either be a cairo pattern object,
 --   nil or a string that gears.color() understands.
+-- @see gears.color
 function drawable:set_fg(c)
     c = c or "#FFFFFF"
     if type(c) == "string" or type(c) == "table" then
@@ -261,6 +278,21 @@ function drawable:set_fg(c)
     end
     self.foreground_color = c
     self._do_complete_repaint()
+end
+
+function drawable:_force_screen(s)
+    self._forced_screen = s
+end
+
+function drawable:_inform_visible(visible)
+    self._visible = visible
+    if visible then
+        visible_drawables[self] = true
+        -- The wallpaper or widgets might have changed
+        self:_do_complete_repaint()
+    else
+        visible_drawables[self] = nil
+    end
 end
 
 local function emit_difference(name, list, skip)
@@ -355,8 +387,15 @@ function drawable.new(d, widget_context_skeleton, drawable_name)
         ret._need_complete_repaint = true
         ret:draw()
     end
-    drawables[ret._do_complete_repaint] = true
+
+    -- Do a full redraw if the surface changes (the new surface has no content yet)
     d:connect_signal("property::surface", ret._do_complete_repaint)
+
+    -- Do a normal redraw when the drawable moves. This will likely do nothing
+    -- in most cases, but it makes us do a complete repaint when we are moved to
+    -- a different screen.
+    d:connect_signal("property::x", ret.draw)
+    d:connect_signal("property::y", ret.draw)
 
     -- Currently we aren't redrawing on move (signals not connected).
     -- :set_bg() will later recompute this.
@@ -374,8 +413,7 @@ function drawable.new(d, widget_context_skeleton, drawable_name)
             local widgets = ret:find_widgets(x, y)
             for _, v in pairs(widgets) do
                 -- Calculate x/y inside of the widget
-                local lx = x - v.x
-                local ly = y - v.y
+                local lx, ly = v.hierarchy:get_matrix_from_device():transform_point(x, y)
                 v.widget:emit_signal(name, lx, ly, button, modifiers,v)
             end
         end)
@@ -388,6 +426,10 @@ function drawable.new(d, widget_context_skeleton, drawable_name)
 
     -- Set up our callbacks for repaints
     ret._redraw_callback = function(hierar, arg)
+        -- Avoid crashes when a drawable was partly finalized and dirty_area is broken.
+        if not ret._visible then
+            return
+        end
         if ret._widget_hierarchy_callback_arg ~= arg then
             return
         end
@@ -405,7 +447,11 @@ function drawable.new(d, widget_context_skeleton, drawable_name)
             return
         end
         ret._need_relayout = true
-        ret:draw()
+        -- When not visible, we will be redrawn when we become visible. In the
+        -- mean-time, the layout does not matter much.
+        if ret._visible then
+            ret:draw()
+        end
     end
 
     -- Add __tostring method to metatable.
@@ -425,10 +471,20 @@ end
 
 -- Redraw all drawables when the wallpaper changes
 capi.awesome.connect_signal("wallpaper_changed", function()
-    for k in pairs(drawables) do
-        k()
+    for d in pairs(visible_drawables) do
+        d:_do_complete_repaint()
     end
 end)
+
+-- Give drawables a chance to react to screen changes
+local function draw_all()
+    for d in pairs(visible_drawables) do
+        d:draw()
+    end
+end
+screen.connect_signal("property::geometry", draw_all)
+screen.connect_signal("added", draw_all)
+screen.connect_signal("removed", draw_all)
 
 return setmetatable(drawable, { __call = function(_, ...) return drawable.new(...) end })
 

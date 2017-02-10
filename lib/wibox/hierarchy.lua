@@ -5,7 +5,6 @@
 --
 -- @author Uli Schlachter
 -- @copyright 2015 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @module wibox.hierarchy
 ---------------------------------------------------------------------------
 
@@ -23,6 +22,7 @@ local function hierarchy_new(redraw_callback, layout_callback, callback_arg)
         _matrix_to_device = matrix.identity,
         _need_update = true,
         _widget = nil,
+        _context = nil,
         _redraw_callback = redraw_callback,
         _layout_callback = layout_callback,
         _callback_arg = callback_arg,
@@ -73,6 +73,7 @@ end
 local hierarchy_update
 function hierarchy_update(self, context, widget, width, height, region, matrix_to_parent, matrix_to_device)
     if (not self._need_update) and self._widget == widget and
+            self._context == context and
             self._size.width == width and self._size.height == height and
             matrix.equals(self._matrix, matrix_to_parent) and
             matrix.equals(self._matrix_to_device, matrix_to_device) then
@@ -101,6 +102,7 @@ function hierarchy_update(self, context, widget, width, height, region, matrix_t
 
     -- Save the arguments we need to save
     self._widget = widget
+    self._context = context
     self._size.width = width
     self._size.height = height
     self._matrix = matrix_to_parent
@@ -123,7 +125,7 @@ function hierarchy_update(self, context, widget, width, height, region, matrix_t
             r = hierarchy_new(self._redraw_callback, self._layout_callback, self._callback_arg)
             r._parent = self
         end
-        hierarchy_update(r, context, w._widget, w._width, w._height, region, w._matrix, matrix_to_device * w._matrix)
+        hierarchy_update(r, context, w._widget, w._width, w._height, region, w._matrix, w._matrix * matrix_to_device)
         table.insert(self._children, r)
     end
 

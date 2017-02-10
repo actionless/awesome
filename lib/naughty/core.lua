@@ -3,7 +3,6 @@
 --
 -- @author koniu &lt;gkusnierz@gmail.com&gt;
 -- @copyright 2008 koniu
--- @release @AWESOME_VERSION@
 -- @module naughty
 ----------------------------------------------------------------------------
 
@@ -667,8 +666,8 @@ function naughty.notify(args)
     notification.box:set_widget(completelayout)
 
     -- Setup the mouse events
-    layout:buttons(util.table.join(button({ }, 1, run),
-                                   button({ }, 3, function()
+    layout:buttons(util.table.join(button({}, 1, nil, run),
+                                   button({}, 3, nil, function()
                                         die(naughty.notificationClosedReason.dismissedByUser)
                                     end)))
 

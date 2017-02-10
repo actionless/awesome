@@ -1,9 +1,31 @@
 ---------------------------------------------------------------------------
---- Tasklist widget module for awful
+--- Tasklist widget module for awful.
+--
+-- <a name="status_icons"></a>
+-- **Status icons:**
+--
+-- By default, the tasklist prepends some symbols in front of the client name.
+-- This is used to notify that the client has some specific properties that are
+-- currently enabled. This can be disabled using
+-- `beautiful.tasklist_plain_task_name`=true in the theme.
+--
+-- <table class='widget_list' border=1>
+-- <tr style='font-weight: bold;'>
+--  <th align='center'>Icon</th>
+--  <th align='center'>Client property</th>
+-- </tr>
+-- <tr><td>▪</td><td><a href="./client.html#client.sticky">sticky</a></td></tr>
+-- <tr><td>⌃</td><td><a href="./client.html#client.ontop">ontop</a></td></tr>
+-- <tr><td>▴</td><td><a href="./client.html#client.above">above</a></td></tr>
+-- <tr><td>▾</td><td><a href="./client.html#client.below">below</a></td></tr>
+-- <tr><td>✈</td><td><a href="./client.html#client.floating">floating</a></td></tr>
+-- <tr><td>+</td><td><a href="./client.html#client.maximized">maximized</a></td></tr>
+-- <tr><td>⬌</td><td><a href="./client.html#client.maximized_horizontal">maximized_horizontal</a></td></tr>
+-- <tr><td>⬍</td><td><a href="./client.html#client.maximized_vertical">maximized_vertical</a></td></tr>
+-- </table>
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008-2009 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @classmod awful.widget.tasklist
 ---------------------------------------------------------------------------
 
@@ -28,12 +50,156 @@ local tasklist = { mt = {} }
 
 local instances
 
+--- The default foreground (text) color.
+-- @beautiful beautiful.tasklist_fg_normal
+-- @tparam[opt=nil] string|pattern fg_normal
+-- @see gears.color
+
+--- The default background color.
+-- @beautiful beautiful.tasklist_bg_normal
+-- @tparam[opt=nil] string|pattern bg_normal
+-- @see gears.color
+
+--- The focused client foreground (text) color.
+-- @beautiful beautiful.tasklist_fg_focus
+-- @tparam[opt=nil] string|pattern fg_focus
+-- @see gears.color
+
+--- The focused client background color.
+-- @beautiful beautiful.tasklist_bg_focus
+-- @tparam[opt=nil] string|pattern bg_focus
+-- @see gears.color
+
+--- The urgent clients foreground (text) color.
+-- @beautiful beautiful.tasklist_fg_urgent
+-- @tparam[opt=nil] string|pattern fg_urgent
+-- @see gears.color
+
+--- The urgent clients background color.
+-- @beautiful beautiful.tasklist_bg_urgent
+-- @tparam[opt=nil] string|pattern bg_urgent
+-- @see gears.color
+
+--- The minimized clients foreground (text) color.
+-- @beautiful beautiful.tasklist_fg_minimize
+-- @tparam[opt=nil] string|pattern fg_minimize
+-- @see gears.color
+
+--- The minimized clients background color.
+-- @beautiful beautiful.tasklist_bg_minimize
+-- @tparam[opt=nil] string|pattern bg_minimize
+-- @see gears.color
+
+--- The elements default background image.
+-- @beautiful beautiful.tasklist_bg_image_normal
+-- @tparam[opt=nil] string bg_image_normal
+
+--- The focused client background image.
+-- @beautiful beautiful.tasklist_bg_image_focus
+-- @tparam[opt=nil] string bg_image_focus
+
+--- The urgent clients background image.
+-- @beautiful beautiful.tasklist_bg_image_urgent
+-- @tparam[opt=nil] string bg_image_urgent
+
+--- The minimized clients background image.
+-- @beautiful beautiful.tasklist_bg_image_minimize
+-- @tparam[opt=nil] string bg_image_minimize
+
+--- Disable the tasklist client icons.
+-- @beautiful beautiful.tasklist_disable_icon
+-- @tparam[opt=false] boolean tasklist_disable_icon
+
+--- Disable the extra tasklist client property notification icons.
+--
+-- See the <a href="status_icons">Status icons</a> section for more details.
+--
+-- @beautiful beautiful.tasklist_plain_task_name
+-- @tparam[opt=false] boolean tasklist_plain_task_name
+
+--- The tasklist font.
+-- @beautiful beautiful.tasklist_font
+-- @tparam[opt=nil] string font
+
+--- The focused client alignment.
+-- @beautiful beautiful.tasklist_align
+-- @tparam[opt=left] string align *left*, *right* or *center*
+
+--- The focused client title alignment.
+-- @beautiful beautiful.tasklist_font_focus
+-- @tparam[opt=nil] string font_focus
+
+--- The minimized clients font.
+-- @beautiful beautiful.tasklist_font_minimized
+-- @tparam[opt=nil] string font_minimized
+
+--- The urgent clients font.
+-- @beautiful beautiful.tasklist_font_urgent
+-- @tparam[opt=nil] string font_urgent
+
+--- The space between the tasklist elements.
+-- @beautiful beautiful.tasklist_spacing
+-- @tparam[opt=0] number spacing The spacing between tasks.
+
+--- The default tasklist elements shape.
+-- @beautiful beautiful.tasklist_shape
+-- @tparam[opt=nil] gears.shape shape
+
+--- The default tasklist elements border width.
+-- @beautiful beautiful.tasklist_shape_border_width
+-- @tparam[opt=0] number shape_border_width
+
+--- The default tasklist elements border color.
+-- @beautiful beautiful.tasklist_shape_border_color
+-- @tparam[opt=nil] string|color shape_border_color
+-- @see gears.color
+
+--- The focused client shape.
+-- @beautiful beautiful.tasklist_shape_focus
+-- @tparam[opt=nil] gears.shape shape_focus
+
+--- The focused client border width.
+-- @beautiful beautiful.tasklist_shape_border_width_focus
+-- @tparam[opt=0] number shape_border_width_focus
+
+--- The focused client border color.
+-- @beautiful beautiful.tasklist_shape_border_color_focus
+-- @tparam[opt=nil] string|color shape_border_color_focus
+-- @see gears.color
+
+--- The minimized clients shape.
+-- @beautiful beautiful.tasklist_shape_minimized
+-- @tparam[opt=nil] gears.shape shape_minimized
+
+--- The minimized clients border width.
+-- @beautiful beautiful.tasklist_shape_border_width_minimized
+-- @tparam[opt=0] number shape_border_width_minimized
+
+--- The minimized clients border color.
+-- @beautiful beautiful.tasklist_shape_border_color_minimized
+-- @tparam[opt=nil] string|color shape_border_color_minimized
+-- @see gears.color
+
+--- The urgent clients shape.
+-- @beautiful beautiful.tasklist_shape_urgent
+-- @tparam[opt=nil] gears.shape shape_urgent
+
+--- The urgent clients border width.
+-- @beautiful beautiful.tasklist_shape_border_width_urgent
+-- @tparam[opt=0] number shape_border_width_urgent
+
+--- The urgent clients border color.
+-- @beautiful beautiful.tasklist_shape_border_color_urgent
+-- @tparam[opt=nil] string|color shape_border_color_urgent
+-- @see gears.color
+
 -- Public structures
 tasklist.filter = {}
 
 local function tasklist_label(c, args, tb)
     if not args then args = {} end
     local theme = beautiful.get()
+    local align = args.align or theme.tasklist_align or "left"
     local fg_normal = util.ensure_pango_color(args.fg_normal or theme.tasklist_fg_normal or theme.fg_normal, "white")
     local bg_normal = args.bg_normal or theme.tasklist_bg_normal or theme.bg_normal or "#000000"
     local fg_focus = util.ensure_pango_color(args.fg_focus or theme.tasklist_fg_focus or theme.fg_focus, fg_normal)
@@ -42,10 +208,11 @@ local function tasklist_label(c, args, tb)
     local bg_urgent = args.bg_urgent or theme.tasklist_bg_urgent or theme.bg_urgent or bg_normal
     local fg_minimize = util.ensure_pango_color(args.fg_minimize or theme.tasklist_fg_minimize or theme.fg_minimize, fg_normal)
     local bg_minimize = args.bg_minimize or theme.tasklist_bg_minimize or theme.bg_minimize or bg_normal
-    local bg_image_normal = args.bg_image_normal or theme.bg_image_normal
-    local bg_image_focus = args.bg_image_focus or theme.bg_image_focus
-    local bg_image_urgent = args.bg_image_urgent or theme.bg_image_urgent
-    local bg_image_minimize = args.bg_image_minimize or theme.bg_image_minimize
+    -- FIXME v5, remove the fallback theme.bg_image_* variables, see GH#1403
+    local bg_image_normal = args.bg_image_normal or theme.tasklist_bg_image_normal or theme.bg_image_normal
+    local bg_image_focus = args.bg_image_focus or theme.tasklist_bg_image_focus or theme.bg_image_focus
+    local bg_image_urgent = args.bg_image_urgent or theme.tasklist_bg_image_urgent or theme.bg_image_urgent
+    local bg_image_minimize = args.bg_image_minimize or theme.tasklist_bg_image_minimize or theme.bg_image_minimize
     local tasklist_disable_icon = args.tasklist_disable_icon or theme.tasklist_disable_icon or false
     local font = args.font or theme.tasklist_font or theme.font or ""
     local font_focus = args.font_focus or theme.tasklist_font_focus or theme.font_focus or font or ""
@@ -55,6 +222,9 @@ local function tasklist_label(c, args, tb)
     local name = ""
     local bg
     local bg_image
+    local shape              = args.shape or theme.tasklist_shape
+    local shape_border_width = args.shape_border_width or theme.tasklist_shape_border_width
+    local shape_border_color = args.shape_border_color or theme.tasklist_shape_border_color
 
     -- symbol to use to indicate certain client properties
     local sticky = args.sticky or theme.tasklist_sticky or "▪"
@@ -65,6 +235,8 @@ local function tasklist_label(c, args, tb)
     local maximized = args.maximized or theme.tasklist_maximized or '<b>+</b>'
     local maximized_horizontal = args.maximized_horizontal or theme.tasklist_maximized_horizontal or '⬌'
     local maximized_vertical = args.maximized_vertical or theme.tasklist_maximized_vertical or '⬍'
+
+    tb:set_align(align)
 
     if not theme.tasklist_plain_task_name then
         if c.sticky then name = name .. sticky end
@@ -103,23 +275,66 @@ local function tasklist_label(c, args, tb)
         text = text .. "<span color='"..fg_focus.."'>"..name.."</span>"
         bg_image = bg_image_focus
         font = font_focus
+
+        if args.shape_focus or theme.tasklist_shape_focus then
+            shape = args.shape_focus or theme.tasklist_shape_focus
+        end
+
+        if args.shape_border_width_focus or theme.tasklist_shape_border_width_focus then
+            shape_border_width = args.shape_border_width_focus or theme.tasklist_shape_border_width_focus
+        end
+
+        if args.shape_border_color_focus or theme.tasklist_shape_border_color_focus then
+            shape_border_color = args.shape_border_color_focus or theme.tasklist_shape_border_color_focus
+        end
     elseif c.urgent then
         bg = bg_urgent
         text = text .. "<span color='"..fg_urgent.."'>"..name.."</span>"
         bg_image = bg_image_urgent
         font = font_urgent
+
+        if args.shape_urgent or theme.tasklist_shape_urgent then
+            shape = args.shape_urgent or theme.tasklist_shape_urgent
+        end
+
+        if args.shape_border_width_urgent or theme.tasklist_shape_border_width_urgent then
+            shape_border_width = args.shape_border_width_urgent or theme.tasklist_shape_border_width_urgent
+        end
+
+        if args.shape_border_color_urgent or theme.tasklist_shape_border_color_urgent then
+            shape_border_color = args.shape_border_color_urgent or theme.tasklist_shape_border_color_urgent
+        end
     elseif c.minimized then
         bg = bg_minimize
         text = text .. "<span color='"..fg_minimize.."'>"..name.."</span>"
         bg_image = bg_image_minimize
         font = font_minimized
+
+        if args.shape_minimized or theme.tasklist_shape_minimized then
+            shape = args.shape_minimized or theme.tasklist_shape_minimized
+        end
+
+        if args.shape_border_width_minimized or theme.tasklist_shape_border_width_minimized then
+            shape_border_width = args.shape_border_width_minimized or theme.tasklist_shape_border_width_minimized
+        end
+
+        if args.shape_border_color_minimized or theme.tasklist_shape_border_color_minimized then
+            shape_border_color = args.shape_border_color_minimized or theme.tasklist_shape_border_color_minimized
+        end
     else
         bg = bg_normal
         text = text .. "<span color='"..fg_normal.."'>"..name.."</span>"
         bg_image = bg_image_normal
     end
     tb:set_font(font)
-    return text, bg, bg_image, not tasklist_disable_icon and c.icon or nil
+
+    local other_args = {
+        shape              = shape,
+        shape_border_width = shape_border_width,
+        shape_border_color = shape_border_color,
+    }
+
+    return text, bg, bg_image, not tasklist_disable_icon and c.icon or nil, other_args
 end
 
 local function tasklist_update(s, w, buttons, filter, data, style, update_function)
@@ -146,34 +361,53 @@ end
 -- @param screen The screen to draw tasklist for.
 -- @param filter Filter function to define what clients will be listed.
 -- @param buttons A table with buttons binding to set.
--- @param style The style overrides default theme.
+-- @tparam[opt={}] table style The style overrides default theme.
+-- @tparam[opt=nil] string|pattern style.fg_normal
+-- @tparam[opt=nil] string|pattern style.bg_normal
+-- @tparam[opt=nil] string|pattern style.fg_focus
+-- @tparam[opt=nil] string|pattern style.bg_focus
+-- @tparam[opt=nil] string|pattern style.fg_urgent
+-- @tparam[opt=nil] string|pattern style.bg_urgent
+-- @tparam[opt=nil] string|pattern style.fg_minimize
+-- @tparam[opt=nil] string|pattern style.bg_minimize
+-- @tparam[opt=nil] string style.bg_image_normal
+-- @tparam[opt=nil] string style.bg_image_focus
+-- @tparam[opt=nil] string style.bg_image_urgent
+-- @tparam[opt=nil] string style.bg_image_minimize
+-- @tparam[opt=nil] boolean style.tasklist_disable_icon
+-- @tparam[opt=nil] string style.font
+-- @tparam[opt=left] string style.align *left*, *right* or *center*
+-- @tparam[opt=nil] string style.font_focus
+-- @tparam[opt=nil] string style.font_minimized
+-- @tparam[opt=nil] string style.font_urgent
+-- @tparam[opt=nil] number style.spacing The spacing between tags.
+-- @tparam[opt=nil] gears.shape style.shape
+-- @tparam[opt=nil] number style.shape_border_width
+-- @tparam[opt=nil] string|color style.shape_border_color
+-- @tparam[opt=nil] gears.shape style.shape_focus
+-- @tparam[opt=nil] number style.shape_border_width_focus
+-- @tparam[opt=nil] string|color style.shape_border_color_focus
+-- @tparam[opt=nil] gears.shape style.shape_minimized
+-- @tparam[opt=nil] number style.shape_border_width_minimized
+-- @tparam[opt=nil] string|color style.shape_border_color_minimized
+-- @tparam[opt=nil] gears.shape style.shape_urgent
+-- @tparam[opt=nil] number style.shape_border_width_urgent
+-- @tparam[opt=nil] string|color style.shape_border_color_urgent
 -- @param[opt] update_function Function to create a tag widget on each
 --   update. See `awful.widget.common.list_update`.
 -- @tparam[opt] table base_widget Container widget for tag widgets. Default
 --   is `wibox.layout.flex.horizontal`.
--- @param base_widget.bg_normal The background color for unfocused client.
--- @param base_widget.bg_normal The background color for unfocused client.
--- @param base_widget.fg_normal The foreground color for unfocused client.
--- @param base_widget.bg_focus The background color for focused client.
--- @param base_widget.fg_focus The foreground color for focused client.
--- @param base_widget.bg_urgent The background color for urgent clients.
--- @param base_widget.fg_urgent The foreground color for urgent clients.
--- @param base_widget.bg_minimize The background color for minimized clients.
--- @param base_widget.fg_minimize The foreground color for minimized clients.
--- @param base_widget.floating Symbol to use for floating clients.
--- @param base_widget.ontop Symbol to use for ontop clients.
--- @param base_widget.above Symbol to use for clients kept above others.
--- @param base_widget.below Symbol to use for clients kept below others.
--- @param base_widget.maximized Symbol to use for clients that have been maximized (vertically and horizontally).
--- @param base_widget.maximized_horizontal Symbol to use for clients that have been horizontally maximized.
--- @param base_widget.maximized_vertical Symbol to use for clients that have been vertically maximized.
--- @param base_widget.font The font.
+-- @function awful.tasklist
 function tasklist.new(screen, filter, buttons, style, update_function, base_widget)
     screen = get_screen(screen)
     local uf = update_function or common.list_update
     local w = base_widget or flex.horizontal()
 
     local data = setmetatable({}, { __mode = 'k' })
+
+    if w.set_spacing and (style and style.spacing or beautiful.tasklist_spacing) then
+        w:set_spacing(style and style.spacing or beautiful.tasklist_spacing)
+    end
 
     local queued_update = false
     function w._do_tasklist_update()
@@ -219,6 +453,7 @@ function tasklist.new(screen, filter, buttons, style, update_function, base_widg
         capi.client.connect_signal("property::floating", u)
         capi.client.connect_signal("property::maximized_horizontal", u)
         capi.client.connect_signal("property::maximized_vertical", u)
+        capi.client.connect_signal("property::maximized", u)
         capi.client.connect_signal("property::minimized", u)
         capi.client.connect_signal("property::name", u)
         capi.client.connect_signal("property::icon_name", u)

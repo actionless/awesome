@@ -7,7 +7,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module gears.geometry
 ---------------------------------------------------------------------------
 local math = math
@@ -239,3 +238,5 @@ function gears.geometry.rectangle.area_remove(areas, elem)
 end
 
 return gears.geometry
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

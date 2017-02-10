@@ -3,8 +3,7 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
--- @module awful.layout.suit.magnifier
+-- @module awful.layout
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
@@ -18,12 +17,17 @@ local capi =
     mousegrabber = mousegrabber
 }
 
+--- The magnifier layout layoutbox icon.
+-- @beautiful beautiful.layout_magnifier
+-- @param surface
+-- @see gears.surface
+
 local magnifier = {}
 
 function magnifier.mouse_resize_handler(c, corner, x, y)
     capi.mouse.coords({ x = x, y = y })
 
-    local wa = capi.screen[c.screen].workarea
+    local wa = c.screen.workarea
     local center_x = wa.x + wa.width / 2
     local center_y = wa.y + wa.height / 2
     local maxdist_pow = (wa.width^2 + wa.height^2) / 4
@@ -50,6 +54,10 @@ function magnifier.mouse_resize_handler(c, corner, x, y)
                           end, corner .. "_corner")
 end
 
+local function get_screen(s)
+    return s and capi.screen[s]
+end
+
 function magnifier.arrange(p)
     -- Fullscreen?
     local area = p.workarea
@@ -60,15 +68,10 @@ function magnifier.arrange(p)
     local fidx
 
     -- Check that the focused window is on the right screen
-    if focus and focus.screen ~= p.screen then focus = nil end
+    if focus and focus.screen ~= get_screen(p.screen) then focus = nil end
 
-    if not focus and #cls > 0 then
-        focus = cls[1]
-        fidx = 1
-    end
-
-    -- If focused window is not tiled, take the first one which is tiled.
-    if focus.floating then
+    -- If no window is focused or focused window is not tiled, take the first tiled one.
+    if (not focus or focus.floating) and #cls > 0 then
         focus = cls[1]
         fidx = 1
     end
@@ -137,6 +140,9 @@ function magnifier.arrange(p)
         end
     end
 end
+
+--- The magnifier layout.
+-- @clientlayout awful.layout.suit.magnifier
 
 magnifier.name = "magnifier"
 

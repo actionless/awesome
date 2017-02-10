@@ -3,18 +3,36 @@
 -- Display master client in a corner of the screen, and slaves in one
 -- column and one row around the master.
 -- See Pull Request for example : https://github.com/awesomeWM/awesome/pull/251
--- @module awful.layout.suit.corner
+-- @module awful.layout
 -- @author Alexis Brenon &lt;brenon.alexis+awesomewm@gmail.com&gt;
 -- @copyright 2015 Alexis Brenon
--- @release @AWESOME_VERSION@
 
 -- Grab environment we need
 local ipairs = ipairs
 local math = math
 local capi = {screen = screen}
-local tag = require("awful.tag")
 
---- Actually arrange clients of p.clients for corner layout
+--- The cornernw layout layoutbox icon.
+-- @beautiful beautiful.layout_cornernw
+-- @param surface
+-- @see gears.surface
+
+--- The cornerne layout layoutbox icon.
+-- @beautiful beautiful.layout_cornerne
+-- @param surface
+-- @see gears.surface
+
+--- The cornersw layout layoutbox icon.
+-- @beautiful beautiful.layout_cornersw
+-- @param surface
+-- @see gears.surface
+
+--- The cornerse layout layoutbox icon.
+-- @beautiful beautiful.layout_cornerse
+-- @param surface
+-- @see gears.surface
+
+-- Actually arrange clients of p.clients for corner layout
 -- @param p Mandatory table containing required informations for layouts
 -- (clients to arrange, workarea geometry, etc.)
 -- @param orientation String indicating in which corner is the master window.
@@ -101,7 +119,7 @@ local function do_corner(p, orientation)
             master.height = wa.height
         end
         if #cls < 2  then
-            if tag.getmfpol(t) == "expand" then
+            if t.master_fill_policy == "expand" then
                 master = wa
             else
                 master.x = master.x + (wa.width - master.width)/2
@@ -144,18 +162,38 @@ end
 
 local corner = {}
 corner.row_privileged = false
+
+--- Corner layout.
+-- Display master client in a corner of the screen, and slaves in one
+-- column and one row around the master.
+-- @clientlayout awful.layout.suit.corner.nw
 corner.nw = {
         name = "cornernw",
         arrange = function (p) return do_corner(p, "NW") end
     }
+
+--- Corner layout.
+-- Display master client in a corner of the screen, and slaves in one
+-- column and one row around the master.
+-- @clientlayout awful.layout.suit.corner.ne
 corner.ne = {
         name = "cornerne",
         arrange = function (p) return do_corner(p, "NE") end
     }
+
+--- Corner layout.
+-- Display master client in a corner of the screen, and slaves in one
+-- column and one row around the master.
+-- @clientlayout awful.layout.suit.corner.sw
 corner.sw = {
         name = "cornersw",
         arrange = function (p) return do_corner(p, "SW") end
     }
+
+--- Corner layout.
+-- Display master client in a corner of the screen, and slaves in one
+-- column and one row around the master.
+-- @clientlayout awful.layout.suit.corner.se
 corner.se = {
         name = "cornerse",
         arrange = function (p) return do_corner(p, "SE") end

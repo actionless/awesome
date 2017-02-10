@@ -1,7 +1,7 @@
 # Using Cairo and LGI
 
-These days, Awesome interface is mostly based on a library called LGI. It allows
-to access C libraries such as GTK, GLib, Cairo, Pango, PangoCairo and RSVG using
+These days, Awesome's interface is mostly based on a library called LGI. It provides
+access to C libraries such as GTK, GLib, Cairo, Pango, PangoCairo and RSVG using
 Lua code without having to write actual "glue" C code.
 
 This is done using the GObject-introspection framework. The main advantage is
@@ -130,7 +130,7 @@ applying operations.
 ### Cairo in Awesome
 
 All of Awesome's `wibox`es, `awful.wibar`s, `gears.wallpaper`s and
-`awful.titlebar`s contain a Cairo surfaces, which can be accessed through the
+`awful.titlebar`s contain Cairo surfaces, which can be accessed through the
 `drawin` API.  This allows widgets to use the Cairo context directly.
 See the
 [declarative layout system](../documentation/03-declarative-layout.md.html)
@@ -160,4 +160,4 @@ some examples. Here is the most simple example you can get:
 This can then be used as `bgimage` for a `wibox`, `awful.wibar` or
 `wibox.container.background`:
 
-    mywibox[screen.primary].bgimage = img
+    screen.primary.mywibox.bgimage = img

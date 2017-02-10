@@ -1,6 +1,7 @@
 [Desktop Entry]
+Encoding=UTF-8
 Name=Awesome ARGB
-Comment=This session logs you into Awesome
-Type=Application
+Comment=Highly configurable framework window manager
+TryExec=awesome
 Exec=awesome_argb
-TryExec=awesome_argb
+Type=Application

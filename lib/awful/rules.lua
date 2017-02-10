@@ -1,9 +1,24 @@
 ---------------------------------------------------------------------------
 --- Apply rules to clients at startup.
 --
+-- All existing `client` properties can be used in rules. It is also possible
+-- to add random properties that will be later accessible as `c.property_name`
+-- (where `c` is a valid client object)
+--
+-- In addition to the existing properties, the following are supported:
+--
+-- * placement
+-- * honor_padding
+-- * honor_workarea
+-- * tag
+-- * new_tag
+-- * switchtotag
+-- * focus
+-- * titlebars_enabled
+-- * callback
+--
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module awful.rules
 ---------------------------------------------------------------------------
 
@@ -257,6 +272,9 @@ rules.extra_properties = {}
 -- @tfield table awful.rules.high_priority_properties
 rules.high_priority_properties = {}
 
+--- Delayed properties.
+-- Properties applied after all other categories.
+-- @tfield table awful.rules.delayed_properties
 rules.delayed_properties = {}
 
 local force_ignore = {
@@ -265,10 +283,16 @@ local force_ignore = {
     border_width=true,floating=true,size_hints_honor=true
 }
 
-function rules.high_priority_properties.tag(c, value)
+function rules.high_priority_properties.tag(c, value, props)
     if value then
         if type(value) == "string" then
             value = atag.find_by_name(c.screen, value)
+        end
+
+        -- In case the tag has been forced to another screen, move the client
+        if c.screen ~= value.screen then
+            c.screen = value.screen
+            props.screen = value.screen -- In case another rule query it
         end
 
         c:tags{ value }
@@ -313,8 +337,9 @@ end
 --- Create a new tag based on a rule.
 -- @tparam client c The client
 -- @tparam boolean|function|string value The value.
+-- @tparam table props The properties.
 -- @treturn tag The new tag
-function rules.high_priority_properties.new_tag(c, value)
+function rules.high_priority_properties.new_tag(c, value, props)
     local ty = type(value)
     local t = nil
 
@@ -325,8 +350,16 @@ function rules.high_priority_properties.new_tag(c, value)
         -- Create a tag named after "value"
         t = atag.add(value, {screen=c.screen, volatile=true})
     elseif ty == "table" then
-        -- Assume a table of tags properties
-        t = atag.add(value.name or c.class or "N/A", value)
+        -- Assume a table of tags properties. Set the right screen, but
+        -- avoid editing the original table
+        local values = value.screen and value or util.table.clone(value)
+        values.screen = values.screen or c.screen
+
+        t = atag.add(value.name or c.class or "N/A", values)
+
+        -- In case the tag has been forced to another screen, move the client
+        c.screen = t.screen
+        props.screen = t.screen -- In case another rule query it
     else
         assert(false)
     end
@@ -336,7 +369,7 @@ function rules.high_priority_properties.new_tag(c, value)
     return t
 end
 
-function rules.extra_properties.placement(c, value)
+function rules.extra_properties.placement(c, value, props)
     -- Avoid problems
     if awesome.startup and
       (c.size_hints.user_position or c.size_hints.program_position) then
@@ -346,8 +379,8 @@ function rules.extra_properties.placement(c, value)
     local ty = type(value)
 
     local args = {
-        honor_workarea = true,
-        honor_padding  = true
+        honor_workarea = props.honor_workarea ~= false,
+        honor_padding  = props.honor_padding ~= false
     }
 
     if ty == "function" or (ty == "table" and
@@ -359,9 +392,32 @@ function rules.extra_properties.placement(c, value)
     end
 end
 
-function rules.extra_properties.tags(c, value)
+function rules.high_priority_properties.tags(c, value, props)
     local current = c:tags()
-    c:tags(util.table.merge(current, value))
+
+    local tags, s = {}, nil
+
+    for _, t in ipairs(value) do
+        if type(t) == "string" then
+            t = atag.find_by_name(c.screen, t)
+        end
+
+        if t and ((not s) or t.screen == s) then
+            table.insert(tags, t)
+            s = s or t.screen
+        end
+    end
+
+    if s and s ~= c.screen then
+        c.screen = s
+        props.screen = s -- In case another rule query it
+    end
+
+    if #current == 0 or (value[1] and value[1].screen ~= current[1].screen) then
+        c:tags(tags)
+    else
+        c:tags(util.table.merge(current, tags))
+    end
 end
 
 --- Apply properties and callbacks to a client.
@@ -410,17 +466,9 @@ function rules.execute(c, props, callbacks)
                 value = value(c, props)
             end
 
-            handler(c, value)
+            handler(c, value, props)
         end
 
-    end
-
-    -- By default, rc.lua use no_overlap+no_offscreen placement. This has to
-    -- be executed before x/y/width/height/geometry as it would otherwise
-    -- always override the user specified position with the default rule.
-    if props.placement then
-        -- It may be a function, so this one doesn't execute it like others
-        rules.extra_properties.placement(c, props.placement, props)
     end
 
     -- Make sure the tag is selected before the main rules are called.
@@ -455,7 +503,7 @@ function rules.execute(c, props, callbacks)
 
         if not ignore then
             if rules.extra_properties[property] then
-                rules.extra_properties[property](c, value)
+                rules.extra_properties[property](c, value, props)
             elseif type(c[property]) == "function" then
                 c[property](c, value)
             else
@@ -492,9 +540,8 @@ function rules.execute(c, props, callbacks)
     end
 end
 
-function rules.completed_with_payload_callback(c, props)
-    rules.execute(c, props, type(props.callback) == "function" and
-        {props.callback} or props.callback )
+function rules.completed_with_payload_callback(c, props, callbacks)
+    rules.execute(c, props, callbacks)
 end
 
 client.connect_signal("spawn::completed_with_payload", rules.completed_with_payload_callback)

@@ -27,7 +27,6 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @classmod drawin
  */
 
@@ -64,6 +63,7 @@
  * @field window The X window id.
  * @field shape_bounding The drawin's bounding shape as a (native) cairo surface.
  * @field shape_clip The drawin's clip shape as a (native) cairo surface.
+ * @field shape_input The drawin's input shape as a (native) cairo surface.
  * @table drawin
  */
 
@@ -77,6 +77,10 @@
 
 /**
  * @signal property::shape_clip
+ */
+
+/**
+ * @signal property::shape_input
  */
 
 /**
@@ -297,10 +301,10 @@ static void
 drawin_map(lua_State *L, int widx)
 {
     drawin_t *drawin = luaA_checkudata(L, widx, &drawin_class);
-    /* Activate BMA */
-    client_ignore_enterleave_events();
     /* Apply any pending changes */
     drawin_apply_moveresize(drawin);
+    /* Activate BMA */
+    client_ignore_enterleave_events();
     /* Map the drawin */
     xcb_map_window(globalconf.connection, drawin->window);
     /* Deactivate BMA */
@@ -691,6 +695,45 @@ luaA_drawin_set_shape_clip(lua_State *L, drawin_t *drawin)
     return 0;
 }
 
+/** Get the drawin's input shape.
+ * \param L The Lua VM state.
+ * \param drawin The drawin object.
+ * \return The number of elements pushed on stack.
+ */
+static int
+luaA_drawin_get_shape_input(lua_State *L, drawin_t *drawin)
+{
+    cairo_surface_t *surf = xwindow_get_shape(drawin->window, XCB_SHAPE_SK_INPUT);
+    if (!surf)
+        return 0;
+    /* lua has to make sure to free the ref or we have a leak */
+    lua_pushlightuserdata(L, surf);
+    return 1;
+}
+
+/** Set the drawin's input shape.
+ * \param L The Lua VM state.
+ * \param drawin The drawin object.
+ * \return The number of elements pushed on stack.
+ */
+static int
+luaA_drawin_set_shape_input(lua_State *L, drawin_t *drawin)
+{
+    cairo_surface_t *surf = NULL;
+    if(!lua_isnil(L, -1))
+        surf = (cairo_surface_t *)lua_touserdata(L, -1);
+
+    /* The drawin might have been resized to a larger size. Apply that. */
+    drawin_apply_moveresize(drawin);
+
+    xwindow_set_shape(drawin->window,
+            drawin->geometry.width + 2*drawin->border_width,
+            drawin->geometry.height + 2*drawin->border_width,
+            XCB_SHAPE_SK_INPUT, surf, -drawin->border_width);
+    luaA_object_emit_signal(L, -3, "property::shape_input", 0);
+    return 0;
+}
+
 void
 drawin_class_setup(lua_State *L)
 {
@@ -759,6 +802,10 @@ drawin_class_setup(lua_State *L)
                             (lua_class_propfunc_t) luaA_drawin_set_shape_clip,
                             (lua_class_propfunc_t) luaA_drawin_get_shape_clip,
                             (lua_class_propfunc_t) luaA_drawin_set_shape_clip);
+    luaA_class_add_property(&drawin_class, "shape_input",
+                            (lua_class_propfunc_t) luaA_drawin_set_shape_input,
+                            (lua_class_propfunc_t) luaA_drawin_get_shape_input,
+                            (lua_class_propfunc_t) luaA_drawin_set_shape_input);
 }
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

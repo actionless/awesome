@@ -4,7 +4,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @submodule mouse
 ---------------------------------------------------------------------------
 
@@ -22,7 +21,7 @@ function module.drag_to_tag(c)
 
     local dir = nil
 
-    local wa = capi.screen[c.screen].workarea
+    local wa = c.screen.workarea
 
     if coords.x >= wa.x + wa.width - 1 then
         capi.mouse.coords({ x = wa.x + 2 }, true)
@@ -57,3 +56,5 @@ resize.add_move_callback(function(c, _, _)
 end, "mouse.move")
 
 return setmetatable(module, {__call = function(_, ...) return module.drag_to_tag(...) end})
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

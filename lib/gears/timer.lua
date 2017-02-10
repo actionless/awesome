@@ -1,10 +1,51 @@
 ---------------------------------------------------------------------------
 --- Timer objects and functions.
 --
+-- @usage
+--    -- Create a widget and update its content using the output of a shell
+--    -- command every 10 seconds:
+--    local mybatterybar = wibox.widget {
+--        {
+--            min_value    = 0,
+--            max_value    = 100,
+--            value        = 0,
+--            paddings     = 1,
+--            border_width = 1,
+--            forced_width = 50,
+--            border_color = "#0000ff",
+--            id           = "mypb",
+--            widget       = wibox.widget.progressbar,
+--        },
+--        {
+--            id           = "mytb",
+--            text         = "100%",
+--            widget       = wibox.widget.textbox,
+--        },
+--        layout      = wibox.layout.stack,
+--        set_battery = function(self, val)
+--            self.mytb.text  = tonumber(val).."%"
+--            self.mypb.value = tonumber(val)
+--        end,
+--    }
+--
+--    gears.timer {
+--        timeout   = 10,
+--        autostart = true,
+--        callback  = function()
+--            -- You should read it from `/sys/class/power_supply/` (on Linux)
+--            -- instead of spawning a shell. This is only an example.
+--            awful.spawn.easy_async(
+--                {"sh", "-c", "acpi | sed -n 's/^.*, \([0-9]*\)%/\1/p'"},
+--                function(out)
+--                    mybatterybar.battery = out
+--                end
+--            )
+--        end
+--    }
+--
 -- @author Uli Schlachter
 -- @copyright 2014 Uli Schlachter
--- @release @AWESOME_VERSION@
--- @module gears.timer
+-- @classmod gears.timer
 ---------------------------------------------------------------------------
 
 local capi = { awesome = awesome }
@@ -30,10 +71,13 @@ local protected_call = require("gears.protected_call")
 -- @table timer
 
 --- When the timer is started.
--- @signal start
+-- @signal .start
 
 --- When the timer is stopped.
--- @signal stop
+-- @signal .stop
+
+--- When the timer had a timeout event.
+-- @signal .timeout
 
 local timer = { mt = {} }
 
@@ -71,6 +115,15 @@ function timer:again()
     self:start()
 end
 
+--- The timer is started.
+-- @property started
+-- @param boolean
+
+--- The timer timeout value.
+-- **Signal:** property::timeout
+-- @property timeout
+-- @param number
+
 local timer_instance_mt = {
     __index = function(self, property)
         if property == "timeout" then
@@ -93,8 +146,14 @@ local timer_instance_mt = {
 --- Create a new timer object.
 -- @tparam table args Arguments.
 -- @tparam number args.timeout Timeout in seconds (e.g. 1.5).
+-- @tparam[opt=false] boolean args.autostart Automatically start the timer.
+-- @tparam[opt=nil] function args.callback Callback function to connect to the
+--  "timeout" signal.
+-- @tparam[opt=false] boolean args.single_shot Run only once then stop.
 -- @treturn timer
-timer.new = function(args)
+-- @function gears.timer
+function timer.new(args)
+    args = args or {}
     local ret = object()
 
     ret.data = { timeout = 0 }
@@ -102,6 +161,18 @@ timer.new = function(args)
 
     for k, v in pairs(args) do
         ret[k] = v
+    end
+
+    if args.autostart then
+        ret:start()
+    end
+
+    if args.callback then
+        ret:connect_signal("timeout", args.callback)
+    end
+
+    if args.single_shot then
+        ret:connect_signal("timeout", function() ret:stop() end)
     end
 
     return ret
@@ -114,7 +185,8 @@ end
 -- @tparam number timeout Timeout in seconds (e.g. 1.5).
 -- @tparam function callback Function to run.
 -- @treturn timer The timer object that was set up.
--- @see timer.weak_start_new
+-- @function gears.timer.start_new
+-- @see gears.timer.weak_start_new
 function timer.start_new(timeout, callback)
     local t = timer.new({ timeout = timeout })
     t:connect_signal("timeout", function()
@@ -128,14 +200,15 @@ function timer.start_new(timeout, callback)
 end
 
 --- Create a timeout for calling some callback function.
--- This function is almost identical to `timer.start_new`. The only difference
+-- This function is almost identical to `gears.timer.start_new`. The only difference
 -- is that this does not prevent the callback function from being garbage
 -- collected. After the callback function was collected, the timer returned
 -- will automatically be stopped.
 -- @tparam number timeout Timeout in seconds (e.g. 1.5).
 -- @tparam function callback Function to start.
 -- @treturn timer The timer object that was set up.
--- @see timer.start_new
+-- @function gears.timer.weak_start_new
+-- @see gears.timer.start_new
 function timer.weak_start_new(timeout, callback)
     local indirection = setmetatable({}, { __mode = "v" })
     indirection.callback = callback
@@ -158,6 +231,7 @@ end)
 --- Call the given function at the end of the current main loop iteration
 -- @tparam function callback The function that should be called
 -- @param ... Arguments to the callback function
+-- @function gears.timer.delayed_call
 function timer.delayed_call(callback, ...)
     assert(type(callback) == "function", "callback must be a function, got: " .. type(callback))
     table.insert(delayed_calls, { callback, ... })

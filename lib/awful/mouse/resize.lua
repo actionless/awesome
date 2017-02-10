@@ -6,7 +6,6 @@
 --
 -- @author Emmanuel Lepage Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2016 Emmanuel Lepage Vallee
--- @release @AWESOME_VERSION@
 -- @submodule mouse
 ---------------------------------------------------------------------------
 
@@ -21,8 +20,16 @@ local req       = "request::geometry"
 local callbacks = {enter={}, move={}, leave={}}
 
 local cursors = {
-    ["mouse.resize"] = "cross",
-    ["mouse.move"  ] = "fleur"
+    ["mouse.move"               ] = "fleur",
+    ["mouse.resize"             ] = "cross",
+    ["mouse.resize_left"        ] = "sb_h_double_arrow",
+    ["mouse.resize_right"       ] = "sb_h_double_arrow",
+    ["mouse.resize_top"         ] = "sb_v_double_arrow",
+    ["mouse.resize_bottom"      ] = "sb_v_double_arrow",
+    ["mouse.resize_top_left"    ] = "top_left_corner",
+    ["mouse.resize_top_right"   ] = "top_right_corner",
+    ["mouse.resize_bottom_left" ] = "bottom_left_corner",
+    ["mouse.resize_bottom_right"] = "bottom_right_corner",
 }
 
 --- The resize cursor name.
@@ -48,14 +55,14 @@ function module.set_mode(m)
     mode = m
 end
 
---- Add a initialization callback.
--- This callback will be executed before the mouse grabbing start
+--- Add an initialization callback.
+-- This callback will be executed before the mouse grabbing starts.
 -- @function awful.mouse.resize.add_enter_callback
 -- @tparam function cb The callback (or nil)
 -- @tparam[default=other] string context The callback context
 function module.add_enter_callback(cb, context)
-    context = context or  "other"
-    callbacks.enter[context] =  callbacks.enter[context] or {}
+    context = context or "other"
+    callbacks.enter[context] = callbacks.enter[context] or {}
     table.insert(callbacks.enter[context], cb)
 end
 
@@ -138,8 +145,12 @@ local function handler(_, client, context, args) --luacheck: no unused_args
 
     -- Select the cursor
     local tcontext = context:gsub('[.]', '_')
+    local corner = args.corner and ("_".. args.corner) or ""
 
-    local cursor = beautiful["cursor_"..tcontext] or cursors[context] or "fleur"
+    local cursor = beautiful["cursor_"..tcontext]
+        or cursors[context..corner]
+        or cursors[context]
+        or "fleur"
 
     -- Execute the placement function and use request::geometry
     capi.mousegrabber.run(function (_mouse)
@@ -185,7 +196,7 @@ local function handler(_, client, context, args) --luacheck: no unused_args
 
         -- Only resize after the mouse is released, this avoid losing content
         -- in resize sensitive apps such as XTerm or allow external modules
-        -- to implement custom resizing
+        -- to implement custom resizing.
         if args.mode == "after" then
             -- Get the new geometry
             geo = args.placement(client, args)
@@ -216,3 +227,5 @@ local function handler(_, client, context, args) --luacheck: no unused_args
 end
 
 return setmetatable(module, {__call=handler})
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

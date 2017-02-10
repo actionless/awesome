@@ -2,8 +2,7 @@
 --- Suits for awful
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
--- @module awful.layout.suit
+-- @module awful.layout
 ---------------------------------------------------------------------------
 
 return

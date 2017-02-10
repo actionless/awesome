@@ -54,9 +54,6 @@
 #include <xcb/xtest.h>
 #include <xcb/shape.h>
 
-#include <X11/Xlib-xcb.h>
-#include <X11/XKBlib.h>
-
 #include <glib-unix.h>
 
 awesome_t globalconf;
@@ -202,7 +199,7 @@ scan(xcb_query_tree_cookie_t tree_c)
 
         state = xwindow_get_state_reply(state_wins[i]);
 
-        if(!attr_r || attr_r->override_redirect
+        if(!geom_r || !attr_r || attr_r->override_redirect
            || attr_r->map_state == XCB_MAP_STATE_UNMAPPED
            || state == XCB_ICCCM_WM_STATE_WITHDRAWN)
         {
@@ -262,6 +259,8 @@ acquire_WM_Sn(bool replace)
     get_sel_reply = xcb_get_selection_owner_reply(globalconf.connection,
             xcb_get_selection_owner(globalconf.connection, globalconf.selection_atom),
             NULL);
+    if (!get_sel_reply)
+        fatal("GetSelectionOwner for WM_Sn failed");
     if (!replace && get_sel_reply->owner != XCB_NONE)
         fatal("another window manager is already running (selection owned; use --replace)");
 
@@ -295,12 +294,23 @@ acquire_WM_Sn(bool replace)
     xcb_send_event(globalconf.connection, false, globalconf.screen->root, 0xFFFFFF, (char *) &ev);
 }
 
+static xcb_generic_event_t *poll_for_event(void)
+{
+    if (globalconf.pending_event) {
+        xcb_generic_event_t *event = globalconf.pending_event;
+        globalconf.pending_event = NULL;
+        return event;
+    }
+
+    return xcb_poll_for_event(globalconf.connection);
+}
+
 static void
 a_xcb_check(void)
 {
     xcb_generic_event_t *mouse = NULL, *event;
 
-    while((event = xcb_poll_for_event(globalconf.connection)))
+    while((event = poll_for_event()))
     {
         /* We will treat mouse events later.
          * We cannot afford to treat all mouse motion events,
@@ -364,6 +374,12 @@ a_glib_poll(GPollFD *ufds, guint nfsd, gint timeout)
         lua_settop(L, 0);
     }
 
+    /* Don't sleep if there is a pending event */
+    assert(globalconf.pending_event == NULL);
+    globalconf.pending_event = xcb_poll_for_event(globalconf.connection);
+    if (globalconf.pending_event != NULL)
+        timeout = 0;
+
     /* Check how long this main loop iteration took */
     gettimeofday(&now, NULL);
     timersub(&now, &last_wakeup, &length_time);
@@ -415,6 +431,12 @@ restart_on_signal(gpointer data)
 {
     awesome_restart();
     return TRUE;
+}
+
+static bool
+true_config_callback(const char *unused)
+{
+    return true;
 }
 
 /** Print help and exit(2) with given exit_code.
@@ -473,6 +495,7 @@ main(int argc, char **argv)
     p_clear(&globalconf, 1);
     globalconf.keygrabber = LUA_REFNIL;
     globalconf.mousegrabber = LUA_REFNIL;
+    globalconf.exit_code = EXIT_SUCCESS;
     buffer_init(&globalconf.startup_errors);
     string_array_init(&searchpath);
 
@@ -507,16 +530,12 @@ main(int argc, char **argv)
             run_test = true;
             break;
           case 'c':
-            if(a_strlen(optarg))
-                confpath = a_strdup(optarg);
-            else
-                fatal("-c option requires a file name");
+            if (confpath != NULL)
+                fatal("--config may only be specified once");
+            confpath = a_strdup(optarg);
             break;
           case 's':
-            if(a_strlen(optarg))
-                string_array_append(&searchpath, a_strdup(optarg));
-            else
-                fatal("-s option requires a directory name");
+            string_array_append(&searchpath, a_strdup(optarg));
             break;
           case 'a':
             no_argb = true;
@@ -524,18 +543,45 @@ main(int argc, char **argv)
           case 'r':
             replace_wm = true;
             break;
+          default:
+            exit_help(EXIT_FAILURE);
+            break;
         }
 
     /* Get XDG basedir data */
     xdgInitHandle(&xdg);
 
-    /* init lua */
-    luaA_init(&xdg, &searchpath);
-    string_array_wipe(&searchpath);
+    /* add XDG_CONFIG_DIR as include path */
+    const char * const *xdgconfigdirs = xdgSearchableConfigDirectories(&xdg);
+    for(; *xdgconfigdirs; xdgconfigdirs++)
+    {
+        /* Append /awesome to *xdgconfigdirs */
+        const char *suffix = "/awesome";
+        size_t len = a_strlen(*xdgconfigdirs) + a_strlen(suffix) + 1;
+        char *entry = p_new(char, len);
+        a_strcat(entry, len, *xdgconfigdirs);
+        a_strcat(entry, len, suffix);
+        string_array_append(&searchpath, entry);
+    }
 
     if (run_test)
     {
-        if(!luaA_parserc(&xdg, confpath, false))
+        bool success = true;
+        /* Get the first config that will be tried */
+        const char *config = luaA_find_config(&xdg, confpath, true_config_callback);
+
+        /* Try to parse it */
+        lua_State *L = luaL_newstate();
+        if(luaL_loadfile(L, config))
+        {
+            const char *err = lua_tostring(L, -1);
+            fprintf(stderr, "%s\n", err);
+            success = false;
+        }
+        p_delete(&config);
+        lua_close(L);
+
+        if(!success)
         {
             fprintf(stderr, "✘ Configuration file syntax error.\n");
             return EXIT_FAILURE;
@@ -559,6 +605,7 @@ main(int argc, char **argv)
     sigaction(SIGFPE, &sa, 0);
     sigaction(SIGILL, &sa, 0);
     sigaction(SIGSEGV, &sa, 0);
+    signal(SIGPIPE, SIG_IGN);
 
     /* We have no clue where the input focus is right now */
     globalconf.focus.need_update = true;
@@ -566,16 +613,8 @@ main(int argc, char **argv)
     /* set the default preferred icon size */
     globalconf.preferred_icon_size = 0;
 
-    /* XLib sucks */
-    XkbIgnoreExtension(True);
-
     /* X stuff */
-    globalconf.display = XOpenDisplay(NULL);
-    if (globalconf.display == NULL)
-        fatal("Cannot open display");
-    XSetEventQueueOwner(globalconf.display, XCBOwnsEventQueue);
-    globalconf.default_screen = XDefaultScreen(globalconf.display);
-    globalconf.connection = XGetXCBConnection(globalconf.display);;
+    globalconf.connection = xcb_connect(NULL, &globalconf.default_screen);
     if(xcb_connection_has_error(globalconf.connection))
         fatal("cannot open display (error %d)", xcb_connection_has_error(globalconf.connection));
 
@@ -605,6 +644,11 @@ main(int argc, char **argv)
 
     if (xcb_cursor_context_new(globalconf.connection, globalconf.screen, &globalconf.cursor_ctx) < 0)
         fatal("Failed to initialize xcb-cursor");
+    globalconf.xrmdb = xcb_xrm_database_from_default(globalconf.connection);
+    if (globalconf.xrmdb == NULL)
+        globalconf.xrmdb = xcb_xrm_database_from_string("");
+    if (globalconf.xrmdb == NULL)
+        fatal("Failed to initialize xcb-xrm");
 
     /* Did we get some usable data from the above X11 setup? */
     draw_test_cairo_xcb();
@@ -642,11 +686,21 @@ main(int argc, char **argv)
     /* check for xtest extension */
     const xcb_query_extension_reply_t *query;
     query = xcb_get_extension_data(globalconf.connection, &xcb_test_id);
-    globalconf.have_xtest = query->present;
+    globalconf.have_xtest = query && query->present;
 
     /* check for shape extension */
     query = xcb_get_extension_data(globalconf.connection, &xcb_shape_id);
-    globalconf.have_shape = query->present;
+    globalconf.have_shape = query && query->present;
+    if (globalconf.have_shape)
+    {
+        xcb_shape_query_version_reply_t *reply =
+            xcb_shape_query_version_reply(globalconf.connection,
+                    xcb_shape_query_version_unchecked(globalconf.connection),
+                    NULL);
+        globalconf.have_input_shape = reply && (reply->major_version > 1 ||
+                (reply->major_version == 1 && reply->minor_version >= 1));
+        p_delete(&reply);
+    }
 
     event_init();
 
@@ -656,10 +710,6 @@ main(int argc, char **argv)
     /* init atom cache */
     atoms_init(globalconf.connection);
 
-    /* init screens information */
-    screen_scan();
-
-    /* do this only for real screen */
     ewmh_init();
     systray_init();
 
@@ -710,8 +760,17 @@ main(int argc, char **argv)
     /* get the current wallpaper, from now on we are informed when it changes */
     root_update_wallpaper();
 
+    /* init lua */
+    luaA_init(&xdg, &searchpath);
+    string_array_wipe(&searchpath);
+
+    ewmh_init_lua();
+
+    /* init screens information */
+    screen_scan();
+
     /* Parse and run configuration file */
-    if (!luaA_parserc(&xdg, confpath, true))
+    if (!luaA_parserc(&xdg, confpath))
         fatal("couldn't find any rc file");
 
     p_delete(&confpath);
@@ -738,7 +797,7 @@ main(int argc, char **argv)
 
     awesome_atexit(false);
 
-    return EXIT_SUCCESS;
+    return globalconf.exit_code;
 }
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80
