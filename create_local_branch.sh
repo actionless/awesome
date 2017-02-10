@@ -8,6 +8,7 @@ branches=(
 	# my branches
     'rounded-naughty-2'
     'menubar-close-count_file'
+    'menubar-fix-saving-query'
 
 	# psychon
 
