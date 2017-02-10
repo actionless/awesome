@@ -3,13 +3,11 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module awful.util
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
 local os = os
-local io = io
 local assert = assert
 local load = loadstring or load -- luacheck: globals loadstring (compatibility with Lua 5.1)
 local loadfile = loadfile
@@ -34,12 +32,16 @@ local floor = math.floor
 local util = {}
 util.table = {}
 
+--- The default shell used when spawing processes.
 util.shell = os.getenv("SHELL") or "/bin/sh"
 
 local displayed_deprecations = {}
 --- Display a deprecation notice, but only once per traceback.
 -- @param[opt] see The message to a new method / function to use.
-function util.deprecate(see)
+-- @tparam table args Extra arguments
+-- @tparam boolean args.raw Print the message as-is without the automatic context
+function util.deprecate(see, args)
+    args = args or {}
     local tb = debug.traceback()
     if displayed_deprecations[tb] then
         return
@@ -51,7 +53,9 @@ function util.deprecate(see)
     local funcname = info.name or "?"
     local msg = "awful: function " .. funcname .. " is deprecated"
     if see then
-        if string.sub(see, 1, 3) == 'Use' then
+        if args.raw then
+            msg = see
+        elseif string.sub(see, 1, 3) == 'Use' then
             msg = msg .. ". " .. see
         else
             msg = msg .. ", see " .. see
@@ -82,7 +86,7 @@ function util.deprecate_class(fallback, old_name, new_name)
     end
 
     local function newindex(_, k, v)
-        util.deprecate(message)
+        util.deprecate(message, {raw = true})
 
         fallback[k] = v
     end
@@ -196,13 +200,13 @@ end
 --- Get the path to the directory where themes are installed.
 -- @return A string with the requested path with a slash at the end.
 function util.get_themes_dir()
-    return "@AWESOME_THEMES_PATH@" .. "/"
+    return (os.getenv('AWESOME_THEMES_PATH') or awesome.themes_path) .. "/"
 end
 
 --- Get the path to the directory where our icons are installed.
 -- @return A string with the requested path with a slash at the end.
 function util.get_awesome_icon_dir()
-    return "@AWESOME_ICON_PATH@" .. "/"
+    return (os.getenv('AWESOME_ICON_PATH') or awesome.icon_path) .. "/"
 end
 
 --- Get the user's config or cache dir.
@@ -256,17 +260,11 @@ end
 -- @param filename The file path.
 -- @return True if file exists and is readable.
 function util.file_readable(filename)
-    local file = io.open(filename)
-    if file then
-        local _, _, code = file:read(1)
-        io.close(file)
-        if code == 21 then
-            -- "Is a directory".
-            return false
-        end
-        return true
-    end
-    return false
+    local gfile = Gio.File.new_for_path(filename)
+    local gfileinfo = gfile:query_info("standard::type,access::can-read",
+                                       Gio.FileQueryInfoFlags.NONE)
+    return gfileinfo and gfileinfo:get_file_type() ~= "DIRECTORY" and
+        gfileinfo:get_attribute_boolean("access::can-read")
 end
 
 --- Check if a path exists, is readable and is a directory.

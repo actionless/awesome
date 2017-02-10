@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module mouse
 ---------------------------------------------------------------------------
 
@@ -83,6 +82,7 @@ function mouse.client.move(c, snap, finished_cb) --luacheck: no unused args
 
     if not c
         or c.fullscreen
+        or c.maximized
         or c.type == "desktop"
         or c.type == "splash"
         or c.type == "dock" then
@@ -190,21 +190,37 @@ function mouse.client.resize(c, corner, args)
     if not c then return end
 
     if c.fullscreen
+        or c.maximized
         or c.type == "desktop"
         or c.type == "splash"
         or c.type == "dock" then
         return
     end
 
+    -- Set some default arguments
+    local new_args = setmetatable(
+        {
+            include_sides = (not args) or args.include_sides ~= false
+        },
+        {
+            __index = args or {}
+        }
+    )
+
     -- Move the mouse to the corner
     if corner and aplace[corner] then
         aplace[corner](capi.mouse, {parent=c})
     else
         local _
-        _, corner = aplace.closest_corner(capi.mouse, {parent=c})
+        _, corner = aplace.closest_corner(capi.mouse, {
+            parent        = c,
+            include_sides = new_args.include_sides ~= false,
+        })
     end
 
-    mouse.resize(c, "mouse.resize", args or {include_sides=true})
+    new_args.corner = corner
+
+    mouse.resize(c, "mouse.resize", new_args)
 
     return corner
 end
@@ -284,7 +300,6 @@ end
 -- @treturn table The list of widgets.The first element is the biggest
 -- container while the last is the topmost widget. The table contains *x*, *y*,
 -- *width*, *height* and *widget*.
--- @see wibox.find_widgets
 
 function mouse.object.get_current_widgets()
     local w = mouse.object.get_current_wibox()
@@ -307,7 +322,6 @@ end
 -- @property current_widget
 -- @tparam widget|nil widget The widget
 -- @treturn ?widget The widget
--- @see wibox.find_widgets
 -- @see current_widget_geometry
 
 function mouse.object.get_current_widget()

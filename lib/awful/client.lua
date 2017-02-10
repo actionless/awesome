@@ -3,13 +3,13 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module client
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
 local util = require("awful.util")
 local spawn = require("awful.spawn")
+local set_shape = require("awful.client.shape").update.all
 local object = require("gears.object")
 local grect = require("gears.geometry").rectangle
 local pairs = pairs
@@ -46,9 +46,7 @@ local client = {object={}}
 -- Private data
 client.data = {}
 client.data.marked = {}
-client.data.properties = setmetatable({}, { __mode = 'k' })
 client.data.persistent_properties_registered = {} -- keys are names of persistent properties, value always true
-client.data.persistent_properties_loaded = setmetatable({}, { __mode = 'k' }) -- keys are clients, value always true
 
 -- Functions
 client.urgent = require("awful.client.urgent")
@@ -140,6 +138,7 @@ function client.tiled(s, stacked)
     for _, c in pairs(clients) do
         if not client.object.get_floating(c)
             and not c.fullscreen
+            and not c.maximized
             and not c.maximized_vertical
             and not c.maximized_horizontal then
             table.insert(tclients, c)
@@ -279,7 +278,7 @@ end
 --- Get the master window.
 --
 -- @legacylayout awful.client.getmaster
--- @param[opt] s The screen number, defaults to focused screen.
+-- @screen_or_idx[opt=awful.screen.focused()] s The screen.
 -- @return The master window.
 function client.getmaster(s)
     s = s or screen.focused()
@@ -670,6 +669,7 @@ function client.object.get_floating(c)
             or c.fullscreen
             or c.maximized_vertical
             or c.maximized_horizontal
+            or c.maximized
             or client.object.is_fixed(c) then
             return true
         end
@@ -903,19 +903,19 @@ function client.setwfact(wfact, c)
     t:emit_signal("property::windowfact")
 end
 
---- Increment a client's window factor
+--- Change window factor of a client.
 --
 -- @legacylayout awful.client.incwfact
--- @param add amount to increase the client's window
+-- @tparam number add Amount to increase/decrease the client's window factor.
+--   Should be between `-current_window_factor` and something close to
+--   infinite.  The normalisation then ensures that the sum of all factors is 1.
 -- @client c the client
 function client.incwfact(add, c)
     c = c or capi.client.focus
     if not c then return end
 
     local t = c.screen.selected_tag
-
     local w = client.idx(c)
-
     local data = t.windowfact or {}
     local colfact = data[w.col] or {}
     local curr = colfact[w.idx] or 1
@@ -927,12 +927,10 @@ function client.incwfact(add, c)
     t:emit_signal("property::windowfact")
 end
 
---- Get a client dockable state.
+--- Get a client's dockable state.
 --
 -- @client c A client.
--- @return True or false. Note that some windows might be dockable even if you
---   did not set them manually. For example, windows with a type "utility",
---   "toolbar" or "dock"
+-- @treturn bool
 -- @deprecated awful.client.dockable.get
 function client.dockable.get(c)
     util.deprecate("Use c.dockable instead of awful.client.dockable.get")
@@ -940,8 +938,12 @@ function client.dockable.get(c)
 end
 
 --- If the client is dockable.
+--
 -- A dockable client is an application confined to the edge of the screen. The
--- space it occupy is substracted from the `screen.workarea`.
+-- space it occupies is substracted from the `screen.workarea`.
+--
+-- Clients with a type of "utility", "toolbar" or "dock" are dockable by
+-- default.
 --
 -- **Signal:**
 --
@@ -965,7 +967,8 @@ function client.object.get_dockable(c)
     return value
 end
 
---- Set a client dockable state, overriding auto-detection.
+--- Set a client's dockable state, overriding auto-detection.
+--
 -- With this enabled you can dock windows by moving them from the center
 -- to the edge of the workarea.
 --
@@ -986,8 +989,8 @@ end
 -- @return The property.
 -- @deprecated awful.client.property.get
 function client.property.get(c, prop)
-    if not client.data.persistent_properties_loaded[c] then
-        client.data.persistent_properties_loaded[c] = true
+    if not c.data._persistent_properties_loaded then
+        c.data._persistent_properties_loaded = true
         for p in pairs(client.data.persistent_properties_registered) do
             local value = c:get_xproperty("awful.client.property." .. p)
             if value ~= nil then
@@ -995,8 +998,8 @@ function client.property.get(c, prop)
             end
         end
     end
-    if client.data.properties[c] then
-        return client.data.properties[c][prop]
+    if c.data.awful_client_properties then
+        return c.data.awful_client_properties[prop]
     end
 end
 
@@ -1010,14 +1013,14 @@ end
 -- @param value The value.
 -- @deprecated awful.client.property.set
 function client.property.set(c, prop, value)
-    if not client.data.properties[c] then
-        client.data.properties[c] = {}
+    if not c.data.awful_client_properties then
+        c.data.awful_client_properties = {}
     end
-    if client.data.properties[c][prop] ~= value then
+    if c.data.awful_client_properties[prop] ~= value then
         if client.data.persistent_properties_registered[prop] then
             c:set_xproperty("awful.client.property." .. prop, value)
         end
-        client.data.properties[c][prop] = value
+        c.data.awful_client_properties[prop] = value
         c:emit_signal("property::" .. prop)
     end
 end
@@ -1034,9 +1037,9 @@ function client.property.persist(prop, kind)
     client.data.persistent_properties_registered[prop] = true
 
     -- Make already-set properties persistent
-    for c in pairs(client.data.properties) do
-        if client.data.properties[c] and client.data.properties[c][prop] ~= nil then
-            c:set_xproperty(xprop, client.data.properties[c][prop])
+    for c in pairs(capi.client.get()) do
+        if c.data.awful_client_properties and c.data.awful_client_properties[prop] ~= nil then
+            c:set_xproperty(xprop, c.data.awful_client_properties[prop])
         end
     end
 end
@@ -1153,6 +1156,15 @@ function client.object.is_transient_for(self, c2)
         tc = tc.transient_for
     end
     return nil
+end
+
+--- Set the client shape.
+-- @property shape
+-- @tparam gears.shape A gears.shape compatible function.
+-- @see gears.shape
+function client.object.set_shape(self, shape)
+    client.property.set(self, "_shape", shape)
+    set_shape(self)
 end
 
 -- Register standards signals

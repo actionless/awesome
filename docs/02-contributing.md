@@ -69,8 +69,8 @@ You can use the full power of
 the comments.
 
 Every module and class should have a short description at its beginning which
-should include `@author author`, `@copyright year author`,
-`@release @AWESOME_VERSION@` and `@module module-name` or `@classmod class-name`.
+should include `@author author`, `@copyright year author` and
+`@module module-name` or `@classmod class-name`.
 
 Parameters of functions should be documented using
 `@tparam <type> <parmname> <description>`, and return values via
@@ -113,12 +113,3 @@ method.
 #### Pull request
 - create a [pull request](https://github.com/awesomeWM/awesome/pulls)
 
-#### git-send-email
-- use `git format-patch -M` to create the patch;
-- do *not* PGP sign your patch;
-- be *careful* doing cut & paste into your mailer, not to corrupt whitespaces;
-- if you change, add or remove the user API, the associated documentation
-  should be updated as well;
-- send the patch to the list (`awesome-devel@naquadah.org`) if (and only if)
-  the patch is ready for inclusion. If you use git-send-email(1), please *test*
-  it first by sending email to yourself.

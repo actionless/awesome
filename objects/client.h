@@ -61,6 +61,11 @@ struct client_t
     char *class, *instance;
     /** Window geometry */
     area_t geometry;
+    /** Old window geometry currently configured in X11 */
+    area_t x11_client_geometry;
+    area_t x11_frame_geometry;
+    /** Got a configure request and have to call client_send_configure() if its ignored? */
+    bool got_configure_request;
     /** Startup ID */
     char *startup_id;
     /** True if the client is sticky */
@@ -77,6 +82,10 @@ struct client_t
     bool maximized_horizontal;
     /** True if the client is maximized vertically */
     bool maximized_vertical;
+    /** True if the client is maximized both horizontally and vertically by the
+      * the user
+      */
+    bool maximized;
     /** True if the client is above others */
     bool above;
     /** True if the client is below others */

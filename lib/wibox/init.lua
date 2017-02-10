@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Uli Schlachter
 -- @copyright 2010 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @classmod wibox
 ---------------------------------------------------------------------------
 
@@ -18,6 +17,7 @@ local object = require("gears.object")
 local grect =  require("gears.geometry").rectangle
 local beautiful = require("beautiful")
 local base = require("wibox.widget.base")
+local cairo = require("lgi").cairo
 
 --- This provides widget box windows. Every wibox can also be used as if it were
 -- a drawin. All drawin functions and properties are also available on wiboxes!
@@ -32,6 +32,7 @@ wibox.hierarchy = require("wibox.hierarchy")
 local force_forward = {
     shape_bounding = true,
     shape_clip = true,
+    shape_input = true,
 }
 
 --@DOC_wibox_COMMON@
@@ -62,6 +63,63 @@ function wibox:find_widgets(x, y)
     return self._drawable:find_widgets(x, y)
 end
 
+function wibox:_apply_shape()
+    local shape = self._shape
+
+    if not shape then
+        self.shape_bounding = nil
+        self.shape_clip = nil
+        return
+    end
+
+    local geo = self:geometry()
+    local bw = self.border_width
+
+    -- First handle the bounding shape (things including the border)
+    local img = cairo.ImageSurface(cairo.Format.A1, geo.width + 2*bw, geo.height + 2*bw)
+    local cr = cairo.Context(img)
+
+    -- We just draw the shape in its full size
+    shape(cr, geo.width + 2*bw, geo.height + 2*bw)
+    cr:set_operator(cairo.Operator.SOURCE)
+    cr:fill()
+    self.shape_bounding = img._native
+    img:finish()
+
+    -- Now handle the clip shape (things excluding the border)
+    img = cairo.ImageSurface(cairo.Format.A1, geo.width, geo.height)
+    cr = cairo.Context(img)
+
+    -- We give the shape the same arguments as for the bounding shape and draw
+    -- it in its full size (the translate is to compensate for the smaller
+    -- surface)
+    cr:translate(-bw, -bw)
+    shape(cr, geo.width + 2*bw, geo.height + 2*bw)
+    cr:set_operator(cairo.Operator.SOURCE)
+    cr:fill_preserve()
+    -- Now we remove an area of width 'bw' again around the shape (We use 2*bw
+    -- since half of that is on the outside and only half on the inside)
+    cr:set_source_rgba(0, 0, 0, 0)
+    cr:set_line_width(2*bw)
+    cr:stroke()
+    self.shape_clip = img._native
+    img:finish()
+end
+
+--- Set the wibox shape.
+-- @property shape
+-- @tparam gears.shape A gears.shape compatible function.
+-- @see gears.shape
+
+function wibox:set_shape(shape)
+    self._shape = shape
+    self:_apply_shape()
+end
+
+function wibox:get_shape()
+    return self._shape
+end
+
 function wibox:get_screen()
     if self.screen_assigned and self.screen_assigned.valid then
         return self.screen_assigned
@@ -87,6 +145,7 @@ function wibox:set_screen(s)
     -- Remember this screen so things work correctly if screens overlap and
     -- (x,y) is not enough to figure out the correct screen.
     self.screen_assigned = s
+    self._drawable:_force_screen(s)
 end
 
 for _, k in pairs{ "buttons", "struts", "geometry", "get_xproperty", "set_xproperty" } do
@@ -120,6 +179,7 @@ local function setup_signals(_wibox)
     clone_signal("property::geometry")
     clone_signal("property::shape_bounding")
     clone_signal("property::shape_clip")
+    clone_signal("property::shape_input")
 
     obj = _wibox._drawable
     clone_signal("button::press")
@@ -147,6 +207,7 @@ end
 -- @tparam wibox.widget args.widget The widget that the wibox displays.
 -- @param args.shape_bounding The wibox’s bounding shape as a (native) cairo surface.
 -- @param args.shape_clip The wibox’s clip shape as a (native) cairo surface.
+-- @param args.shape_input The wibox’s input shape as a (native) cairo surface.
 -- @tparam color args.bg The background of the wibox.
 -- @tparam surface args.bgimage The background image of the drawable.
 -- @tparam color args.fg The foreground (text) of the wibox.
@@ -158,16 +219,18 @@ local function new(args)
     local ret = object()
     local w = capi.drawin(args)
 
-    -- lua 5.1 and luajit have issues with self referencing loops
-    local avoid_leak = setmetatable({ret},{__mode="v"})
-
     function w.get_wibox()
-        return avoid_leak[1]
+        return ret
     end
 
     ret.drawin = w
     ret._drawable = wibox.drawable(w.drawable, { wibox = ret },
         "wibox drawable (" .. object.modulename(3) .. ")")
+
+    ret._drawable:_inform_visible(w.visible)
+    w:connect_signal("property::visible", function()
+        ret._drawable:_inform_visible(w.visible)
+    end)
 
     for k, v in pairs(wibox) do
         if type(v) == "function" then
@@ -177,9 +240,6 @@ local function new(args)
 
     setup_signals(ret)
     ret.draw = ret._drawable.draw
-    ret.widget_at = function(_, widget, x, y, width, height)
-        return ret._drawable:widget_at(widget, x, y, width, height)
-    end
 
     -- Set the default background
     ret:set_bg(args.bg or beautiful.bg_normal)
@@ -196,6 +256,9 @@ local function new(args)
 
     -- Make sure the wibox is drawn at least once
     ret.draw()
+
+    ret:connect_signal("property::geometry", ret._apply_shape)
+    ret:connect_signal("property::border_width", ret._apply_shape)
 
     -- If a value is not found, look in the drawin
     setmetatable(ret, {
@@ -229,6 +292,8 @@ local function new(args)
     if args.screen then
         ret:set_screen ( args.screen  )
     end
+
+    ret.shape = args.shape
 
     return ret
 end

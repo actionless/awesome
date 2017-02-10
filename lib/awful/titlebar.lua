@@ -3,7 +3,6 @@
 --
 -- @author Uli Schlachter
 -- @copyright 2012 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @module awful.titlebar
 ---------------------------------------------------------------------------
 
@@ -24,6 +23,191 @@ local capi = {
 local titlebar = {
     widget = {}
 }
+
+--- The titlebar foreground (text) color.
+-- @beautiful beautiful.titlebar_fg_normal
+-- @param color
+-- @see gears.color
+
+--- The titlebar background color.
+-- @beautiful beautiful.titlebar_bg_normal
+-- @param color
+-- @see gears.color
+
+--- The titlebar background image image.
+-- @beautiful beautiful.titlebar_bgimage_normal
+-- @param surface
+-- @see gears.surface
+
+--- The titlebar foreground (text) color.
+-- @beautiful beautiful.titlebar_fg
+-- @param color
+-- @see gears.color
+
+--- The titlebar background color.
+-- @beautiful beautiful.titlebar_bg
+-- @param color
+-- @see gears.color
+
+--- The titlebar background image image.
+-- @beautiful beautiful.titlebar_bgimage
+-- @param surface
+-- @see gears.surface
+
+--- The focused titlebar foreground (text) color.
+-- @beautiful beautiful.titlebar_fg_focus
+-- @param color
+-- @see gears.color
+
+--- The focused titlebar background color.
+-- @beautiful beautiful.titlebar_bg_focus
+-- @param color
+-- @see gears.color
+
+--- The focused titlebar background image image.
+-- @beautiful beautiful.titlebar_bgimage_focus
+-- @param surface
+-- @see gears.surface
+
+--- floating_button_normal.
+-- @beautiful beautiful.titlebar_floating_button_normal
+-- @param surface
+-- @see gears.surface
+
+--- maximized_button_normal.
+-- @beautiful beautiful.titlebar_maximized_button_normal
+-- @param surface
+-- @see gears.surface
+
+--- minimize_button_normal
+-- @beautiful beautiful.titlebar_minimize_button_normal
+-- @param surface
+-- @see gears.surface
+
+--- close_button_normal.
+-- @beautiful beautiful.titlebar_close_button_normal
+-- @param surface
+-- @see gears.surface
+
+--- ontop_button_normal.
+-- @beautiful beautiful.titlebar_ontop_button_normal
+-- @param surface
+-- @see gears.surface
+
+--- sticky_button_normal.
+-- @beautiful beautiful.titlebar_sticky_button_normal
+-- @param surface
+-- @see gears.surface
+
+--- floating_button_focus.
+-- @beautiful beautiful.titlebar_floating_button_focus
+-- @param surface
+-- @see gears.surface
+
+--- maximized_button_focus.
+-- @beautiful beautiful.titlebar_maximized_button_focus
+-- @param surface
+-- @see gears.surface
+
+--- minimize_button_focus.
+-- @beautiful beautiful.titlebar_minimize_button_focus
+-- @param surface
+-- @see gears.surface
+
+--- close_button_focus.
+-- @beautiful beautiful.titlebar_close_button_focus
+-- @param surface
+-- @see gears.surface
+
+--- ontop_button_focus.
+-- @beautiful beautiful.titlebar_ontop_button_focus
+-- @param surface
+-- @see gears.surface
+
+--- sticky_button_focus.
+-- @beautiful beautiful.titlebar_sticky_button_focus
+-- @param surface
+-- @see gears.surface
+
+--- floating_button_normal_active.
+-- @beautiful beautiful.titlebar_floating_button_normal_active
+-- @param surface
+-- @see gears.surface
+
+--- maximized_button_normal_active.
+-- @beautiful beautiful.titlebar_maximized_button_normal_active
+-- @param surface
+-- @see gears.surface
+
+--- ontop_button_normal_active.
+-- @beautiful beautiful.titlebar_ontop_button_normal_active
+-- @param surface
+-- @see gears.surface
+
+--- sticky_button_normal_active.
+-- @beautiful beautiful.titlebar_sticky_button_normal_active
+-- @param surface
+-- @see gears.surface
+
+--- floating_button_focus_active.
+-- @beautiful beautiful.titlebar_floating_button_focus_active
+-- @param surface
+-- @see gears.surface
+
+--- maximized_button_focus_active.
+-- @beautiful beautiful.titlebar_maximized_button_focus_active
+-- @param surface
+-- @see gears.surface
+
+--- ontop_button_focus_active.
+-- @beautiful beautiful.titlebar_ontop_button_focus_active
+-- @param surface
+-- @see gears.surface
+
+--- sticky_button_focus_active.
+-- @beautiful beautiful.titlebar_sticky_button_focus_active
+-- @param surface
+-- @see gears.surface
+
+--- floating_button_normal_inactive.
+-- @beautiful beautiful.titlebar_floating_button_normal_inactive
+-- @param surface
+-- @see gears.surface
+
+--- maximized_button_normal_inactive.
+-- @beautiful beautiful.titlebar_maximized_button_normal_inactive
+-- @param surface
+-- @see gears.surface
+
+--- ontop_button_normal_inactive.
+-- @beautiful beautiful.titlebar_ontop_button_normal_inactive
+-- @param surface
+-- @see gears.surface
+
+--- sticky_button_normal_inactive.
+-- @beautiful beautiful.titlebar_sticky_button_normal_inactive
+-- @param surface
+-- @see gears.surface
+
+--- floating_button_focus_inactive.
+-- @beautiful beautiful.titlebar_floating_button_focus_inactive
+-- @param surface
+-- @see gears.surface
+
+--- maximized_button_focus_inactive.
+-- @beautiful beautiful.titlebar_maximized_button_focus_inactive
+-- @param surface
+-- @see gears.surface
+
+--- ontop_button_focus_inactive.
+-- @beautiful beautiful.titlebar_ontop_button_focus_inactive
+-- @param surface
+-- @see gears.surface
+
+--- sticky_button_focus_inactive.
+-- @beautiful beautiful.titlebar_sticky_button_focus_inactive
+-- @param surface
+-- @see gears.surface
 
 --- Set a declarative widget hierarchy description.
 -- See [The declarative layout system](../documentation/03-declarative-layout.md.html)
@@ -65,8 +249,8 @@ end
 --- Get a client's titlebar
 -- @class function
 -- @tparam client c The client for which a titlebar is wanted.
--- @tparam[opt={}] table args A table with extra arguments for the titlebar. 
--- @tparam[opt=font.height*1.5] number args.size The height of the titlebar. 
+-- @tparam[opt={}] table args A table with extra arguments for the titlebar.
+-- @tparam[opt=font.height*1.5] number args.size The height of the titlebar.
 -- @tparam[opt=top] string args.position" values are `top`,
 -- `left`, `right` and `bottom`.
 -- @tparam[opt=top] string args.bg_normal
@@ -97,6 +281,7 @@ local function new(c, args)
             position = position
         }
         ret = drawable(d, context, "awful.titlebar")
+        ret:_inform_visible(true)
         local function update_colors()
             local args_ = bars[position].args
             ret:set_bg(get_color("bg", c, args_))
@@ -113,6 +298,9 @@ local function new(c, args)
         -- Update the colors when focus changes
         c:connect_signal("focus", update_colors)
         c:connect_signal("unfocus", update_colors)
+
+        -- Inform the drawable when it becomes invisible
+        c:connect_signal("unmanage", function() ret:_inform_visible(false) end)
     else
         bars[position].args = args
         ret = bars[position].drawable
@@ -226,7 +414,6 @@ function titlebar.widget.button(c, name, selector, action)
                     img = "inactive"
                 end
             end
-            -- First try with a prefix based on the client's focus state
             local prefix = "normal"
             if capi.client.focus == c then
                 prefix = "focus"
@@ -234,11 +421,12 @@ function titlebar.widget.button(c, name, selector, action)
             if img ~= "" then
                 prefix = prefix .. "_"
             end
+            -- First try with a prefix based on the client's focus state,
+            -- then try again without that prefix if nothing was found,
+            -- and finally, try a fallback for compatibility with Awesome 3.5 themes
             local theme = beautiful["titlebar_" .. name .. "_button_" .. prefix .. img]
-            if not theme then
-                -- Then try again without that prefix if nothing was found
-                theme = beautiful["titlebar_" .. name .. "_button_" .. img]
-            end
+                       or beautiful["titlebar_" .. name .. "_button_" .. img]
+                       or beautiful["titlebar_" .. name .. "_button_" .. prefix .. "_inactive"]
             if theme then
                 img = theme
             end
@@ -272,13 +460,11 @@ end
 -- @param c The client for which the button is wanted.
 function titlebar.widget.maximizedbutton(c)
     local widget = titlebar.widget.button(c, "maximized", function(cl)
-        return cl.maximized_horizontal or cl.maximized_vertical
+        return cl.maximized
     end, function(cl, state)
-        cl.maximized_horizontal = not state
-        cl.maximized_vertical = not state
+        cl.maximized = not state
     end)
-    c:connect_signal("property::maximized_vertical", widget.update)
-    c:connect_signal("property::maximized_horizontal", widget.update)
+    c:connect_signal("property::maximized", widget.update)
     return widget
 end
 

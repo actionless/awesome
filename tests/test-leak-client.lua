@@ -6,17 +6,17 @@ local wibox = require("wibox")
 -- "Enable" titlebars (so that the titlebar can prevent garbage collection)
 client.connect_signal("manage", function (c)
     local buttons = awful.util.table.join(
-            awful.button({ }, 1, function()
-                client.focus = c
-                c:raise()
-                awful.mouse.client.move(c)
-            end),
-            awful.button({ }, 3, function()
-                client.focus = c
-                c:raise()
-                awful.mouse.client.resize(c)
-            end)
-            )
+        awful.button({ }, 1, function()
+            client.focus = c
+            c:raise()
+            awful.mouse.client.move(c)
+        end),
+        awful.button({ }, 3, function()
+        client.focus = c
+        c:raise()
+        awful.mouse.client.resize(c)
+    end)
+    )
 
     -- Widgets that are aligned to the left
     local left_layout = wibox.layout.fixed.horizontal(awful.titlebar.widget.iconwidget(c))
@@ -37,7 +37,7 @@ client.connect_signal("manage", function (c)
             awful.titlebar.widget.stickybutton(c),
             awful.titlebar.widget.ontopbutton(c),
             awful.titlebar.widget.closebutton(c)
-        )), { position = "bottom"})
+            )), { position = "bottom"})
 end)
 
 -- We tell the garbage collector when to work, disable it
@@ -62,7 +62,7 @@ local steps = {
             -- Wait for one iteration so that gears.timer handles other delayed
             -- calls (= the tasklist updates)
             second_call = true
-        else
+        elseif #client.get() == 0 then
             assert(#objs == 1)
 
             -- Test that we have a client and that it's invalid (tostring()

@@ -11,20 +11,20 @@ local has_spawned = false
 
 local steps = {
 
--- Add enough clients
-function(count)
-    if count <= 1 and not has_spawned then
-        for _=1, 5 do awful.spawn("xterm") end
-        has_spawned = true
-    elseif #client.get() >= 5 then
+    -- Add enough clients
+    function(count)
+        if count <= 1 and not has_spawned then
+            for _=1, 5 do awful.spawn("xterm") end
+            has_spawned = true
+        elseif #client.get() >= 5 then
 
-        first_layout = client.focus:tags()[1].layout
+            first_layout = client.focus:tags()[1].layout
 
-        t = client.focus:tags()[1]
+            t = client.focus:tags()[1]
 
-        return true
-    end
-end,
+            return true
+        end
+    end,
 
 }
 
@@ -76,8 +76,8 @@ local common_steps = {
         return true
     end,
     function()
-        t.master_fill_policy = t.master_fill_policy == "mwfact" and
-            "expand" or "mwfact"
+        t.master_fill_policy = t.master_fill_policy == "master_width_factor" and
+        "expand" or "master_width_factor"
 
         return true
     end,
@@ -120,3 +120,5 @@ for _ in ipairs(awful.layout.layouts) do
 end
 
 require("_runner").run_steps(steps)
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

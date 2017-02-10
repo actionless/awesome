@@ -20,14 +20,13 @@
 --     221                 end
 --     222               end
 --     223             end),
---     224             mylayoutbox[s],
--- 
+--     224             s.mylayoutbox,
+--
 -- ![Example screenshot](../images/awful_widget_watch.png)
 --
 -- @author Benjamin Petrenko
 -- @author Yauheni Kirylau
 -- @copyright 2015, 2016 Benjamin Petrenko, Yauheni Kirylau
--- @release @AWESOME_VERSION@
 -- @classmod awful.widget.watch
 ---------------------------------------------------------------------------
 
@@ -63,7 +62,8 @@ local watch = { mt = {} }
 --
 -- @param[opt=wibox.widget.textbox()] base_widget Base widget.
 --
--- @return The widget used by this watch
+-- @return The widget used by this watch.
+-- @return Its gears.timer.
 function watch.new(command, timeout, callback, base_widget)
     timeout = timeout or 5
     base_widget = base_widget or textbox()
@@ -80,7 +80,7 @@ function watch.new(command, timeout, callback, base_widget)
     end)
     t:start()
     t:emit_signal("timeout")
-    return base_widget
+    return base_widget, t
 end
 
 function watch.mt.__call(_, ...)

@@ -8,12 +8,13 @@ branches=(
 	# my branches
 	#'rounded-naughty'
     'rounded-naughty-2'
-    'awful-hotkeys-refactor'
+    'menubar-close-count_file'
+    'menubar-fix-saving-query'
 
 	# psychon
 
 	# elv13
-    #'pr/644'
+    'upstream_dynamic_p7'
 
     # blueyed
 

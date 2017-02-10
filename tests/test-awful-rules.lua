@@ -11,6 +11,13 @@ local tests = {}
 local tb_height = awful.util.round(beautiful.get_font_height() * 1.5)
 -- local border_width = beautiful.border_width
 
+-- Detect "manage" race conditions
+local real_apply = awful.rules.apply
+function awful.rules.apply(c)
+    assert(#c:tags() == 0)
+    return real_apply(c)
+end
+
 local function test_rule(rule)
     rule.rule = rule.rule or {}
 
@@ -289,3 +296,5 @@ local function spawn_clients()
 end
 
 require("_runner").run_steps{spawn_clients, unpack(tests)}
+
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

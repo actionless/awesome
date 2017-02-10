@@ -19,10 +19,64 @@ After building is finished, you can either install via `make install`:
 or by auto-generating a .deb or .rpm package, for easy removal later on:
 
     make package
-    
+
     sudo dpkg -i awesome-x.y.z.deb
     # or
     sudo rpm -Uvh awesome-x.y.z.rpm
+
+NOTE: awesome uses [`cmake`](https://cmake.org) to build. In case you want to
+pass arguments to cmake, please use the `CMAKE_ARGS` environment variable. For
+instance:
+
+    CMAKE_ARGS="-DCMAKE_INSTALL_PREFIX=/opt/awesome" make
+
+### Build dependencies
+
+Awesome has the following dependencies (besides a more-or-less standard POSIX
+environment):
+
+- [CMake >= 3.0.0](https://cmake.org)
+- [Lua >= 5.1.0](https://www.lua.org) or [LuaJIT](http://luajit.org)
+- [LGI >= 0.8.0](https://github.com/pavouk/lgi)
+- [xproto >= 7.0.15](https://www.x.org/archive//individual/proto/)
+- [libxcb >= 1.6](https://xcb.freedesktop.org/) with support for the RandR, XTest, Xinerama, SHAPE and
+  XKB extensions
+- [libxcb-cursor](https://xcb.freedesktop.org/)
+- [libxcb-util >= 0.3.8](https://xcb.freedesktop.org/)
+- [libxcb-keysyms >= 0.3.4](https://xcb.freedesktop.org/)
+- [libxcb-icccm >= 0.3.8](https://xcb.freedesktop.org/)
+- [xcb-util-xrm >= 1.0](https://github.com/Airblader/xcb-util-xrm)
+- [libxkbcommon](http://xkbcommon.org/) with X11 support enabled
+- [libstartup-notification >=
+  0.10](https://www.freedesktop.org/wiki/Software/startup-notification/)
+- [cairo](https://www.cairographics.org/) with support for XCB and GObject
+  introspection
+- [Pango](http://www.pango.org/) with support for Cairo and GObject
+  introspection
+- [GLib](https://wiki.gnome.org/Projects/GLib) with support for GObject
+  introspection
+- [GIO](https://developer.gnome.org/gio/stable/) with support for GObject
+  introspection
+- [GdkPixbuf](https://wiki.gnome.org/Projects/GdkPixbuf)
+- libX11 with xcb support
+- [Imagemagick's convert utility](http://www.imagemagick.org/script/index.php)
+- [libxdg-basedir >= 1.0.0](https://github.com/devnev/libxdg-basedir)
+
+Additionally, the following optional dependencies exist:
+
+- [DBus](https://www.freedesktop.org/wiki/Software/dbus/) for DBus integration
+  and the `awesome-client` utility
+- [asciidoc](http://www.methods.co.nz/asciidoc/) and
+  [xmlto](https://fedorahosted.org/xmlto/) for generating man pages
+- [gzip](http://www.gzip.org/) for compressing man pages
+- [ldoc](https://stevedonovan.github.io/ldoc/) for generating the documentation
+- [busted](https://olivinelabs.com/busted/) for running unit tests
+- [luacheck](https://github.com/mpeterv/luacheck) for static code analysis
+- [LuaCov](https://keplerproject.github.io/luacov/) for collecting code coverage
+  information
+- libexecinfo on systems where libc does not provide `backtrace_symbols()` to
+  generate slightly better backtraces on crashes
+- `Xephyr` or `Xvfb` for running integration tests
 
 ## Running awesome
 
@@ -44,7 +98,7 @@ the `DISPLAY` environment variable is set correctly, e.g.:
 The configuration of awesome is done by creating a
 `$XDG_CONFIG_HOME/awesome/rc.lua` file, typically `~/.config/awesome/rc.lua`.
 
-An example configuration named `awesomerc.lua.in` is provided in the source.
+An example configuration named `awesomerc.lua` is provided in the source.
 
 ## Troubleshooting
 
@@ -82,9 +136,7 @@ for any coding, documentation or patch guidelines.
 
 ## Documentation
 
-Online documentation is available at http://awesome.naquadah.org/doc/ for the
-stable branch and at http://awesomewm.github.io/apidoc/ for the master branch.
-It can be built using `make ldoc`.
+Online documentation is available at https://awesomewm.org/apidoc/.
 
 ## License
 

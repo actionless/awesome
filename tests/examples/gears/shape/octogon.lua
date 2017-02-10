@@ -2,9 +2,11 @@ local shape,cr,show = ... --DOC_HIDE
 
 shape.octogon(cr, 70, 70)
 show(cr) --DOC_HIDE
- 
+
 shape.octogon(cr,70,70,70/2.5)
 show(cr) --DOC_HIDE
- 
+
 shape.transform(shape.octogon) : translate(0, 25) (cr,70,20)
 show(cr) --DOC_HIDE
+
+--DOC_HIDE vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

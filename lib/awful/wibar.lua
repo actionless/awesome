@@ -5,7 +5,6 @@
 --
 -- @author Emmanuel Lepage Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2016 Emmanuel Lepage Vallee
--- @release @AWESOME_VERSION@
 -- @classmod awful.wibar
 ---------------------------------------------------------------------------
 
@@ -263,7 +262,7 @@ end
 --
 -- @deprecated awful.wibox.stretch
 -- @see awful.placement
--- @see stretch
+-- @see awful.wibar.stretch
 
 --- Create a new wibox and attach it to a screen edge.
 -- You can add also position key with value top, bottom, left or right.
@@ -289,6 +288,7 @@ end
 -- @tparam wibox.widget arg.widget The widget that the wibox displays.
 -- @param arg.shape_bounding The wibox’s bounding shape as a (native) cairo surface.
 -- @param arg.shape_clip The wibox’s clip shape as a (native) cairo surface.
+-- @param arg.shape_input The wibox’s input shape as a (native) cairo surface.
 -- @tparam color arg.bg The background of the wibox.
 -- @tparam surface arg.bgimage The background image of the drawable.
 -- @tparam color arg.fg The foreground (text) of the wibox.
@@ -360,10 +360,14 @@ function awfulwibar.new(arg)
 end
 
 capi.screen.connect_signal("removed", function(s)
+    local wibars = {}
     for _, wibar in ipairs(wiboxes) do
         if wibar._screen == s then
-            wibar:remove()
+            table.insert(wibars, wibar)
         end
+    end
+    for _, wibar in ipairs(wibars) do
+        wibar:remove()
     end
 end)
 

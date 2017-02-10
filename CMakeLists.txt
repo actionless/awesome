@@ -22,8 +22,7 @@ include_directories(
     ${AWESOME_REQUIRED_INCLUDE_DIRS}
     ${AWESOME_OPTIONAL_INCLUDE_DIRS})
 
-set(AWE_CONF_FILE_DEFAULT ${BUILD_DIR}/awesomerc.lua)
-set(AWE_CONF_FILE rc.lua)
+set(CHECK_TARGETS check-integration)
 
 set(AWE_ICON_DIR ${SOURCE_DIR}/icons)
 set(AWE_THEMES_DIR ${SOURCE_DIR}/themes)
@@ -105,6 +104,9 @@ set(AWESOME_C_FLAGS
     CACHE STRING "CFLAGS used to compile ${PROJECT_AWE_NAME}")
 mark_as_advanced(AWESOME_C_FLAGS)
 target_compile_options(${PROJECT_AWE_NAME} PRIVATE ${AWESOME_C_FLAGS})
+
+# Make sure awesomerc.lua is generated
+add_dependencies(${PROJECT_AWE_NAME} generate_awesomerc)
 
 # Linux w/ GCC requires -rdynamic to get backtrace to fully work.
 #
@@ -262,6 +264,12 @@ if(GENERATE_DOC)
 
     file(GLOB_RECURSE AWE_LUA_FILES ${BUILD_DIR}/lib/*.lua)
     file(GLOB_RECURSE AWE_MD_FILES ${AWE_DOC_DIR}/*.md)
+    file(GLOB_RECURSE AWE_MD_LUA_FILES RELATIVE "${SOURCE_DIR}/docs" docs/*.md.lua)
+    foreach(file ${AWE_MD_LUA_FILES})
+        # Remove .lua file extensions
+        string(REPLACE ".lua" "" file ${file})
+        list(APPEND AWE_MD_FILES "${AWE_DOC_DIR}/${file}")
+    endforeach()
 
     # Copy the images to the build directory
     file(COPY ${SOURCE_DIR}/docs/images DESTINATION ${BUILD_DIR}/doc)
@@ -269,14 +277,22 @@ if(GENERATE_DOC)
     # Copy the aliases to the build directory
     file(COPY ${SOURCE_DIR}/docs/aliases DESTINATION ${BUILD_DIR}/docs)
 
+    add_custom_target(ldoc ALL
+        COMMAND ${LDOC_EXECUTABLE} .
+        WORKING_DIRECTORY ${AWE_DOC_DIR}
+        DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES}
+    )
+
     # Run ldoc and make it fail if any warnings are generated. The
     # redirection-magic swaps stdout and stderr and awk exits with a non-zero
     # status if it sees at least one line of input.
     # All together, this fails as soon as ldoc prints on stderr.
-    add_custom_target(ldoc ALL
+    add_custom_target(check-ldoc-warnings
         COMMAND ${LDOC_EXECUTABLE} . 3>&1 1>&2 2>&3 | awk "{ fail=1 \; print } END { exit fail }"
         WORKING_DIRECTORY ${AWE_DOC_DIR}
-        DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES})
+        DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES}
+    )
+    list(APPEND CHECK_QA_TARGETS check-ldoc-warnings)
 endif()
 # }}}
 
@@ -335,8 +351,8 @@ install(TARGETS ${PROJECT_AWE_NAME} RUNTIME DESTINATION bin)
 install(FILES "utils/awesome-client" DESTINATION bin PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 install(DIRECTORY ${BUILD_DIR}/lib DESTINATION ${AWESOME_DATA_PATH}
     PATTERN "*.in" EXCLUDE)
-install(FILES ${AWE_CONF_FILE_DEFAULT} DESTINATION ${AWESOME_SYSCONFDIR}
-        RENAME ${AWE_CONF_FILE})
+install(FILES ${BUILD_DIR}/awesomerc.lua DESTINATION ${AWESOME_SYSCONFDIR}
+        RENAME rc.lua)
 if(GENERATE_MANPAGES)
     if(COMPRESS_MANPAGES)
         set(regex "\\.(xml|txt|[0-9])$")
@@ -359,28 +375,34 @@ endif()
 # }}}
 
 # {{{ Tests
-set(CHECK_TARGETS check-integration)
 add_custom_target(check-integration
     sh -c "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ${CMAKE_SOURCE_DIR}/tests/run.sh"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running integration tests"
+    USES_TERMINAL
     VERBATIM)
+add_custom_target(check-requires
+    lua "${CMAKE_SOURCE_DIR}/build-utils/check_for_invalid_requires.lua"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Checking use of require()"
+    USES_TERMINAL
+    VERBATIM)
+list(APPEND CHECK_QA_TARGETS check-requires)
 a_find_program(BUSTED_EXECUTABLE busted FALSE)
 if(BUSTED_EXECUTABLE)
     # Keep the arguments in sync with the version below!
     add_custom_target(check-unit ALL
         ${BUSTED_EXECUTABLE} "--helper=${CMAKE_SOURCE_DIR}/spec/preload.lua"
-        "--lpath=${CMAKE_BINARY_DIR}/lib/?.lua;${CMAKE_BINARY_DIR}/lib/?/init.lua;spec/?.lua"
+        "--lpath=lib/?.lua;lib/?/init.lua;spec/?.lua"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running unit tests"
         VERBATIM)
     list(APPEND CHECK_TARGETS check-unit)
 
     # Same as above, but with --coverage argument
-    add_custom_target(check-coverage
-        "BUILD_DIRECTORY=${CMAKE_BINARY_DIR}/"
+    add_custom_target(check-unit-coverage
         ${BUSTED_EXECUTABLE} "--helper=${CMAKE_SOURCE_DIR}/spec/preload.lua"
-        "--lpath=${CMAKE_BINARY_DIR}/lib/?.lua;${CMAKE_BINARY_DIR}/lib/?/init.lua;spec/?.lua"
+        "--lpath=lib/?.lua;lib/?/init.lua;spec/?.lua"
         "--coverage"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running unit tests under LuaCov"
@@ -393,9 +415,10 @@ if(LUACHECK_EXECUTABLE)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running Luacheck"
         VERBATIM)
-    list(APPEND CHECK_TARGETS luacheck)
+    list(APPEND CHECK_QA_TARGETS luacheck)
 endif()
-add_custom_target(check DEPENDS ${CHECK_TARGETS})
+add_custom_target(check-qa DEPENDS ${CHECK_QA_TARGETS})
+add_custom_target(check DEPENDS ${CHECK_TARGETS} check-qa)
 # }}}
 
 INCLUDE(${CMAKE_SOURCE_DIR}/Packaging.cmake)

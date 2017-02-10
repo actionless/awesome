@@ -6,6 +6,7 @@ screen.count = 1
 
 local function create_screen(args)
     local s = gears_obj()
+    s.data = {}
 
     -- Copy the geo in case the args are mutated
     local geo = {
@@ -25,26 +26,26 @@ local function create_screen(args)
     local wa = args.workarea_sides or 10
 
     return setmetatable(s,{ __index = function(_, key)
-            if key == "geometry" then
-                return {
-                    x      = geo.x or 0,
-                    y      = geo.y or 0,
-                    width  = geo.width ,
-                    height = geo.height,
-                }
-            elseif key == "workarea" then
-                return {
-                    x      = (geo.x or 0) + wa  ,
-                    y      = (geo.y or 0) + wa  ,
-                    width  = geo.width    - 2*wa,
-                    height = geo.height   - 2*wa,
-                }
-            else
-                return meta.__index(_, key)
-            end
-        end,
-        __newindex = function(...) return meta.__newindex(...) end
-    })
+        if key == "geometry" then
+            return {
+                x      = geo.x or 0,
+                y      = geo.y or 0,
+                width  = geo.width ,
+                height = geo.height,
+            }
+        elseif key == "workarea" then
+            return {
+                x      = (geo.x or 0) + wa  ,
+                y      = (geo.y or 0) + wa  ,
+                width  = geo.width    - 2*wa,
+                height = geo.height   - 2*wa,
+            }
+        else
+            return meta.__index(_, key)
+        end
+    end,
+    __newindex = function(...) return meta.__newindex(...) end
+})
 end
 
 local screens = {}
@@ -98,4 +99,3 @@ screen._add_screen {width=320, height=240}
 return screen
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80
-

@@ -1,7 +1,6 @@
 ---------------------------------------------------------------------------
 -- @author Uli Schlachter
 -- @copyright 2012 Uli Schlachter
--- @release @AWESOME_VERSION@
 -- @module gears.wallpaper
 ---------------------------------------------------------------------------
 
@@ -21,6 +20,10 @@ end
 -- Information about a pending wallpaper change, see prepare_context()
 local pending_wallpaper = nil
 
+local function get_screen(s)
+    return s and screen[s]
+end
+
 --- Prepare the needed state for setting a wallpaper.
 -- This function returns a cairo context through which a wallpaper can be drawn.
 -- The context is only valid for a short time and should not be saved in a
@@ -29,8 +32,10 @@ local pending_wallpaper = nil
 -- @return[1] The available geometry (table with entries width and height)
 -- @return[1] A cairo context that the wallpaper should be drawn to
 function wallpaper.prepare_context(s)
+    s = get_screen(s)
+
     local root_width, root_height = root.size()
-    local geom = s and screen[s].geometry or root_geometry()
+    local geom = s and s.geometry or root_geometry()
     local source, target, cr
 
     if not pending_wallpaper then
@@ -83,6 +88,7 @@ end
 --- Set the current wallpaper.
 -- @param pattern The wallpaper that should be set. This can be a cairo surface,
 --   a description for gears.color or a cairo pattern.
+-- @see gears.color
 function wallpaper.set(pattern)
     if cairo.Surface:is_type_of(pattern) then
         pattern = cairo.Pattern.create_for_surface(pattern)
@@ -102,6 +108,7 @@ end
 --   all screens are set.
 -- @param background The background color that should be used. Gets handled via
 --   gears.color. The default is black.
+-- @see gears.color
 function wallpaper.centered(surf, s, background)
     local geom, cr = wallpaper.prepare_context(s)
     surf = surface.load_uncached(surf)
@@ -183,6 +190,7 @@ end
 --   all screens are set.
 -- @param background The background color that should be used. Gets handled via
 --   gears.color. The default is black.
+-- @see gears.color
 function wallpaper.fit(surf, s, background)
     local geom, cr = wallpaper.prepare_context(s)
     surf = surface.load_uncached(surf)

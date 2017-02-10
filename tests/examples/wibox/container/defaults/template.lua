@@ -35,9 +35,9 @@ local container = wibox.widget {
                 shape_border_width = beautiful.border_width,
                 widget             = wibox.container.background,
                 shape              = shape.transform(shape.arrow)
-                                        : rotate_at(15,15,math.pi/2)
-                                        : translate(0,-8)
-                                        : scale(0.9, 0.9),
+                : rotate_at(15,15,math.pi/2)
+                : translate(0,-8)
+                : scale(0.9, 0.9),
             },
             strategy = 'exact',
             width    = 42,
@@ -75,3 +75,4 @@ local f_w, f_h = container:fit({dpi=96}, 9999, 9999)
 local img = surface.widget_to_svg(container, image_path..".svg", f_w, f_h)
 img:finish()
 
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

@@ -1,15 +1,24 @@
 ---------------------------------------------------------------------------
---- Fair layouts module for awful
+--- Fair layouts module for awful.
 --
 -- @author Josh Komoroske
 -- @copyright 2012 Josh Komoroske
--- @release @AWESOME_VERSION@
--- @module awful.layout.suit.fair
+-- @module awful.layout
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
 local ipairs = ipairs
 local math = math
+
+--- The fairh layout layoutbox icon.
+-- @beautiful beautiful.layout_fairh
+-- @param surface
+-- @see gears.surface
+
+--- The fairv layout layoutbox icon.
+-- @beautiful beautiful.layout_fairv
+-- @param surface
+-- @see gears.surface
 
 local fair = {}
 

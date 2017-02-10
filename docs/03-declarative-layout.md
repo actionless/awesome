@@ -1,13 +1,13 @@
 # The declarative layout system
 
-This system provide an alternative to the system used in Awesome 3.5 and is
-inspired by the one once used by Awesome 3.2-3.4 and Qt QML system.
+The declarative layout system provides an alternative to the imperative system.
+It is inspired by the one used by Awesome 3.2-3.4 and the Qt QML style.
 
 ## The default widgets
 
 ### Widgets
 
-Awesome provide 2 collections of widgets:
+Awesome provides 2 collections of widgets:
 
  * `wibox.widget`: Generic widgets, containers and layouts
  * `awful.widget`: The Awesome specific widgets
@@ -17,15 +17,15 @@ Awesome provide 2 collections of widgets:
 
 ### Containers
 
-Containers are widget wrapping another widget. It can be used to add decorations
-or to modify the content of the child widget.
+A container is a widget that wraps another widget. It can be used to add
+decorations or to modify the content of the child widget.
 
 @DOC_container_WIDGET_LIST@
 
 ### Layouts
 
-Layouts are collection of children widgets. They place them according to rules
-and usually provide some options.
+Layouts are collections of children widgets. They are placed according to
+configurable rules.
 
 @DOC_layout_WIDGET_LIST@
 
@@ -39,7 +39,7 @@ and usually provide some options.
 
 Code:
 
-    mywibox[s] : setup {
+    s.mywibox : setup {
         s == 1 and my_first_widget, -- Only display on screen 1
         my_second_widget,
         { -- Add a background color/pattern for my_third_widget
@@ -52,8 +52,8 @@ Code:
 
 
 In this example `s == 1` is an inline expression. In the default `rc.lua`,
-there is an `s` variable represent to define the current screen. Any lua
-logic expression can be used as long as it return a valid widget, or a
+there is an `s` variable represent to define the current screen. Any Lua
+logic expression can be used as long as it returns a valid widget or a
 declarative layout, or `nil`.
 
 
@@ -66,7 +66,7 @@ declarative layout, or `nil`.
 
 Code:
 
-    mywibox[s] : setup {
+    s.mywibox : setup {
         {
             -- Force the textbox to always be 300 pixel long
             {
@@ -106,14 +106,14 @@ Result:
 ![Example2 screenshot](../images/widgetlayout1.png)
 
 
-### Use an `wibox.layout.align` layout
+### Use a `wibox.layout.align` layout
 The `wibox.layout.align` is a little different. While most layouts will
-ignore any `nil` lines, the `align` layout rely on them so `left`, `middle`
-and `right` can be defined
+ignore any `nil` lines, the `align` layout relies on them so `left`, `middle`
+and `right` can be defined.
 
 Code:
 
-    mywibox[s] : setup {
+    s.mywibox : setup {
         my_textbox1, -- Left
         nil,         -- Nothing in the middle
         my_textbox2, -- Right
@@ -129,7 +129,7 @@ is a simple circle widget:
 
 Code:
 
-    mywibox[s] : setup {
+    s.mywibox : setup {
         fit    = function(self, context, width, height)
             return height, height -- A square taking the full height
         end,
@@ -144,7 +144,7 @@ Code:
 Result:
 ![Example4 screenshot](../images/widgetlayout2.png)
 
-For more information about how to draw widgets, refer to the `Cairo` api:
+For more information about how to draw widgets, refer to the `Cairo` API:
 
 * [Path](http://cairographics.org/manual/cairo-Paths.html)
 * [Context](http://cairographics.org/manual/cairo-cairo-t.html)
@@ -165,7 +165,7 @@ Code:
     tb:set_markup("Hello world! ")
     
     -- Repeat "tb" 3 times
-    mywibox[s] : setup {
+    s.mywibox : setup {
         tb,
         tb,
         tb,
@@ -177,28 +177,28 @@ Code:
 ### Accessing widgets
 
 For each widget or container, it is possible to add an `identifier` attribute
-so the widget can be accessed later.
+so that it can be accessed later.
 
-Widgets defined using `setup` can be access by 3 means:
+Widgets defined using `setup` can be accessed using these methods:
 
-* Avoid the issue by using externally created widgets
-* Use `my_wibox.my_first_widget.my_second_widget` style access
-* Use JavaScript like `my_wibox:get_children_by_id("my_second_widget")[1]`
+* Avoiding the issue by using externally created widgets
+* Using `my_wibox.my_first_widget.my_second_widget` style access
+* Using JavaScript like `my_wibox:get_children_by_id("my_second_widget")[1]`
 
-The first method mixes the imperative and declarative syntax, but makes the code
+The first method mixes the imperative and declarative syntax, and makes the code
 less readable. The second is a little verbose and only works if every node in
-the chain have a valid identifier. The last one doesn't require long paths,
+the chain has a valid identifier. The last one doesn't require long paths,
 but it is not easy to get a specific instance if multiple widgets have the
 same identifier.
 
-WARNING: The widget identifier must not use reseved name. This include all
+WARNING: The widget identifier must not use a reserved name. This includes all
 method names, existing widget attributes, `layout` and `widget`. Names should
-also respect the lua variable name policies (case sensitive, alphanumeric and
-underscore characters and non-numeric first character)
+also respect the Lua variable conventions (case-sensitive, alphanumeric,
+underscore characters and non-numeric first character).
 
 Code:
 
-    mywibox[s] : setup {
+    s.mywibox : setup {
         {
             id     = "second",
             widget = wibox.widget.textbox
@@ -211,8 +211,8 @@ Code:
         layout = wibox.layout.fixed.horizontal,
     }
     
-    mywibox[s].first.second:set_markup("changed!")
-    mywibox[s]:get_children_by_id("third")[1]:set_markup("Also changed!")
+    s.mywibox.first.second:set_markup("changed!")
+    s.mywibox:get_children_by_id("third")[1]:set_markup("Also changed!")
 
 
 
@@ -220,10 +220,10 @@ Code:
 
 This system is very flexible. Each section attribute (the entries with string
 keys) is directly linked to the layout or widget API. When setting the
-imaginary `myproperty`, it will first check if `set_myproperty` exist. If it
+imaginary `myproperty`, it will first check if `set_myproperty` exists. If it
 doesn't, it will check if there is a `myproperty` method. Finally, it will
 just set the `mywidget.myproperty` directly in case it is used later or
-catched by a lua `metatable` (operator overload).
+caught by a Lua `metatable` (operator overload).
 
 Code:
 
@@ -234,7 +234,7 @@ Code:
         vicious.register(w, f(args))
     end
 
-    mywibox[s] : setup {
+    s.mywibox : setup {
         {
             vicious = {vicious.widgets.cpu, "CPU: $1%", 3},
             widget  = wibox.widget.textbox
@@ -244,7 +244,7 @@ Code:
 
 
 In this example, the system is extended to that the popular
-[Vicious](http://awesome.naquadah.org/wiki/Vicious) extension module can be
+[Vicious](https://github.com/Mic92/vicious) extension module can be
 used directly in the layout declaration. This example will update the textbox
 every 3 seconds to show the CPU usage.
 
@@ -273,7 +273,7 @@ Code:
     local l = wibox.widget.align()
     
     -- 3 circle
-    mywibox[s] : setup {
+    s.mywibox : setup {
         circle,
         circle,
         circle,
@@ -287,5 +287,5 @@ Code:
         table.insert(three_circle, circle)
     end
     
-    mywibox[s] : setup (three_circle)
+    s.mywibox : setup (three_circle)
 

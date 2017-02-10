@@ -22,7 +22,6 @@
 /** awesome root window API
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @module root
  */
 
@@ -137,7 +136,7 @@ root_set_wallpaper(cairo_pattern_t *pattern)
 
     result = true;
 disconnect:
-    xcb_flush(c);
+    xcb_aux_sync(c);
     xcb_disconnect(c);
     return result;
 }
@@ -361,7 +360,11 @@ luaA_root_buttons(lua_State *L)
     return 1;
 }
 
-/** Set the root cursor.
+/** Set the root cursor
+ *
+ * The possible values are:
+ *
+ *@DOC_cursor_c_COMMON@
  *
  * @param cursor_name A X cursor name.
  * @function cursor

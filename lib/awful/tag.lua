@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module tag
 ---------------------------------------------------------------------------
 
@@ -12,6 +11,7 @@ local util = require("awful.util")
 local ascreen = require("awful.screen")
 local beautiful = require("beautiful")
 local object = require("gears.object")
+local timer = require("gears.timer")
 local pairs = pairs
 local ipairs = ipairs
 local table = table
@@ -34,12 +34,31 @@ local tag = {object = {},  mt = {} }
 -- Private data
 local data = {}
 data.history = {}
-data.dynamic_cache = setmetatable({}, { __mode = 'k' })
-data.tags = setmetatable({}, { __mode = 'k' })
 
 -- History functions
 tag.history = {}
 tag.history.limit = 20
+
+-- Default values
+local defaults = {}
+
+-- The gap between clients (in points).
+defaults.gap                 = 0
+
+-- The default gap_count.
+defaults.gap_single_client   = true
+
+-- The default master fill policy.
+defaults.master_fill_policy  = "expand"
+
+-- The default master width factor.
+defaults.master_width_factor = 0.5
+
+-- The default master count.
+defaults.master_count        = 1
+
+-- The default column count.
+defaults.column_count        = 1
 
 -- screen.tags depend on index, it cannot be used by awful.tag
 local function raw_tags(scr)
@@ -55,6 +74,7 @@ end
 
 --- The number of elements kept in the history.
 -- @tfield integer awful.tag.history.limit
+-- @tparam[opt=20] integer limit
 
 --- The tag index.
 --
@@ -135,7 +155,6 @@ end
 
 --- Swap 2 tags
 -- @function tag.swap
--- @see tag.swap
 -- @param tag2 The second tag
 -- @see client.swap
 function tag.object.swap(self, tag2)
@@ -189,12 +208,12 @@ function tag.add(name, props)
     -- signal is sent
     properties.screen = get_screen(properties.screen or ascreen.focused())
     -- Index is also required
-    properties.index = #raw_tags(properties.screen)+1
+    properties.index = properties.index or #raw_tags(properties.screen)+1
 
     local newtag = capi.tag{ name = name }
 
     -- Start with a fresh property table to avoid collisions with unsupported data
-    data.tags[newtag] = {screen=properties.screen, index=properties.index}
+    newtag.data.awful_tag_properties = {screen=properties.screen, index=properties.index}
 
     newtag.activated = true
 
@@ -259,15 +278,14 @@ end
 --  stickied tags to.
 -- @tparam[opt=false] boolean force Move even non-sticky clients to the fallback
 -- tag.
--- @return Returns true if the tag is successfully deleted, nil otherwise.
+-- @return Returns true if the tag is successfully deleted.
 -- If there are no clients exclusively on this tag then delete it. Any
 -- stickied clients are assigned to the optional 'fallback_tag'.
 -- If after deleting the tag there is no selected tag, try and restore from
 -- history or select the first tag on the screen.
 function tag.object.delete(self, fallback_tag, force)
-
     -- abort if the taf isn't currently activated
-    if not self.activated then return end
+    if not self.activated then return false end
 
     local target_scr = get_screen(tag.getproperty(self, "screen"))
     local tags       = target_scr.tags
@@ -275,7 +293,7 @@ function tag.object.delete(self, fallback_tag, force)
     local ntags      = #tags
 
     -- We can't use the target tag as a fallback.
-    if fallback_tag == self then return end
+    if fallback_tag == self then return false end
 
     -- No fallback_tag provided, try and get one.
     if fallback_tag == nil then
@@ -284,7 +302,7 @@ function tag.object.delete(self, fallback_tag, force)
 
     -- Abort if we would have un-tagged clients.
     local clients = self:clients()
-    if ( #clients > 0 and ntags <= 1 ) or fallback_tag == nil then return end
+    if #clients > 0 and fallback_tag == nil then return false end
 
     -- Move the clients we can off of this tag.
     for _, c in pairs(clients) do
@@ -301,7 +319,7 @@ function tag.object.delete(self, fallback_tag, force)
     end
 
     -- delete the tag
-    data.tags[self].screen = nil
+    self.data.awful_tag_properties.screen = nil
     self.activated = false
 
     -- Update all indexes
@@ -309,9 +327,11 @@ function tag.object.delete(self, fallback_tag, force)
         tag.setproperty(tags[i], "index", i-1)
     end
 
-    -- If no tags are visible, try and view one.
-    if target_scr.selected_tag == nil and ntags > 0 then
-        tag.history.restore(nil, 1)
+    -- If no tags are visible (and we did not delete the lasttag), try and
+    -- view one. The > 1 is because ntags is no longer synchronized with the
+    -- current count.
+    if target_scr.selected_tag == nil and ntags > 1 then
+        tag.history.restore(target_scr, 1)
         if target_scr.selected_tag == nil then
             local other_tag = tags[tags[1] == self and 2 or 1]
             if other_tag then
@@ -465,6 +485,7 @@ function tag.object.set_screen(t, s)
 
     -- Change the screen
     tag.setproperty(t, "screen", s)
+    tag.setproperty(t, "index", #s:get_tags(true))
 
     -- Make sure the client's screen matches its tags
     for _,c in ipairs(t:clients()) do
@@ -473,10 +494,8 @@ function tag.object.set_screen(t, s)
     end
 
     -- Update all indexes
-    for _,screen in ipairs {old_screen, s} do
-        for i,t2 in ipairs(screen.tags) do
-            tag.setproperty(t2, "index", i)
-        end
+    for i,t2 in ipairs(old_screen.tags) do
+        tag.setproperty(t2, "index", i)
     end
 
     -- Restore the old screen history if the tag was selected
@@ -508,7 +527,7 @@ end
 -- @param[opt] t tag object
 -- @return Screen number
 function tag.getscreen(t)
-    util.deprecate("Use t.screen instead of awful.tag.setscreen(t, s)")
+    util.deprecate("Use t.screen instead of awful.tag.getscreen(t)")
 
     -- A new getter is not required
 
@@ -542,6 +561,13 @@ function tag.selected(s)
     return s.selected_tag
 end
 
+--- The default master width factor
+--
+-- @beautiful beautiful.master_width_factor
+-- @param number (default: 0.5)
+-- @see master_width_factor
+-- @see gap
+
 --- The tag master width factor.
 --
 -- The master width factor is one of the 5 main properties used to configure
@@ -570,7 +596,9 @@ function tag.object.set_master_width_factor(t, mwfact)
 end
 
 function tag.object.get_master_width_factor(t)
-    return tag.getproperty(t, "master_width_factor") or 0.5
+    return tag.getproperty(t, "master_width_factor")
+        or beautiful.master_width_factor
+        or defaults.master_width_factor
 end
 
 --- Set master width factor.
@@ -678,11 +706,11 @@ function tag.object.set_layout(t, layout)
         and getmetatable(layout)
         and getmetatable(layout).__call
     ) then
-        if not data.dynamic_cache[t] then
-            data.dynamic_cache[t] = {}
+        if not t.dynamic_layout_cache then
+            t.dynamic_layout_cache = {}
         end
 
-        local instance = data.dynamic_cache[t][layout] or layout(t)
+        local instance = t.dynamic_layout_cache[layout] or layout(t)
 
         -- Always make sure the layout is notified it is enabled
         if tag.getproperty(t, "screen").selected_tag == t and instance.wake_up then
@@ -691,7 +719,7 @@ function tag.object.set_layout(t, layout)
 
         -- Avoid creating the same layout twice, use layout:reset() to reset
         if instance.is_dynamic then
-            data.dynamic_cache[t][layout] = instance
+            t.dynamic_layout_cache[layout] = instance
         end
 
         layout = instance
@@ -764,6 +792,7 @@ end
 -- @beautiful beautiful.useless_gap
 -- @param number (default: 0)
 -- @see gap
+-- @see gap_single_client
 
 --- The gap (spacing, also called `useless_gap`) between clients.
 --
@@ -776,6 +805,7 @@ end
 --
 -- @property gap
 -- @param number The value has to be greater than zero.
+-- @see gap_single_client
 
 function tag.object.set_gap(t, useless_gap)
     if useless_gap >= 0 then
@@ -784,7 +814,9 @@ function tag.object.set_gap(t, useless_gap)
 end
 
 function tag.object.get_gap(t)
-    return tag.getproperty(t, "useless_gap") or beautiful.useless_gap or 0
+    return tag.getproperty(t, "useless_gap")
+        or beautiful.useless_gap
+        or defaults.gap
 end
 
 --- Set the spacing between clients
@@ -808,6 +840,38 @@ function tag.incgap(add, t)
     tag.object.set_gap(t, tag.object.get_gap(t) + add)
 end
 
+--- Enable gaps for a single client.
+--
+-- @beautiful beautiful.gap_single_client
+-- @param boolean (default: true)
+-- @see gap
+-- @see gap_single_client
+
+--- Enable gaps for a single client.
+--
+-- **Signal:**
+--
+-- * *property::gap\_single\_client*
+--
+-- @property gap_single_client
+-- @param boolean Enable gaps for a single client
+
+function tag.object.set_gap_single_client(t, gap_single_client)
+    tag.setproperty(t, "gap_single_client", gap_single_client == true)
+end
+
+function tag.object.get_gap_single_client(t)
+    local val = tag.getproperty(t, "gap_single_client")
+    if val ~= nil then
+        return val
+    end
+    val = beautiful.gap_single_client
+    if val ~= nil then
+        return val
+    end
+    return defaults.gap_single_client
+end
+
 --- Get the spacing between clients.
 -- @deprecated awful.tag.getgap
 -- @see gap
@@ -825,7 +889,25 @@ function tag.getgap(t, numclients)
     return tag.object.get_gap(t or ascreen.focused().selected_tag)
 end
 
+--- The default fill policy.
+--
+-- ** Possible values**:
+--
+-- * *expand*: Take all the space
+-- * *master_width_factor*: Only take the ratio defined by the
+--   `master_width_factor`
+--
+-- @beautiful beautiful.master_fill_policy
+-- @param string (default: "expand")
+-- @see master_fill_policy
+
 --- Set size fill policy for the master client(s).
+--
+-- ** Possible values**:
+--
+-- * *expand*: Take all the space
+-- * *master_width_factor*: Only take the ratio defined by the
+--   `master_width_factor`
 --
 -- **Signal:**
 --
@@ -835,7 +917,9 @@ end
 -- @param string "expand" or "master_width_factor"
 
 function tag.object.get_master_fill_policy(t)
-    return tag.getproperty(t, "master_fill_policy") or "expand"
+    return tag.getproperty(t, "master_fill_policy")
+        or beautiful.master_fill_policy
+        or defaults.master_fill_policy
 end
 
 --- Set size fill policy for the master client(s)
@@ -878,15 +962,23 @@ function tag.getmfpol(t)
     util.deprecate("Use t.master_fill_policy instead of awful.tag.getmfpol")
 
     t = t or ascreen.focused().selected_tag
-    return tag.getproperty(t, "master_fill_policy") or "expand"
+    return tag.getproperty(t, "master_fill_policy")
+        or beautiful.master_fill_policy
+        or defaults.master_fill_policy
 end
+
+--- The default number of master windows.
+--
+-- @beautiful beautiful.master_count
+-- @param integer (default: 1)
+-- @see master_count
 
 --- Set the number of master windows.
 --
 -- **Signal:**
 --
 -- * *property::nmaster* (deprecated)
--- * *property::master_count* (deprecated)
+-- * *property::master_count*
 --
 -- @property master_count
 -- @param integer nmaster Only positive values are accepted
@@ -899,10 +991,12 @@ function tag.object.set_master_count(t, nmaster)
 end
 
 function tag.object.get_master_count(t)
-    return tag.getproperty(t, "master_count") or 1
+    return tag.getproperty(t, "master_count")
+        or beautiful.master_count
+        or defaults.master_count
 end
 
---- 
+---
 -- @deprecated awful.tag.setnmaster
 -- @see master_count
 -- @param nmaster The number of master windows.
@@ -987,6 +1081,12 @@ function tag.geticon(_tag)
     return tag.getproperty(_tag, "icon")
 end
 
+--- The default number of columns.
+--
+-- @beautiful beautiful.column_count
+-- @param integer (default: 1)
+-- @see column_count
+
 --- Set the number of columns.
 --
 -- **Signal:**
@@ -1005,7 +1105,9 @@ function tag.object.set_column_count(t, ncol)
 end
 
 function tag.object.get_column_count(t)
-    return tag.getproperty(t, "column_count") or 1
+    return tag.getproperty(t, "column_count")
+        or beautiful.column_count
+        or defaults.column_count
 end
 
 --- Set number of column windows.
@@ -1038,8 +1140,8 @@ end
 -- @function awful.tag.incncol
 -- @param add Value to add to number of column windows.
 -- @param[opt] t The tag to modify, if null tag.selected() is used.
--- @tparam[opt=false] boolean sensible Limit column_count based on the number of visible
--- tiled windows?
+-- @tparam[opt=false] boolean sensible Limit column_count based on the number
+--   of visible tiled windows?
 function tag.incncol(add, t, sensible)
     t = t or ascreen.focused().selected_tag
 
@@ -1190,7 +1292,7 @@ end
 -- @tparam tag _tag The tag.
 -- @return The data table.
 function tag.getdata(_tag)
-    return data.tags[_tag]
+    return _tag.data.awful_tag_properties
 end
 
 --- Get a tag property.
@@ -1202,8 +1304,9 @@ end
 -- @tparam string prop The property name.
 -- @return The property.
 function tag.getproperty(_tag, prop)
-    if data.tags[_tag] then
-        return data.tags[_tag][prop]
+    if not _tag then return end -- FIXME: Turn this into an error?
+    if _tag.data.awful_tag_properties then
+       return _tag.data.awful_tag_properties[prop]
     end
 end
 
@@ -1218,12 +1321,12 @@ end
 -- @param prop The property name.
 -- @param value The value.
 function tag.setproperty(_tag, prop, value)
-    if not data.tags[_tag] then
-        data.tags[_tag] = {}
+    if not _tag.data.awful_tag_properties then
+        _tag.data.awful_tag_properties = {}
     end
 
-    if data.tags[_tag][prop] ~= value then
-        data.tags[_tag][prop] = value
+    if _tag.data.awful_tag_properties[prop] ~= value then
+        _tag.data.awful_tag_properties[prop] = value
         _tag:emit_signal("property::" .. prop)
     end
 end
@@ -1267,7 +1370,9 @@ end
 -- future. When a tag is detached from the screen, its signal is removed.
 --
 -- @function awful.tag.attached_connect_signal
--- @param screen The screen concerned, or all if nil.
+-- @screen screen The screen concerned, or all if nil.
+-- @tparam[opt] string signal The signal name.
+-- @tparam[opt] function Callback
 function tag.attached_connect_signal(screen, ...)
     if screen then
         attached_connect_signal_screen(screen, ...)
@@ -1277,21 +1382,28 @@ function tag.attached_connect_signal(screen, ...)
 end
 
 -- Register standard signals.
-capi.client.connect_signal("manage", function(c)
-    -- If we are not managing this application at startup,
-    -- move it to the screen where the mouse is.
-    -- We only do it for "normal" windows (i.e. no dock, etc).
-    if not awesome.startup and c.type ~= "desktop" and c.type ~= "dock" then
-        if c.transient_for then
-            c.screen = c.transient_for.screen
-            if not c.sticky then
-                c:tags(c.transient_for:tags())
-            end
-        else
-            c.screen = ascreen.focused()
+capi.client.connect_signal("property::screen", function(c)
+    -- First, the delayed timer is necessary to avoid a race condition with
+    -- awful.rules. It is also messing up the tags before the user have a chance
+    -- to set them manually.
+    timer.delayed_call(function()
+        if not c.valid then
+            return
         end
-    end
-    c:connect_signal("property::screen", function() c:to_selected_tags() end)
+        local tags, new_tags = c:tags(), {}
+
+        for _, t in ipairs(tags) do
+            if t.screen == c.screen then
+                table.insert(new_tags, t)
+            end
+        end
+
+        if #new_tags == 0 then
+            c:emit_signal("request::tag", nil, {reason="screen"})
+        elseif #new_tags < #tags then
+            c:tags(new_tags)
+        end
+    end)
 end)
 
 -- Keep track of the number of urgent clients.
@@ -1371,8 +1483,8 @@ capi.screen.connect_signal("removed", function(s)
     for _, t in pairs(s.tags) do
         t.activated = false
 
-        if data.tags[t] then
-            data.tags[t].screen = nil
+        if t.data.awful_tag_properties then
+            t.data.awful_tag_properties.screen = nil
         end
     end
 end)

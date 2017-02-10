@@ -3,8 +3,7 @@
 --
 -- @author Gregor Best
 -- @copyright 2008 Gregor Best
--- @release @AWESOME_VERSION@
--- @module awful.layout.suit.floating
+-- @module awful.layout
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
@@ -14,6 +13,11 @@ local capi =
     mouse = mouse,
     mousegrabber = mousegrabber
 }
+
+--- The floating layout layoutbox icon.
+-- @beautiful beautiful.layout_floating
+-- @param surface
+-- @see gears.surface
 
 local floating = {}
 
@@ -97,6 +101,9 @@ end
 
 function floating.arrange()
 end
+
+--- The floating layout.
+-- @clientlayout awful.layout.suit.
 
 floating.name = "floating"
 

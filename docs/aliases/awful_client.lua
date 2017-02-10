@@ -1,6 +1,5 @@
 ---------------------------------------------------------------------------
---- This module is deprecated, use `client`
---  ===============================
+--- This module documentation has been merged with the `client` class.
 --
 -- @module awful.client
 ---------------------------------------------------------------------------

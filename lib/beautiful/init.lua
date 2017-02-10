@@ -4,7 +4,6 @@
 -- @author Damien Leone &lt;damien.leone@gmail.com&gt;
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008-2009 Damien Leone, Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module beautiful
 ----------------------------------------------------------------------------
 
@@ -21,14 +20,79 @@ local gears_debug = require("gears.debug")
 local protected_call = require("gears.protected_call")
 
 local xresources = require("beautiful.xresources")
+local theme_assets = require("beautiful.theme_assets")
 
-local beautiful = { xresources = xresources, mt = {} }
+local beautiful = {
+    xresources = xresources,
+    theme_assets = theme_assets,
+    mt = {}
+}
 
 -- Local data
 local theme = {}
 local descs = setmetatable({}, { __mode = 'k' })
 local fonts = setmetatable({}, { __mode = 'v' })
 local active_font
+
+--- The default font.
+-- @beautiful beautiful.font
+
+-- The default background color.
+-- @beautiful beautiful.bg_normal
+
+-- The default focused element background color.
+-- @beautiful beautiful.bg_focus
+
+-- The default urgent element background color.
+-- @beautiful beautiful.bg_urgent
+
+-- The default minimized element background color.
+-- @beautiful beautiful.bg_minimize
+
+-- The system tray background color.
+-- Please note that only solid colors are currently supported.
+-- @beautiful beautiful.bg_systray
+
+-- The default focused element foreground (text) color.
+-- @beautiful beautiful.fg_normal
+
+-- The default focused element foreground (text) color.
+-- @beautiful beautiful.fg_focus
+
+-- The default urgent element foreground (text) color.
+-- @beautiful beautiful.fg_urgent
+
+-- The default minimized element foreground (text) color.
+-- @beautiful beautiful.fg_minimize
+
+--- The gap between clients.
+-- @beautiful beautiful.useless_gap
+-- @param[opt=0] number
+
+--- The client border width.
+-- @beautiful beautiful.border_width
+
+--- The default clients border width.
+-- Note that only solid colors are supported.
+-- @beautiful beautiful.border_normal
+
+--- The focused client border width.
+-- Note that only solid colors are supported.
+-- @beautiful beautiful.border_focus
+
+--- The marked clients border width.
+-- Note that only solid colors are supported.
+-- @beautiful beautiful.border_marked
+
+--- The wallpaper path.
+-- @beautiful beautiful.wallpaper
+
+-- The icon theme name.
+-- It has to be a directory in `/usr/share/icons` or an XDG icon folder.
+-- @beautiful beautiful.icon_theme
+
+--- The Awesome icon path.
+-- @beautiful beautiful.awesome_icon
 
 --- Load a font from a string or a font description.
 --
@@ -132,6 +196,7 @@ function beautiful.init(config)
 
             if theme.font then set_font(theme.font) end
         else
+            theme = {}
             return gears_debug.print_error("beautiful: error loading theme file " .. config)
         end
     else

@@ -5,8 +5,7 @@
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Donald Ephraim Curtis
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
--- @module awful.layout.suit.tile
+-- @module awful.layout
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
@@ -23,12 +22,32 @@ local capi =
 
 local tile = {}
 
+--- The tile layout layoutbox icon.
+-- @beautiful beautiful.layout_tile
+-- @param surface
+-- @see gears.surface
+
+--- The tile top layout layoutbox icon.
+-- @beautiful beautiful.layout_tiletop
+-- @param surface
+-- @see gears.surface
+
+--- The tile bottom layout layoutbox icon.
+-- @beautiful beautiful.layout_tilebottom
+-- @param surface
+-- @see gears.surface
+
+--- The tile left layout layoutbox icon.
+-- @beautiful beautiful.layout_tileleft
+-- @param surface
+-- @see gears.surface
+
 --- Jump mouse cursor to the client's corner when resizing it.
 tile.resize_jump_to_corner = true
 
 local function mouse_resize_handler(c, _, _, _, orientation)
     orientation = orientation or "tile"
-    local wa = capi.screen[c.screen].workarea
+    local wa = c.screen.workarea
     local mwfact = c.screen.selected_tag.master_width_factor
     local cursor
     local g = c:geometry()
@@ -274,6 +293,9 @@ local function do_tile(param, orientation)
 
 end
 
+--- The main tile algo, on the right.
+-- @param screen The screen number to tile.
+-- @clientlayout awful.layout.suit.tile.right
 tile.right = {}
 tile.right.name = "tile"
 tile.right.arrange = do_tile
@@ -281,8 +303,9 @@ function tile.right.mouse_resize_handler(c, corner, x, y)
     return mouse_resize_handler(c, corner, x, y)
 end
 
---- The main tile algo, on left.
+--- The main tile algo, on the left.
 -- @param screen The screen number to tile.
+-- @clientlayout awful.layout.suit.tile.left
 tile.left = {}
 tile.left.name = "tileleft"
 function tile.left.arrange(p)
@@ -292,8 +315,9 @@ function tile.left.mouse_resize_handler(c, corner, x, y)
     return mouse_resize_handler(c, corner, x, y, "left")
 end
 
---- The main tile algo, on bottom.
+--- The main tile algo, on the bottom.
 -- @param screen The screen number to tile.
+-- @clientlayout awful.layout.suit.tile.bottom
 tile.bottom = {}
 tile.bottom.name = "tilebottom"
 function tile.bottom.arrange(p)
@@ -303,8 +327,9 @@ function tile.bottom.mouse_resize_handler(c, corner, x, y)
     return mouse_resize_handler(c, corner, x, y, "bottom")
 end
 
---- The main tile algo, on top.
+--- The main tile algo, on the top.
 -- @param screen The screen number to tile.
+-- @clientlayout awful.layout.suit.tile.top
 tile.top = {}
 tile.top.name = "tiletop"
 function tile.top.arrange(p)

@@ -4,14 +4,23 @@
 -- @author Uli Schlachter &lt;psychon@znc.in&gt;
 -- @copyright 2009 Uli Schlachter
 -- @copyright 2008 Julien Danjou
--- @release @AWESOME_VERSION@
 --
--- @module awful.layout.suit.spiral
+-- @module awful.layout
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
 local ipairs = ipairs
 local math = math
+
+--- The spiral layout layoutbox icon.
+-- @beautiful beautiful.layout_spiral
+-- @param surface
+-- @see gears.surface
+
+--- The dwindle layout layoutbox icon.
+-- @beautiful beautiful.layout_dwindle
+-- @param surface
+-- @see gears.surface
 
 local spiral = {}
 
@@ -60,14 +69,16 @@ local function do_spiral(p, _spiral)
     end
 end
 
---- Dwindle layout
+--- Dwindle layout.
+-- @clientlayout awful.layout.suit.spiral.dwindle
 spiral.dwindle = {}
 spiral.dwindle.name = "dwindle"
 function spiral.dwindle.arrange(p)
     return do_spiral(p, false)
 end
 
---- Spiral layout
+--- Spiral layout.
+-- @clientlayout awful.layout.suit.spiral.name
 spiral.name = "spiral"
 function spiral.arrange(p)
     return do_spiral(p, true)

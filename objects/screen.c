@@ -42,7 +42,6 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @release @AWESOME_VERSION@
  * @classmod screen
  */
 
@@ -78,6 +77,16 @@
 /**
  * This signal is emitted when a screen is removed from the setup.
  * @signal removed
+ */
+
+/** This signal is emitted when the list of available screens changes.
+ * @signal .list
+ */
+
+/** When 2 screens are swapped
+ * @tparam screen screen The other screen
+ * @tparam boolean is_source If self is the source or the destination of the swap
+ * @signal .swapped
  */
 
  /**
@@ -146,7 +155,6 @@
  *
  * @property workarea
  * @see client.struts
- * @see wibox.struts
  * @param table
  * @tfield integer table.x The horizontal position
  * @tfield integer table.y The vertical position
@@ -274,6 +282,11 @@ screen_scan_randr_monitors(lua_State *L, screen_array_t *screens)
     xcb_randr_get_monitors_reply_t *monitors_r = xcb_randr_get_monitors_reply(globalconf.connection, monitors_c, NULL);
     xcb_randr_monitor_info_iterator_t monitor_iter;
 
+    if (monitors_r == NULL) {
+        warn("RANDR GetMonitors failed; this should not be possible");
+        return;
+    }
+
     for(monitor_iter = xcb_randr_get_monitors_monitors_iterator(monitors_r);
             monitor_iter.rem; xcb_randr_monitor_info_next(&monitor_iter))
     {
@@ -336,6 +349,11 @@ screen_scan_randr_crtcs(lua_State *L, screen_array_t *screens)
     xcb_randr_get_screen_resources_cookie_t screen_res_c = xcb_randr_get_screen_resources(globalconf.connection, globalconf.screen->root);
     xcb_randr_get_screen_resources_reply_t *screen_res_r = xcb_randr_get_screen_resources_reply(globalconf.connection, screen_res_c, NULL);
 
+    if (screen_res_r == NULL) {
+        warn("RANDR GetScreenResources failed; this should not be possible");
+        return;
+    }
+
     /* We go through CRTC, and build a screen for each one. */
     xcb_randr_crtc_t *randr_crtcs = xcb_randr_get_screen_resources_crtcs(screen_res_r);
 
@@ -344,6 +362,11 @@ screen_scan_randr_crtcs(lua_State *L, screen_array_t *screens)
         /* Get info on the output crtc */
         xcb_randr_get_crtc_info_cookie_t crtc_info_c = xcb_randr_get_crtc_info(globalconf.connection, randr_crtcs[i], XCB_CURRENT_TIME);
         xcb_randr_get_crtc_info_reply_t *crtc_info_r = xcb_randr_get_crtc_info_reply(globalconf.connection, crtc_info_c, NULL);
+
+        if(!crtc_info_r) {
+            warn("RANDR GetCRTCInfo failed; this should not be possible");
+            continue;
+        }
 
         /* If CRTC has no OUTPUT, ignore it */
         if(!xcb_randr_get_crtc_info_outputs_length(crtc_info_r))
@@ -364,6 +387,11 @@ screen_scan_randr_crtcs(lua_State *L, screen_array_t *screens)
             xcb_randr_get_output_info_cookie_t output_info_c = xcb_randr_get_output_info(globalconf.connection, randr_outputs[j], XCB_CURRENT_TIME);
             xcb_randr_get_output_info_reply_t *output_info_r = xcb_randr_get_output_info_reply(globalconf.connection, output_info_c, NULL);
             screen_output_t output;
+
+            if (!output_info_r) {
+                warn("RANDR GetOutputInfo failed; this should not be possible");
+                continue;
+            }
 
             int len = xcb_randr_get_output_info_name_length(output_info_r);
             /* name is not NULL terminated */
@@ -407,12 +435,14 @@ screen_scan_randr_crtcs(lua_State *L, screen_array_t *screens)
 static void
 screen_scan_randr(lua_State *L, screen_array_t *screens)
 {
+    const xcb_query_extension_reply_t *extension_reply;
     xcb_randr_query_version_reply_t *version_reply;
     uint32_t major_version;
     uint32_t minor_version;
 
     /* Check for extension before checking for XRandR */
-    if(!xcb_get_extension_data(globalconf.connection, &xcb_randr_id)->present)
+    extension_reply = xcb_get_extension_data(globalconf.connection, &xcb_randr_id);
+    if(!extension_reply || !extension_reply->present)
         return;
 
     version_reply =
@@ -461,17 +491,19 @@ static void
 screen_scan_xinerama(lua_State *L, screen_array_t *screens)
 {
     bool xinerama_is_active;
+    const xcb_query_extension_reply_t *extension_reply;
     xcb_xinerama_is_active_reply_t *xia;
     xcb_xinerama_query_screens_reply_t *xsq;
     xcb_xinerama_screen_info_t *xsi;
     int xinerama_screen_number;
 
     /* Check for extension before checking for Xinerama */
-    if(!xcb_get_extension_data(globalconf.connection, &xcb_xinerama_id)->present)
+    extension_reply = xcb_get_extension_data(globalconf.connection, &xcb_xinerama_id);
+    if(!extension_reply || !extension_reply->present)
         return;
 
     xia = xcb_xinerama_is_active_reply(globalconf.connection, xcb_xinerama_is_active(globalconf.connection), NULL);
-    xinerama_is_active = xia->state;
+    xinerama_is_active = xia && xia->state;
     p_delete(&xia);
     if(!xinerama_is_active)
         return;
@@ -479,6 +511,11 @@ screen_scan_xinerama(lua_State *L, screen_array_t *screens)
     xsq = xcb_xinerama_query_screens_reply(globalconf.connection,
                                            xcb_xinerama_query_screens_unchecked(globalconf.connection),
                                            NULL);
+
+    if(!xsq) {
+        warn("Xinerama QueryScreens failed; this should not be possible");
+        return;
+    }
 
     xsi = xcb_xinerama_query_screens_screen_info(xsq);
     xinerama_screen_number = xcb_xinerama_query_screens_screen_info_length(xsq);
@@ -604,6 +641,7 @@ screen_refresh(void)
 
     screen_array_t new_screens;
     lua_State *L = globalconf_get_lua_State();
+    bool list_changed = false;
 
     screen_array_init(&new_screens);
     if (globalconf.have_randr_15)
@@ -625,6 +663,8 @@ screen_refresh(void)
              * globalconf.screens reference this screen now */
             luaA_object_push(L, *new_screen);
             luaA_object_ref(L, -1);
+
+            list_changed = true;
         }
     }
 
@@ -643,6 +683,8 @@ screen_refresh(void)
             lua_pop(L, 1);
             luaA_object_unref(L, old_screen);
             old_screen->valid = false;
+
+            list_changed = true;
         }
     }
 
@@ -657,6 +699,9 @@ screen_refresh(void)
     screen_array_wipe(&new_screens);
 
     screen_update_primary();
+
+    if (list_changed)
+        luaA_class_emit_signal(L, &screen_class, "list", 0);
 }
 
 /** Return the squared distance of the given screen to the coordinates.
@@ -729,6 +774,20 @@ screen_coord_in_screen(screen_t *s, int x, int y)
 {
     return (x >= s->geometry.x && x < s->geometry.x + s->geometry.width)
            && (y >= s->geometry.y && y < s->geometry.y + s->geometry.height);
+}
+
+/** Is there any overlap between the given geometry and a given screen?
+ * \param screen The logical screen number.
+ * \param geom The geometry
+ * \return True if there is any overlap between the geometry and a given screen.
+ */
+bool
+screen_area_in_screen(screen_t *s, area_t geom)
+{
+        return (geom.x < s->geometry.x + s->geometry.width)
+               && (geom.x + geom.width > s->geometry.x )
+               && (geom.y < s->geometry.y + s->geometry.height)
+               && (geom.y + geom.height > s->geometry.y);
 }
 
 void screen_update_workarea(screen_t *screen)
@@ -1052,6 +1111,17 @@ luaA_screen_count(lua_State *L)
 }
 
 /** Add a fake screen.
+ *
+ * To vertically split the first screen in 2 equal parts, use:
+ *
+ *    local geo = screen[1].geometry
+ *    local new_width = math.ceil(geo.width/2)
+ *    local new_width2 = geo.width - new_width
+ *    screen[1]:fake_resize(geo.x, geo.y, new_width, geo.height)
+ *    screen.fake_add(geo.x + new_width, geo.y, new_width2, geo.height)
+ *
+ * Both virtual screens will have their own taglist and wibars.
+ *
  * @tparam integer x X-coordinate for screen.
  * @tparam integer y Y-coordinate for screen.
  * @tparam integer width width for screen.
@@ -1075,13 +1145,14 @@ luaA_screen_fake_add(lua_State *L)
     s->geometry.height = height;
 
     screen_added(L, s);
+    luaA_class_emit_signal(L, &screen_class, "list", 0);
     luaA_object_push(L, s);
 
     return 1;
 }
 
 /** Remove a screen.
- * @function fake_remove.
+ * @function fake_remove
  */
 static int
 luaA_screen_fake_remove(lua_State *L)
@@ -1096,6 +1167,7 @@ luaA_screen_fake_remove(lua_State *L)
     luaA_object_push(L, s);
     screen_removed(L, -1);
     lua_pop(L, 1);
+    luaA_class_emit_signal(L, &screen_class, "list", 0);
     luaA_object_unref(L, s);
     s->valid = false;
 
@@ -1132,6 +1204,47 @@ luaA_screen_fake_resize(lua_State *L)
     return 0;
 }
 
+/** Swap a screen with another one in global screen list.
+ * @client s A screen to swap with.
+ * @function swap
+ */
+static int
+luaA_screen_swap(lua_State *L)
+{
+    screen_t *s = luaA_checkudata(L, 1, &screen_class);
+    screen_t *swap = luaA_checkudata(L, 2, &screen_class);
+
+    if(s != swap)
+    {
+        screen_t **ref_s = NULL, **ref_swap = NULL;
+        foreach(item, globalconf.screens)
+        {
+            if(*item == s)
+                ref_s = item;
+            else if(*item == swap)
+                ref_swap = item;
+            if(ref_s && ref_swap)
+                break;
+        }
+        /* swap ! */
+        *ref_s = swap;
+        *ref_swap = s;
+
+        luaA_class_emit_signal(L, &screen_class, "list", 0);
+
+        luaA_object_push(L, swap);
+        lua_pushboolean(L, true);
+        luaA_object_emit_signal(L, -4, "swapped", 2);
+
+        luaA_object_push(L, swap);
+        luaA_object_push(L, s);
+        lua_pushboolean(L, false);
+        luaA_object_emit_signal(L, -3, "swapped", 2);
+    }
+
+    return 0;
+}
+
 void
 screen_class_setup(lua_State *L)
 {
@@ -1152,6 +1265,7 @@ screen_class_setup(lua_State *L)
         LUA_CLASS_META
         { "fake_remove", luaA_screen_fake_remove },
         { "fake_resize", luaA_screen_fake_resize },
+        { "swap", luaA_screen_swap },
         { NULL, NULL },
     };
 

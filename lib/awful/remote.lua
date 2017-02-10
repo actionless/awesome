@@ -3,7 +3,6 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Julien Danjou
--- @release @AWESOME_VERSION@
 -- @module awful.remote
 ---------------------------------------------------------------------------
 
@@ -18,7 +17,7 @@ local dbus = dbus
 local type = type
 
 if dbus then
-    dbus.connect_signal("org.naquadah.awesome.awful.Remote", function(data, code)
+    dbus.connect_signal("org.awesomewm.awful.Remote", function(data, code)
         if data.member == "Eval" then
             local f, e = load(code)
             if f then

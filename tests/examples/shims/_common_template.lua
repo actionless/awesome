@@ -1,22 +1,26 @@
-return function(_, _, luacovpath)
+-- luacheck: globals string
+function string.wlen(self)
+    return #self
+end
+
+return function(_, _)
 
     -- Set the global shims
-    -- luacheck: globals awesome root tag screen client mouse drawin
-    awesome = require( "awesome" )
-    root    = require( "root"    )
-    tag     = require( "tag"     )
-    screen  = require( "screen"  )
-    client  = require( "client"  )
-    mouse   = require( "mouse"   )
-    drawin  = require( "drawin"  )
+    -- luacheck: globals awesome root tag screen client mouse drawin button
+    -- luacheck: globals mousegrabber keygrabber
+    awesome      = require( "awesome"      )
+    root         = require( "root"         )
+    tag          = require( "tag"          )
+    screen       = require( "screen"       )
+    client       = require( "client"       )
+    mouse        = require( "mouse"        )
+    drawin       = require( "drawin"       )
+    button       = require( "button"       )
+    keygrabber   = require( "keygrabber"   )
+    mousegrabber = require( "mousegrabber" )
 
     -- Force luacheck to be silent about setting those as unused globals
     assert(awesome and root and tag and screen and client and mouse)
-
-    -- If luacov is available, use it. Else, do nothing.
-    pcall(function()
-        require("luacov.runner")(luacovpath)
-    end)
 
     -- Silence debug warnings
     require("gears.debug").print_warning = function() end

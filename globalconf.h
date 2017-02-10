@@ -30,6 +30,7 @@
 #include <xcb/xcb_icccm.h>
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_cursor.h>
+#include <xcb/xcb_xrm.h>
 #include <X11/Xresource.h>
 
 #include "objects/key.h"
@@ -55,6 +56,11 @@ typedef struct button_t button_t;
 typedef struct client_t client_t;
 typedef struct tag tag_t;
 typedef struct xproperty xproperty_t;
+struct sequence_pair {
+    xcb_void_cookie_t begin;
+    xcb_void_cookie_t end;
+};
+typedef struct sequence_pair sequence_pair_t;
 
 ARRAY_TYPE(button_t *, button)
 ARRAY_TYPE(tag_t *, tag)
@@ -62,16 +68,16 @@ ARRAY_TYPE(screen_t *, screen)
 ARRAY_TYPE(client_t *, client)
 ARRAY_TYPE(drawin_t *, drawin)
 ARRAY_TYPE(xproperty_t, xproperty)
+DO_ARRAY(sequence_pair_t, sequence_pair, DO_NOTHING)
+DO_ARRAY(xcb_window_t, window, DO_NOTHING)
 
 /** Main configuration structure */
 typedef struct
 {
-    /** Xlib Display */
-    Display *display;
-    /** X Resources DB */
-    XrmDatabase xrmdb;
     /** Connection ref */
     xcb_connection_t *connection;
+    /** X Resources DB */
+    xcb_xrm_database_t *xrmdb;
     /** Default screen number */
     int default_screen;
     /** xcb-cursor context */
@@ -100,6 +106,10 @@ typedef struct
     bool have_xtest;
     /** Check for SHAPE extension */
     bool have_shape;
+    /** Check for SHAPE extension with input shape support */
+    bool have_input_shape;
+    /** Check for XKB extension */
+    bool have_xkb;
     uint8_t event_base_shape;
     uint8_t event_base_xkb;
     uint8_t event_base_randr;
@@ -180,6 +190,15 @@ typedef struct
     uint32_t preferred_icon_size;
     /** Cached wallpaper information */
     cairo_surface_t *wallpaper;
+    /** List of enter/leave events to ignore */
+    sequence_pair_array_t ignore_enter_leave_events;
+    xcb_void_cookie_t pending_enter_leave_begin;
+    /** List of windows to be destroyed later */
+    window_array_t destroy_later_windows;
+    /** Pending event that still needs to be handled */
+    xcb_generic_event_t *pending_event;
+    /** The exit code that main() will return with */
+    int exit_code;
 } awesome_t;
 
 extern awesome_t globalconf;

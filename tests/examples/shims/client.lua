@@ -17,6 +17,7 @@ end
 -- Create fake clients to move around
 function client.gen_fake(args)
     local ret = gears_obj()
+    ret.data = {}
     ret.type = "normal"
     ret.valid = true
     ret.size_hints = {}
@@ -104,9 +105,9 @@ function client.gen_fake(args)
     assert(not args.screen or (args.screen == ret.screen))
 
     return setmetatable(ret, {
-        __index     = function(...) return meta.__index(...) end,
-        __newindex = function(...) return meta.__newindex(...) end
-    })
+                        __index     = function(...) return meta.__index(...) end,
+                        __newindex = function(...) return meta.__newindex(...) end
+                    })
 end
 
 function client.get(s)

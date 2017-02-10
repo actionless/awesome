@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Process (API) docs after a successful build on Travis (via ../.travis.yml).
 #
@@ -32,7 +32,7 @@ export GIT_AUTHOR_EMAIL="awesome-robot@users.noreply.github.com"
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 
-git clone --branch gh-pages "$REPO_APIDOC" build/apidoc \
+git clone --depth 1 --branch gh-pages "$REPO_APIDOC" build/apidoc \
     2>&1 | sed "s/$GH_APIDOC_TOKEN/GH_APIDOC_TOKEN/g"
 cd build/apidoc
 
@@ -56,6 +56,20 @@ fi
 # Use a temporary branch for the two commits, which allows for a better UI.
 git checkout -b merged-update
 
+# Create the README for the Git repo (https://github.com/awesomeWM/apidoc).
+cat > ../doc/README.md <<END
+# Awesome API documentation
+
+This repository contains the built API documentation for the
+[awesome](https://github.com/awesomeWM/awesome) window manager. It is
+automatically updated via Travis when the master branch changes. Hence:
+
+## Do NOT send pull requests here
+
+Instead, please update the source code of
+[awesome](https://github.com/awesomeWM/awesome) instead.
+END
+
 # Create a patch without irrelevant changes (version / timestamp).
 diff -Nur . ../doc -I "Last updated" -I "<strong>Release</strong>:" \
   -I "<h2>API documentation for awesome, a highly configurable X window manager (version .*)\.</h2>" \
@@ -76,7 +90,7 @@ COMMIT_MSG="Update docs for $AWESOME_VERSION via Travis
 Last commit message:
 $LAST_COMMIT_MSG
 
-Commits: https://github.com/awesomeWM/awesome/compare/${TRAVIS_COMMIT_RANGE}
+Commits: https://github.com/awesomeWM/awesome/compare/${TRAVIS_COMMIT_RANGE/.../..}
 Build URL: https://travis-ci.org/awesomeWM/awesome/builds/${TRAVIS_BUILD_ID}"
 git commit -m "[relevant] $COMMIT_MSG"
 
