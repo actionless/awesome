@@ -28,10 +28,10 @@ sha256sums=('SKIP'
             '5c5437448cc9f01be6ccbb298f5c86d0f8c4bcae23a22e6af699aff0d10f642f'
             '8f25957ef5453f825e05a63a74e24843aad945af86ddffcc0a84084ca2cf9928')
 
-#pkgver() {
-  #cd $pkgname
-  #git describe | sed 's/^v//;s/-/./g'
-#}
+pkgver() {
+  cd $pkgname
+  git describe | sed 's/^v//;s/-/./g'
+}
 
 prepare() {
   cd $pkgname
