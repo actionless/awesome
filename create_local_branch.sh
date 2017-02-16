@@ -7,8 +7,6 @@ branches=(
 
 	# my branches
 	#'rounded-naughty'
-    'rounded-naughty-2'
-    'prompt-fg-bg-doc'
 
 	# psychon
 
