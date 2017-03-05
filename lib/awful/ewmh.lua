@@ -204,7 +204,8 @@ function ewmh.tag(c, t, hints) --luacheck: no unused
         if c.transient_for and not (hints and hints.reason == "screen") then
             c.screen = c.transient_for.screen
             if not c.sticky then
-                c:tags(c.transient_for:tags())
+                local tags = c.transient_for:tags()
+                c:tags(#tags > 0 and tags or c.transient_for.screen.selected_tags)
             end
         else
             c:to_selected_tags()
@@ -246,7 +247,7 @@ local context_mapper = {
 function ewmh.geometry(c, context, hints)
     local layout = c.screen.selected_tag and c.screen.selected_tag.layout or nil
 
-    -- Setting the geometry wont work unless the client is floating.
+    -- Setting the geometry will not work unless the client is floating.
     if (not c.floating) and (not layout == asuit.floating) then
         return
     end
@@ -266,15 +267,15 @@ function ewmh.geometry(c, context, hints)
     -- floating client resize)
     if aplace[context] then
 
-        -- Check if it correspond to a boolean property
+        -- Check if it corresponds to a boolean property.
         local state = c[original_context]
 
-        -- If the property is boolean and it correspond to the undo operation,
+        -- If the property is boolean and it corresponds to the undo operation,
         -- restore the stored geometry.
         if state == false then
             local original = repair_geometry_lock
             repair_geometry_lock = true
-            aplace.restore(c,{context=context})
+            aplace.restore(c, {context=context})
             repair_geometry_lock = original
             return
         end

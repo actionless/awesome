@@ -111,46 +111,43 @@ end
 -- @return item name, item background color, background image, item icon.
 local function label(o)
     if o.focused then
-        return colortext(o.name, (theme.menu_fg_focus or theme.fg_focus)), (theme.menu_bg_focus or theme.bg_focus), nil, o.icon
+        return colortext(o.name, (theme.menu_fg_focus or theme.fg_focus)),
+               (theme.menu_bg_focus or theme.bg_focus),
+               nil,
+               o.icon
     else
         return o.name, (theme.menu_bg_normal or theme.bg_normal), nil, o.icon
     end
 end
 
 local function load_count_table()
+    if instance.count_table then
+        return instance.count_table
+    end
+    instance.count_table = {}
     local count_file_name = awful.util.getdir("cache") .. "/menu_count_file"
-
     local count_file = io.open (count_file_name, "r")
-    local count_table = {}
-
-    -- read weight file
     if count_file then
-        io.input (count_file)
-        for line in io.lines() do
+        for line in count_file:lines() do
             local name, count = string.match(line, "([^;]+);([^;]+)")
             if name ~= nil and count ~= nil then
-                count_table[name] = count
+                instance.count_table[name] = count
             end
         end
+        count_file:close()
     end
-
-    return count_table
+    return instance.count_table
 end
 
 local function write_count_table(count_table)
+    count_table = count_table or instance.count_table
     local count_file_name = awful.util.getdir("cache") .. "/menu_count_file"
-
     local count_file = io.open (count_file_name, "w")
-
-    if count_file then
-        io.output (count_file)
-
-        for name, count in pairs(count_table) do
-            local str = string.format("%s;%d\n", name, count)
-            io.write(str)
-        end
-        io.flush()
+    for name, count in pairs(count_table) do
+        local str = string.format("%s;%d\n", name, count)
+        count_file:write(str)
     end
+    count_file:close()
 end
 
 --- Perform an action for the given menu item.
@@ -166,21 +163,13 @@ local function perform_action(o)
         return true, "", new_prompt
     elseif shownitems[current_item].cmdline then
         awful.spawn(shownitems[current_item].cmdline)
-
         -- load count_table from cache file
         local count_table = load_count_table()
-
         -- increase count
         local curname = shownitems[current_item].name
-        if count_table[curname] ~= nil then
-            count_table[curname] = count_table[curname] + 1
-        else
-            count_table[curname] = 1
-        end
-
+        count_table[curname] = (count_table[curname] or 0) + 1
         -- write updated count table to cache file
         write_count_table(count_table)
-
         -- Let awful.prompt execute dummy exec_callback and
         -- done_callback to stop the keygrabber properly.
         return false
@@ -229,10 +218,9 @@ local function get_current_page(all_items, query, scr)
 end
 
 --- Update the menubar according to the command entered by user.
--- @tparam str query Search query.
 -- @tparam number|screen scr Screen
-local function menulist_update(query, scr)
-    query = query or ""
+local function menulist_update(scr)
+    local query = instance.query or ""
     shownitems = {}
     local pattern = awful.util.query_to_pattern(query)
 
@@ -244,7 +232,6 @@ local function menulist_update(query, scr)
     -- displayed first. Afterwards the non-category entries are added.
     -- All entries are weighted according to the number of times they
     -- have been executed previously (stored in count_table).
-
     local count_table = load_count_table()
     local command_list = {}
 
@@ -351,7 +338,7 @@ function menubar.refresh(scr)
     menubar.menu_gen.generate(function(entries)
         menubar.menu_entries = entries
         if instance then
-            menulist_update(instance.query, scr)
+            menulist_update(scr)
         end
     end)
 end
@@ -409,6 +396,7 @@ function menubar.show(scr)
             widget = menubar.get(scr),
             prompt = awful.widget.prompt(),
             query = nil,
+            count_table = nil,
         }
         local layout = wibox.layout.fixed.horizontal()
         layout:add(instance.prompt)
@@ -435,7 +423,7 @@ function menubar.show(scr)
 
     current_item = 1
     current_category = nil
-    menulist_update(instance.query, scr)
+    menulist_update(scr)
 
     local prompt_args = menubar.prompt_args or {}
 
@@ -447,7 +435,7 @@ function menubar.show(scr)
         done_callback       = menubar.hide,
         changed_callback    = function(query)
             instance.query = query
-            menulist_update(query, scr)
+            menulist_update(scr)
         end,
         keypressed_callback = prompt_keypressed_callback
     }, {__index=prompt_args}))
@@ -459,6 +447,7 @@ end
 function menubar.hide()
     if instance then
         instance.wibox.visible = false
+        instance.query = nil
     end
 end
 
