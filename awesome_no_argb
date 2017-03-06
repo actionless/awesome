@@ -2,10 +2,9 @@
 while $(true) ; do
     code=0
 	awesome --no-argb $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr || code=$?
-    if [[ ${code} -eq 3 ]] ; then
-        awesome $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr
-    fi
     if [[ ${code} -eq 2 ]] ; then
+        awesome $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr
+    elif [[ ${code} -ne 0 ]] ; then
         (sleep 2 ; openbox) ||
             xterm
         sleep 2
