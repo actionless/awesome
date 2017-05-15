@@ -71,6 +71,14 @@ function client.gen_fake(args)
         return nil
     end
 
+    function ret:raise()
+        --TODO
+    end
+
+    function ret:lower()
+        --TODO
+    end
+
     function ret:tags(new) --FIXME
         if new then
             ret._tags = new

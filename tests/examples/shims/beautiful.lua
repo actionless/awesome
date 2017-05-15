@@ -51,6 +51,11 @@ function module.get_font()
     return f
 end
 
+function module.get_font_height()
+    return 9
+end
+
+
 function module.get()
     return module
 end
