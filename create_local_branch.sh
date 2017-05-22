@@ -30,7 +30,7 @@ cp awesome/PKGBUILD ~/build/awesome-git/
 cd tmp-awesome/awesome
 git reset --hard
 
-git fetch --all
+git fetch --all --tags
 git checkout master
 git pull upstream master
 
