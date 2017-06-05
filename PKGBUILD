@@ -41,6 +41,7 @@ prepare() {
 }
 
 build() {
+    rm -r build || true
   mkdir -p build
   cd build
 

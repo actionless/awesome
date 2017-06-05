@@ -37,6 +37,7 @@ git pull upstream master
 git branch -D local
 git checkout -b local
 
+
 for branch in ${branches[@]}; do
 	echo "======================"
 	echo " merge $branch "
@@ -46,6 +47,7 @@ for branch in ${branches[@]}; do
 done
 
 git push origin local -f
+git push origin --tags
 
 if [[ ${1-a} = '-b' ]]; then
     cd ~/build/awesome-git
