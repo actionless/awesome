@@ -11,6 +11,7 @@ branches=(
 	# psychon
 
 	# elv13
+    #'pr/644'
     'upstream_dynamic_p7'
 
     # blueyed
@@ -26,6 +27,7 @@ cd ~/projects
 rm -r tmp-awesome/awesome -f || true
 cp -prf awesome tmp-awesome/
 cp awesome/PKGBUILD ~/build/awesome-git/
+cp awesome/awesome_no_argb ~/build/awesome-git/
 
 cd tmp-awesome/awesome
 git reset --hard
