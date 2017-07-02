@@ -6,13 +6,13 @@ branches=(
 	'actionless'
 
 	# my branches
-	#'rounded-naughty'
+	'xresources-titlebar-hover-press'
 
 	# psychon
 
 	# elv13
     #'pr/644'
-    'upstream_dynamic_p7'
+    #'upstream_dynamic_p7'
 
     # blueyed
 
