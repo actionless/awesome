@@ -38,6 +38,8 @@ prepare() {
   sed -i 's/^lua\b/luajit/' build-utils/lgi-check.sh
   sed -i 's/COMMAND lua\b/COMMAND luajit/' awesomeConfig.cmake tests/examples/CMakeLists.txt
   sed -i 's/LUA_COV_RUNNER lua\b/LUA_COV_RUNNER luajit/' tests/examples/CMakeLists.txt
+
+  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i -e 's/default\/theme/xresources\/theme/g'
 }
 
 build() {
@@ -57,8 +59,6 @@ build() {
 package() {
   cd build
   make DESTDIR="$pkgdir" install
-
-  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i -e 's/default\/theme/xresources\/theme/g'
 
   install -Dm755 "$srcdir"/$pkgname/awesome_argb \
     "$pkgdir/usr/bin/awesome_argb"
