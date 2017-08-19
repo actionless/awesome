@@ -15,12 +15,13 @@ local pairs = pairs
 local ipairs = ipairs
 local table = table
 local common = require("awful.widget.common")
-local util = require("awful.util")
 local tag = require("awful.tag")
 local beautiful = require("beautiful")
 local fixed = require("wibox.layout.fixed")
 local surface = require("gears.surface")
 local timer = require("gears.timer")
+local gcolor = require("gears.color")
+local gstring = require("gears.string")
 
 local function get_screen(s)
     return s and capi.screen[s]
@@ -328,10 +329,10 @@ function taglist.taglist_label(t, args)
     if not tag.getproperty(t, "icon_only") then
         text = "<span font_desc='"..font.."'>"
         if fg_color then
-            text = text .. "<span color='" .. util.ensure_pango_color(fg_color) ..
-                "'>" .. (util.escape(t.name) or "") .. "</span>"
+            text = text .. "<span color='" .. gcolor.ensure_pango_color(fg_color) ..
+                "'>" .. (gstring.xml_escape(t.name) or "") .. "</span>"
         else
-            text = text .. (util.escape(t.name) or "")
+            text = text .. (gstring.xml_escape(t.name) or "")
         end
         text = text .. "</span>"
     end
@@ -383,12 +384,12 @@ end
 -- @tparam[opt=nil] string|pattern style.fg_empty
 -- @tparam[opt=nil] string|pattern style.bg_volatile
 -- @tparam[opt=nil] string|pattern style.fg_volatile
--- @tparam[opt=nil] string style.taglist_squares_sel
--- @tparam[opt=nil] string style.taglist_squares_unsel
--- @tparam[opt=nil] string style.taglist_squares_sel_empty
--- @tparam[opt=nil] string style.taglist_squares_unsel_empty
--- @tparam[opt=nil] string style.taglist_squares_resize
--- @tparam[opt=nil] string style.taglist_disable_icon
+-- @tparam[opt=nil] string style.squares_sel
+-- @tparam[opt=nil] string style.squares_unsel
+-- @tparam[opt=nil] string style.squares_sel_empty
+-- @tparam[opt=nil] string style.squares_unsel_empty
+-- @tparam[opt=nil] string style.squares_resize
+-- @tparam[opt=nil] string style.disable_icon
 -- @tparam[opt=nil] string style.font
 -- @tparam[opt=nil] number style.spacing The spacing between tags.
 -- @param[opt] update_function Function to create a tag widget on each

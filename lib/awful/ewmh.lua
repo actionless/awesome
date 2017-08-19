@@ -9,7 +9,8 @@
 local client = client
 local screen = screen
 local ipairs = ipairs
-local util = require("awful.util")
+local timer = require("gears.timer")
+local gtable = require("gears.table")
 local aclient = require("awful.client")
 local aplace = require("awful.placement")
 local asuit = require("awful.layout.suit")
@@ -119,18 +120,18 @@ end
 -- * **context** (*string*) The activation context.
 -- * **hints** (*table*) Some additional hints (depending on the context)
 --
--- If the callback returns `true`, the client will be activated unless the `force`
--- hint is set. If the callback returns `false`, the activation request is
--- cancelled. If the callback returns `nil`, the previous callback will be
--- executed. This will continue until either a callback handles the request or
--- when it runs out of callbacks. In that case, the request will be granted if
--- the client is visible.
+-- If the callback returns `true`, the client will be activated. If the callback
+-- returns `false`, the activation request is cancelled unless the `force` hint is
+-- set. If the callback returns `nil`, the previous callback will be executed.
+-- This will continue until either a callback handles the request or when it runs
+-- out of callbacks. In that case, the request will be granted if the client is
+-- visible.
 --
 -- For example, to block Firefox from stealing the focus, use:
 --
---    awful.ewmh.add_activate_filter(function(c, "ewmh")
+--    awful.ewmh.add_activate_filter(function(c)
 --        if c.class == "Firefox" then return false end
---    end)
+--    end, "ewmh")
 --
 -- @tparam function f The callback
 -- @tparam[opt] string context The `request::activate` context
@@ -259,7 +260,7 @@ function ewmh.geometry(c, context, hints)
     -- Now, map it to something useful
     context = context_mapper[context] or context
 
-    local props = util.table.clone(hints or {}, false)
+    local props = gtable.clone(hints or {}, false)
     props.store_geometry = props.store_geometry==nil and true or props.store_geometry
 
     -- If it is a known placement function, then apply it, otherwise let
@@ -292,24 +293,98 @@ function ewmh.geometry(c, context, hints)
 
         if original_context == "fullscreen" and beautiful.fullscreen_hide_border ~= false then
             props.ignore_border_width = true
+            props.zap_border_width = true
         end
 
+        local original = repair_geometry_lock
+        repair_geometry_lock = true
         aplace[context](c, props)
-
-        -- Remove the border to get a "real" fullscreen.
-        if original_context == "fullscreen" and beautiful.fullscreen_hide_border ~= false then
-            local original = repair_geometry_lock
-            repair_geometry_lock = true
-            c.border_width = 0
-            repair_geometry_lock = original
-        end
+        repair_geometry_lock = original
     end
 end
+
+--- Merge the 2 requests sent by clients wanting to be maximized.
+--
+-- The X clients set 2 flags (atoms) when they want to be maximized. This caused
+-- 2 request::geometry to be sent. This code gives some time for them to arrive
+-- and send a new `request::geometry` (through the property change) with the
+-- combined state.
+--
+-- @signalhandler awful.ewmh.merge_maximization
+-- @tparam client c The client
+-- @tparam string context The context
+-- @tparam[opt={}] table hints The hints to pass to the handler
+function ewmh.merge_maximization(c, context, hints)
+    if context ~= "client_maximize_horizontal" and context ~= "client_maximize_vertical" then
+        return
+    end
+
+    if not c._delay_maximization then
+        c._delay_maximization = function()
+            -- This ignores unlikely corner cases like mismatching toggles.
+            -- That's likely to be an accident anyway.
+            if c._delayed_max_h and c._delayed_max_v then
+                c.maximized = c._delayed_max_h or c._delayed_max_v
+            elseif c._delayed_max_h then
+                c.maximized_horizontal = c._delayed_max_h
+            elseif c._delayed_max_v then
+                c.maximized_vertical = c._delayed_max_v
+            end
+        end
+
+        timer {
+            timeout     = 1/60,
+            autostart   = true,
+            single_shot = true,
+            callback    = function()
+                if not c.valid then return end
+
+                c._delay_maximization(c)
+                c._delay_maximization = nil
+                c._delayed_max_h = nil
+                c._delayed_max_v = nil
+            end
+        }
+    end
+
+    local function get_value(suffix, long_suffix)
+        if hints.toggle and c["_delayed_max_"..suffix] ~= nil then
+            return not c["_delayed_max_"..suffix]
+        elseif hints.toggle then
+            return not c["maximized_"..long_suffix]
+        else
+            return hints.status
+        end
+    end
+
+    if context == "client_maximize_horizontal" then
+        c._delayed_max_h = get_value("h", "horizontal")
+    elseif context == "client_maximize_vertical" then
+        c._delayed_max_v = get_value("v", "vertical")
+    end
+end
+
+--- Allow the client to move itself.
+--
+-- This is the default geometry request handler when the context is `ewmh`.
+--
+-- @signalhandler awful.ewmh.client_geometry_requests
+-- @tparam client c The client
+-- @tparam string context The context
+-- @tparam[opt={}] table hints The hints to pass to the handler
+function ewmh.client_geometry_requests(c, context, hints)
+    if context == "ewmh" and hints then
+        c:geometry(hints)
+    end
+end
+
 
 client.connect_signal("request::activate", ewmh.activate)
 client.connect_signal("request::tag", ewmh.tag)
 client.connect_signal("request::urgent", ewmh.urgent)
 client.connect_signal("request::geometry", ewmh.geometry)
+client.connect_signal("request::geometry", ewmh.merge_maximization)
+client.connect_signal("request::geometry", ewmh.client_geometry_requests)
 client.connect_signal("property::border_width", repair_geometry)
 client.connect_signal("property::screen", repair_geometry)
 screen.connect_signal("property::workarea", function(s)

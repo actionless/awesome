@@ -21,9 +21,19 @@
 
 /** awesome core API
  *
+ * Additionally to the classes described here, one can also use X properties as
+ * described in @{xproperties}.
+ *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
  * @module awesome
+ */
+
+/** Register a new xproperty.
+ *
+ * @tparam string name The name of the X11 property.
+ * @tparam string type One of "string", "number" or "boolean".
+ * @function register_xproperty
  */
 
 #define _GNU_SOURCE
@@ -78,8 +88,10 @@ extern const struct luaL_Reg awesome_mouse_meta[];
 
 /** A deprecated Lua function was called.
  *
- * @param hint String with a hint on what to use instead of the
+ * @tparam string hint String with a hint on what to use instead of the
  * deprecated functionality.
+ * @tparam[opt=nil] string|nil see The name of the newer API
+ * @tparam[opt=nil] table|nil args The name of the newer API
  * @signal debug::deprecation
  */
 

@@ -93,7 +93,8 @@ local client = require("awful.client")
 local layout = require("awful.layout")
 local a_screen = require("awful.screen")
 local grect = require("gears.geometry").rectangle
-local util = require("awful.util")
+local gdebug = require("gears.debug")
+local gtable = require("gears.table")
 local cairo = require( "lgi" ).cairo
 local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 
@@ -351,13 +352,16 @@ end
 -- @treturn The drawin's area.
 area_common = function(d, new_geo, ignore_border_width, args)
     -- The C side expect no arguments, nil isn't valid
+    if new_geo and args.zap_border_width then
+        d.border_width = 0
+    end
     local geometry = new_geo and d:geometry(new_geo) or d:geometry()
     local border = ignore_border_width and 0 or d.border_width or 0
 
     -- When using the placement composition along with the "pretend"
     -- option, it is necessary to keep a "virtual" geometry.
     if args and args.override_geometry then
-        geometry = util.table.clone(args.override_geometry)
+        geometry = gtable.clone(args.override_geometry)
     end
 
     geometry.width = geometry.width + 2 * border
@@ -950,9 +954,10 @@ end
 -- @treturn table The new geometry
 function placement.next_to_mouse(d, args)
     if type(args) == "number" then
-        util.deprecate(
+        gdebug.deprecate(
             "awful.placement.next_to_mouse offset argument is deprecated"..
-            " use awful.placement.next_to_mouse(c, {offset={x=...}})"
+            " use awful.placement.next_to_mouse(c, {offset={x=...}})",
+            {deprecated_in=4}
         )
         args = nil
     end

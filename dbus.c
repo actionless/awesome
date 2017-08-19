@@ -134,7 +134,7 @@ a_dbus_message_iter(lua_State *L, DBusMessageIter *iter)
 
                     switch(array_type)
                     {
-                      int datalen = 0;
+                      int datalen;
 #define DBUS_MSG_HANDLE_ARRAY_TYPE_NUMBER_OR_INT(type, dbustype, pusher) \
                       case dbustype: \
                         { \
@@ -504,9 +504,6 @@ a_dbus_process_requests_on_bus(DBusConnection *dbus_connection, GSource **source
         dbus_connection_flush(dbus_connection);
 }
 
-/** Foreword D-Bus process session requests on too the correct function.
- * \param data
- */
 static gboolean
 a_dbus_process_requests_session(gpointer data)
 {
@@ -514,9 +511,6 @@ a_dbus_process_requests_session(gpointer data)
     return TRUE;
 }
 
-/** Foreword D-Bus process system requests on too the correct function.
- * \param data
- */
 static gboolean
 a_dbus_process_requests_system(gpointer data)
 {
@@ -524,9 +518,9 @@ a_dbus_process_requests_system(gpointer data)
     return TRUE;
 }
 
-/** Attempt to request a D-Bus name
- * \param dbus_connection The application's connection to D-Bus
- * \param name The D-Bus connection name to be requested
+/** Attempt to request a D-Bus name.
+ * \param dbus_connection The application's connection to D-Bus.
+ * \param name The D-Bus connection name to be requested.
  * \return true if the name is primary owner or the name is already
  * the owner, otherwise false.
  */
@@ -616,7 +610,7 @@ a_dbus_connect(DBusBusType type, const char *type_name, GSourceFunc cb, GSource 
     dbus_connection = dbus_bus_get(type, &err);
     if(dbus_error_is_set(&err))
     {
-        warn("D-Bus session bus %s failed: %s", type_name, err.message);
+        warn("Could not connect to D-Bus %s bus: %s", type_name, err.message);
         dbus_connection = NULL;
         dbus_error_free(&err);
     }
@@ -663,9 +657,9 @@ a_dbus_cleanup(void)
     a_dbus_cleanup_bus(dbus_connection_system, &system_source);
 }
 
-/** Retrieve the D-Bus bus by it's name
- * \param name The name of the bus
- * \return The corresponding D-Bus connection
+/** Retrieve the D-Bus bus by its name.
+ * \param name The name of the bus.
+ * \return The corresponding D-Bus connection.
  */
 static DBusConnection *
 a_dbus_bus_getbyname(const char *name)
@@ -677,7 +671,7 @@ a_dbus_bus_getbyname(const char *name)
     return NULL;
 }
 
-/** Register a D-Bus name to receive message from.
+/** Register a D-Bus name to receive messages from.
  *
  * @param bus A string indicating if we are using system or session bus.
  * @param name A string with the name of the D-Bus name to register.

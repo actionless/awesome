@@ -9,7 +9,6 @@
 -- Grab environment we need
 local ipairs = ipairs
 local type = type
-local util = require("awful.util")
 local capi = {
     screen = screen,
     mouse  = mouse,
@@ -21,6 +20,8 @@ local tag = require("awful.tag")
 local client = require("awful.client")
 local ascreen = require("awful.screen")
 local timer = require("gears.timer")
+local gmath = require("gears.math")
+local protected_call = require("gears.protected_call")
 
 local function get_screen(s)
     return s and capi.screen[s]
@@ -121,7 +122,7 @@ function layout.inc(i, s, layouts)
             end
         end
         if curindex then
-            local newindex = util.cycle(#layouts, curindex + i)
+            local newindex = gmath.cycle(#layouts, curindex + i)
             layout.set(layouts[newindex], t)
         end
     end
@@ -163,8 +164,15 @@ function layout.parameters(t, screen)
         gap_single_client = t.gap_single_client
     end
 
-    local min_clients       = gap_single_client and 1 or 2
-    local useless_gap       = t and (#clients >= min_clients and t.gap or 0) or 0
+    local useless_gap = 0
+    if t then
+        local skip_gap = layout.get(screen).skip_gap or function(nclients)
+            return nclients < 2
+        end
+        if gap_single_client or not skip_gap(#clients, t) then
+            useless_gap = t.gap
+        end
+    end
 
     p.workarea = screen:get_bounding_geometry {
         honor_padding  = true,
@@ -197,19 +205,22 @@ function layout.arrange(screen)
         if arrange_lock then return end
         arrange_lock = true
 
-        local p = layout.parameters(nil, screen)
+        -- protected call to ensure that arrange_lock will be reset
+        protected_call(function()
+            local p = layout.parameters(nil, screen)
 
-        local useless_gap = p.useless_gap
+            local useless_gap = p.useless_gap
 
-        p.geometries = setmetatable({}, {__mode = "k"})
-        layout.get(screen).arrange(p)
-        for c, g in pairs(p.geometries) do
-            g.width = math.max(1, g.width - c.border_width * 2 - useless_gap * 2)
-            g.height = math.max(1, g.height - c.border_width * 2 - useless_gap * 2)
-            g.x = g.x + useless_gap
-            g.y = g.y + useless_gap
-            c:geometry(g)
-        end
+            p.geometries = setmetatable({}, {__mode = "k"})
+            layout.get(screen).arrange(p)
+            for c, g in pairs(p.geometries) do
+                g.width = math.max(1, g.width - c.border_width * 2 - useless_gap * 2)
+                g.height = math.max(1, g.height - c.border_width * 2 - useless_gap * 2)
+                g.x = g.x + useless_gap
+                g.y = g.y + useless_gap
+                c:geometry(g)
+            end
+        end)
         arrange_lock = false
         delayed_arrange[screen] = nil
 
@@ -269,6 +280,12 @@ capi.tag.connect_signal("tagged", arrange_tag)
 capi.screen.connect_signal("property::workarea", layout.arrange)
 capi.screen.connect_signal("padding", layout.arrange)
 
+capi.client.connect_signal("focus", function(c)
+    local screen = c.screen
+    if layout.get(screen).need_focus_update then
+        layout.arrange(screen)
+    end
+end)
 capi.client.connect_signal("raised", function(c) layout.arrange(c.screen) end)
 capi.client.connect_signal("lowered", function(c) layout.arrange(c.screen) end)
 capi.client.connect_signal("list", function()

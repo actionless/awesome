@@ -1,4 +1,20 @@
 cmake_minimum_required(VERSION 3.0.0)
+project(awesome C)
+
+# Require an out-of-source build. We generate an awesomerc.lua in the build dir
+# from the one in the source dir and this does not work otherwise.
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
+    message(SEND_ERROR "\
+You appear to be doing an in-source build, which means that the binaries are \
+generated in the same directory where the source code is. This is currently not \
+supported. Instead, do, for example, the following:\n\
+   mkdir build && cd build && cmake ..\n\
+Beware that CMake likely already generated a CMakeCache.txt in the source \
+directory which you first have to delete. \
+")
+    message(FATAL_ERROR "In-source builds are not supported")
+endif()
+
 set(CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS  TRUE)
 
 if(COMMAND cmake_policy)
@@ -131,10 +147,6 @@ target_link_libraries(${PROJECT_AWE_NAME}
     ${AWESOME_COMMON_REQUIRED_LDFLAGS}
     ${AWESOME_REQUIRED_LDFLAGS}
     ${AWESOME_OPTIONAL_LDFLAGS})
-
-# check for lgi and the needed gobject introspection files
-add_custom_target(lgi-check ALL
-    COMMAND ${SOURCE_DIR}/build-utils/lgi-check.sh)
 
 # {{{ Generated sources
 # atoms
@@ -278,26 +290,19 @@ if(GENERATE_DOC)
     file(COPY ${SOURCE_DIR}/docs/aliases DESTINATION ${BUILD_DIR}/docs)
 
     add_custom_target(ldoc ALL
-        COMMAND ${LDOC_EXECUTABLE} .
+        DEPENDS ${BUILD_DIR}/doc/index.html)
+    add_custom_command(
+        COMMAND ${LDOC_EXECUTABLE} --fatalwarnings .
+        OUTPUT  ${BUILD_DIR}/doc/index.html
         WORKING_DIRECTORY ${AWE_DOC_DIR}
-        DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES}
-    )
-
-    # Run ldoc and make it fail if any warnings are generated. The
-    # redirection-magic swaps stdout and stderr and awk exits with a non-zero
-    # status if it sees at least one line of input.
-    # All together, this fails as soon as ldoc prints on stderr.
-    add_custom_target(check-ldoc-warnings
-        COMMAND ${LDOC_EXECUTABLE} . 3>&1 1>&2 2>&3 | awk "{ fail=1 \; print } END { exit fail }"
-        WORKING_DIRECTORY ${AWE_DOC_DIR}
-        DEPENDS ${AWE_LUA_FILES} ${AWE_MD_FILES}
-    )
-    list(APPEND CHECK_QA_TARGETS check-ldoc-warnings)
+        DEPENDS ${AWE_SRCS} ${AWE_LUA_FILES} ${AWE_MD_FILES} ${BUILD_DIR}/docs/config.ld
+        COMMENT "Generating API documentation"
+        VERBATIM)
 endif()
 # }}}
 
 # {{{ Theme icons
-file(GLOB icon_sources RELATIVE ${SOURCE_DIR} ${SOURCE_DIR}/themes/*/titlebar/*.png)
+file(GLOB_RECURSE icon_sources RELATIVE ${SOURCE_DIR} ${SOURCE_DIR}/themes/*.png)
 
 foreach(icon ${icon_sources})
     # Copy all icons to the build dir to simplify the following code.
@@ -375,12 +380,23 @@ endif()
 # }}}
 
 # {{{ Tests
+add_executable(test-gravity tests/test-gravity.c)
+target_link_libraries(test-gravity
+    ${AWESOME_COMMON_REQUIRED_LDFLAGS} ${AWESOME_REQUIRED_LDFLAGS})
 add_custom_target(check-integration
-    sh -c "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ${CMAKE_SOURCE_DIR}/tests/run.sh"
+    ${CMAKE_COMMAND} -E env CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ./tests/run.sh \$\${TEST_RUN_ARGS:--W}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running integration tests"
+    USES_TERMINAL)
+add_dependencies(check-integration test-gravity)
+add_custom_target(check-themes
+    ${CMAKE_COMMAND} -E env CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ./tests/themes/run.sh
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Testing themes"
     USES_TERMINAL
-    VERBATIM)
+    DEPENDS generated_icons generate_awesomerc ${PROJECT_AWE_NAME})
+list(APPEND CHECK_TARGETS check-themes)
+
 add_custom_target(check-requires
     lua "${CMAKE_SOURCE_DIR}/build-utils/check_for_invalid_requires.lua"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -391,7 +407,7 @@ list(APPEND CHECK_QA_TARGETS check-requires)
 a_find_program(BUSTED_EXECUTABLE busted FALSE)
 if(BUSTED_EXECUTABLE)
     # Keep the arguments in sync with the version below!
-    add_custom_target(check-unit ALL
+    add_custom_target(check-unit
         ${BUSTED_EXECUTABLE} "--helper=${CMAKE_SOURCE_DIR}/spec/preload.lua"
         "--lpath=lib/?.lua;lib/?/init.lua;spec/?.lua"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -406,6 +422,10 @@ if(BUSTED_EXECUTABLE)
         "--coverage"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running unit tests under LuaCov"
+        VERBATIM)
+else()
+    add_custom_target(check-unit true
+        COMMENT "Skipping check-unit, since busted was not found"
         VERBATIM)
 endif()
 a_find_program(LUACHECK_EXECUTABLE luacheck FALSE)

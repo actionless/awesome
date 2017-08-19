@@ -8,7 +8,7 @@ local capi = {awesome = awesome}
 local setmetatable = setmetatable
 local textbox = require("wibox.widget.textbox")
 local button = require("awful.button")
-local util = require("awful.util")
+local gtable = require("gears.table")
 local widget_base = require("wibox.widget.base")
 local gdebug = require("gears.debug")
 
@@ -46,6 +46,7 @@ keyboardlayout.xkeyboard_country_code = {
     ["epo"] = true,   -- Esperanto
     ["es"] = true,    -- Spain
     ["et"] = true,    -- Ethiopia
+    ["eu"] = true,    -- EurKey
     ["fi"] = true,    -- Finland
     ["fo"] = true,    -- Faroe Islands
     ["fr"] = true,    -- France
@@ -115,10 +116,15 @@ keyboardlayout.xkeyboard_country_code = {
 
 -- Callback for updating current layout.
 local function update_status (self)
-    self._current = awesome.xkb_get_layout_group();
+    self._current = awesome.xkb_get_layout_group()
     local text = ""
-    if (#self._layout > 0) then
-        text = (" " .. self._layout[self._current] .. " ")
+    if #self._layout > 0 then
+        -- Please note that the group number reported by xkb_get_layout_group
+        -- is lower by one than the group numbers reported by xkb_get_group_names.
+        local name = self._layout[self._current+1]
+        if name then
+            text = " " .. name .. " "
+        end
     end
     self.widget:set_text(text)
 end
@@ -238,13 +244,10 @@ local function update_layout(self)
         return
     end
     if #layouts == 1 then
-        layouts[1].group_idx = 0
+        layouts[1].group_idx = 1
     end
     for _, v in ipairs(layouts) do
-        local layout_name = self.layout_name(v)
-        -- Please note that numbers of groups reported by xkb_get_group_names
-        -- is greater by one than the real group number.
-        self._layout[v.group_idx - 1] = layout_name
+        self._layout[v.group_idx] = self.layout_name(v)
     end
     update_status(self)
 end
@@ -288,7 +291,7 @@ function keyboardlayout.new()
 
     -- Mouse bindings
     self:buttons(
-        util.table.join(button({ }, 1, self.next_layout))
+        gtable.join(button({ }, 1, self.next_layout))
     )
 
     return self

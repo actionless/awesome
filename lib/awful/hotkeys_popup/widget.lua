@@ -12,6 +12,8 @@ local capi = {
     keygrabber = keygrabber,
 }
 local awful = require("awful")
+local gtable = require("gears.table")
+local gstring = require("gears.string")
 local wibox = require("wibox")
 local beautiful = require("beautiful")
 local dpi = beautiful.xresources.apply_dpi
@@ -133,7 +135,7 @@ function widget.new(args)
         merge_duplicates = (
             args.merge_duplicates == nil
         ) and widget.merge_duplicates or args.merge_duplicates,
-        group_rules = args.group_rules or awful.util.table.clone(widget.group_rules),
+        group_rules = args.group_rules or gtable.clone(widget.group_rules),
         labels = args.labels or {
             Mod4="Super",
             Mod1="Alt",
@@ -322,13 +324,13 @@ function widget.new(args)
         local max_height_px = height - group_label_height
         local column_layouts = {}
         for _, group in ipairs(available_groups) do
-            local keys = awful.util.table.join(self._cached_awful_keys[group], self._additional_hotkeys[group])
+            local keys = gtable.join(self._cached_awful_keys[group], self._additional_hotkeys[group])
             local joined_descriptions = ""
             for i, key in ipairs(keys) do
                 joined_descriptions = joined_descriptions .. key.description .. (i~=#keys and "\n" or "")
             end
             -- +1 for group label:
-            local items_height = awful.util.linecount(joined_descriptions) * line_height + group_label_height
+            local items_height = gstring.linecount(joined_descriptions) * line_height + group_label_height
             local current_column
             local available_height_px = max_height_px
             local add_new_column = true
@@ -391,7 +393,7 @@ function widget.new(args)
                 end
                 -- +1 for group label:
                 current_column.height_px = (current_column.height_px or 0) +
-                    awful.util.linecount(joined_labels)*line_height + group_label_height
+                    gstring.linecount(joined_labels)*line_height + group_label_height
                 if _add_new_column then
                     table.insert(column_layouts, current_column)
                 end
@@ -447,7 +449,7 @@ function widget.new(args)
             height = height,
         })
         mywibox:set_widget(pages[1])
-        mywibox:buttons(awful.util.table.join(
+        mywibox:buttons(gtable.join(
                 awful.button({ }, 1, function () mywibox.visible=false end),
                 awful.button({ }, 3, function () mywibox.visible=false end)
         ))
@@ -532,7 +534,6 @@ function widget.new(args)
         end)
     end
 
-
     --- Add hotkey descriptions for third-party applications.
     -- @tparam table hotkeys Table with bindings,
     -- see `awful.hotkeys_popup.key.vim` as an example.
@@ -554,6 +555,13 @@ function widget.new(args)
         self:_sort_hotkeys(self._additional_hotkeys)
     end
 
+    --- Add hotkey group rules for third-party applications.
+    -- @tparam string group hotkeys group name,
+    -- @tparam table data rule data for the group
+    -- see `awful.hotkeys_popup.key.vim` as an example.
+    function widget_instance:add_group_rules(group, data)
+        self.group_rules[group] = data
+    end
 
     return widget_instance
 end
@@ -578,6 +586,15 @@ end
 -- see `awful.hotkeys_popup.key.vim` as an example.
 function widget.add_hotkeys(...)
     return get_default_widget():add_hotkeys(...)
+end
+
+--- Add hotkey group rules for third-party applications
+-- (default widget instance will be used).
+-- @tparam string group rule group name,
+-- @tparam table data rule data for the group
+-- see `awful.hotkeys_popup.key.vim` as an example.
+function widget.add_group_rules(group, data)
+    return get_default_widget():add_group_rules(group, data)
 end
 
 return widget

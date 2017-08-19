@@ -12,7 +12,7 @@ local ipairs = ipairs
 local setmetatable = setmetatable
 local base = require("wibox.widget.base")
 local matrix = require("gears.matrix")
-local util = require("awful.util")
+local gtable = require("gears.table")
 
 local mirror = { mt = {} }
 
@@ -96,9 +96,9 @@ end
 
 --- Get the reflection of this mirror layout.
 -- @property reflection
--- @param table reflection A table of booleans with the keys "horizontal", "vertical".
--- @param boolean reflection.horizontal
--- @param boolean reflection.vertical
+-- @tparam table reflection A table of booleans with the keys "horizontal", "vertical".
+-- @tparam boolean reflection.horizontal
+-- @tparam boolean reflection.vertical
 
 function mirror:get_reflection()
     return { horizontal = self._private.horizontal, vertical = self._private.vertical }
@@ -118,7 +118,7 @@ local function new(widget, reflection)
     ret._private.horizontal = false
     ret._private.vertical = false
 
-    util.table.crush(ret, mirror, true)
+    gtable.crush(ret, mirror, true)
 
     ret:set_widget(widget)
     ret:set_reflection(reflection or {})

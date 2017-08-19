@@ -10,7 +10,7 @@
 -- How to create a tooltip?
 -- ---
 --
---     myclock = wibox.widget.textclock({}, "%T", 1)
+--     myclock = wibox.widget.textclock("%T", 1)
 --     myclock_t = awful.tooltip({
 --         objects = { myclock },
 --         timer_function = function()
@@ -41,7 +41,7 @@
 
 local mouse = mouse
 local timer = require("gears.timer")
-local util = require("awful.util")
+local gtable = require("gears.table")
 local object = require("gears.object")
 local color = require("gears.color")
 local wibox = require("wibox")
@@ -137,6 +137,7 @@ local function apply_shape(self)
     s(cr, w, h, unpack(self._private.shape_args or {}))
     cr:fill()
     wb.shape_bounding = img._native
+    img:finish()
 
     -- The wibox background uses ARGB32 border so tooltip anti-aliasing works
     -- when an external compositor is used. This will look better than
@@ -146,8 +147,7 @@ local function apply_shape(self)
 
     -- Draw the border (multiply by 2, then mask the inner part to save a path)
     local bw = (self._private.border_width
-        or beautiful.tooltip_border_width
-        or beautiful.border_width or 0) * 2
+        or beautiful.tooltip_border_width or 0) * 2
 
     -- Fix anti-aliasing
     if bw > 2 and awesome.composite_manager_running then
@@ -558,7 +558,7 @@ function tooltip.new(args)
     end
 
     -- export functions
-    util.table.crush(self, tooltip, true)
+    gtable.crush(self, tooltip, true)
 
     -- setup the timer action only if needed
     if args.timer_function then
@@ -580,6 +580,7 @@ function tooltip.new(args)
         fg = fg,
         bg = color.transparent,
         opacity = beautiful.tooltip_opacity or 1,
+        type = "tooltip",
     }
 
     self.textbox = textbox()

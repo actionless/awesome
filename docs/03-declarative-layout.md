@@ -41,8 +41,16 @@ configurable rules.
 Code:
 
     s.mywibox : setup {
-        s == screen.primary and my_first_widget, -- Only display on primary screen
-        s.index == 2 and my_second_widget, -- Only display on screen 2
+        {
+            layout = awful.widget.only_on_screen,
+            screen = "primary", -- Only display on primary screen
+            my_first_widget,
+        },
+        {
+            layout = awful.widget.only_on_screen,
+            screen = 2, -- Only display on screen 2
+            my_second_widget,
+        },
         my_third_widget, -- Displayed on all screens
         { -- Add a background color/pattern for my_fourth_widget
               my_fourth_widget,
@@ -53,10 +61,8 @@ Code:
     }
 
 
-In this example `s == screen.primary` is an inline expression. In the default
-`rc.lua`, there is an `s` variable represent to define the current screen. Any
-Lua logic expression can be used as long as it returns a valid widget or a
-declarative layout, or `nil`.
+This examples uses the `awful.widget.only_on_screen` container to display
+widgets only on some screens.
 
 ### Composite widgets
 
@@ -169,7 +175,7 @@ Code:
 
     local tb = wibox.widget.textbox()
     tb:set_markup("Hello world! ")
-    
+
     -- Repeat "tb" 3 times
     s.mywibox : setup {
         tb,
@@ -216,7 +222,7 @@ Code:
         id     = "first",
         layout = wibox.layout.fixed.horizontal,
     }
-    
+
     s.mywibox.first.second:set_markup("changed!")
     s.mywibox:get_children_by_id("third")[1]:set_markup("Also changed!")
 
@@ -253,7 +259,7 @@ Code:
     }
 
 
-In this example, the system is extended to that the popular
+In this example, the system is extended so that the popular
 [Vicious](https://github.com/Mic92/vicious) extension module can be
 used directly in the layout declaration. This example will update the textbox
 every 3 seconds to show the CPU usage.
@@ -278,10 +284,10 @@ Code:
         end,
         layout = wibox.widget.base.make_widget,
     }
-    
+
     -- Define a layout with the imperative syntax
     local l = wibox.widget.align()
-    
+
     -- 3 circle
     s.mywibox : setup {
         circle,
@@ -290,12 +296,12 @@ Code:
         l,
         layout = wibox.layout.align.horizontal
     }
-    
+
     -- This can be done instead
     local three_circle = {layout = wibox.layout.align.horizontal}
     for i=1, 3 do
         table.insert(three_circle, circle)
     end
-    
+
     s.mywibox : setup (three_circle)
 

@@ -31,7 +31,7 @@ local type = type
 local ipairs = ipairs
 local pairs = pairs
 local atag = require("awful.tag")
-local util = require("awful.util")
+local gtable = require("gears.table")
 local a_place = require("awful.placement")
 local protected_call = require("gears.protected_call")
 
@@ -247,7 +247,7 @@ end
 -- By default, the table has the following functions:
 --
 -- * geometry
--- * switchtotag
+-- * placement
 --
 -- @tfield table awful.rules.extra_properties
 rules.extra_properties = {}
@@ -275,6 +275,9 @@ rules.high_priority_properties = {}
 --- Delayed properties.
 -- Properties applied after all other categories.
 -- @tfield table awful.rules.delayed_properties
+-- By default, the table has the following functions:
+--
+-- * switchtotag
 rules.delayed_properties = {}
 
 local force_ignore = {
@@ -301,23 +304,7 @@ end
 
 function rules.delayed_properties.switchtotag(c, value)
     if not value then return end
-
-    local selected_tags = {}
-
-    for _,v in ipairs(c.screen.selected_tags) do
-        selected_tags[v] = true
-    end
-
-    local tags = c:tags()
-
-    for _, t in ipairs(tags) do
-        t.selected = true
-        selected_tags[t] = nil
-    end
-
-    for t in pairs(selected_tags) do
-        t.selected = false
-    end
+    atag.viewmore(c:tags(), c.screen)
 end
 
 function rules.extra_properties.geometry(c, _, props)
@@ -352,7 +339,7 @@ function rules.high_priority_properties.new_tag(c, value, props)
     elseif ty == "table" then
         -- Assume a table of tags properties. Set the right screen, but
         -- avoid editing the original table
-        local values = value.screen and value or util.table.clone(value)
+        local values = value.screen and value or gtable.clone(value)
         values.screen = values.screen or c.screen
 
         t = atag.add(value.name or c.class or "N/A", values)
@@ -416,7 +403,7 @@ function rules.high_priority_properties.tags(c, value, props)
     if #current == 0 or (value[1] and value[1].screen ~= current[1].screen) then
         c:tags(tags)
     else
-        c:tags(util.table.merge(current, tags))
+        c:tags(gtable.merge(current, tags))
     end
 end
 
@@ -457,28 +444,26 @@ function rules.execute(c, props, callbacks)
     end
 
     -- Some properties need to be handled first. For example, many properties
-    -- depend that the client is tagged, this isn't yet the case.
+    -- require that the client is tagged, this isn't yet the case.
     for prop, handler in pairs(rules.high_priority_properties) do
         local value = props[prop]
-
         if value ~= nil then
             if type(value) == "function" then
                 value = value(c, props)
             end
-
             handler(c, value, props)
         end
-
     end
 
     -- Make sure the tag is selected before the main rules are called.
-    -- Otherwise properties like "urgent" or "focus" may fail because they
-    -- will be overiden by various callbacks.
-    -- Previously, this was done in a second client.manage callback, but caused
-    -- a race condition where the order the require() would change the output.
+    -- Otherwise properties like "urgent" or "focus" may fail (if they were
+    -- overridden by other callbacks).
+    -- Previously this was done in a second client.manage callback, but caused
+    -- a race condition where the order of modules being loaded would change
+    -- the outcome.
     c:emit_signal("request::tag", nil, {reason="rules"})
 
-    -- By default, rc.lua use no_overlap+no_offscreen placement. This has to
+    -- By default, rc.lua uses no_overlap+no_offscreen placement. This has to
     -- be executed before x/y/width/height/geometry as it would otherwise
     -- always override the user specified position with the default rule.
     if props.placement then
@@ -486,13 +471,12 @@ function rules.execute(c, props, callbacks)
         rules.extra_properties.placement(c, props.placement, props)
     end
 
-    -- Now that the tags and screen are set, handle the geometry
+    -- Handle the geometry (since tags and screen are set).
     if props.height or props.width or props.x or props.y or props.geometry then
         rules.extra_properties.geometry(c, nil, props)
     end
 
-    -- As most race conditions should now have been avoided, apply the remaining
-    -- properties.
+    -- Apply the remaining properties (after known race conditions are handled).
     for property, value in pairs(props) do
         if property ~= "focus" and type(value) == "function" then
             value = value(c, props)
@@ -523,12 +507,10 @@ function rules.execute(c, props, callbacks)
     for prop, handler in pairs(rules.delayed_properties) do
         if not force_ignore[prop] then
             local value = props[prop]
-
             if value ~= nil then
                 if type(value) == "function" then
                     value = value(c, props)
                 end
-
                 handler(c, value, props)
             end
         end

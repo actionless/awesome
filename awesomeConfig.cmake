@@ -4,9 +4,7 @@ set(PROJECT_AWE_NAME awesome)
 # `git describe` later.
 set(VERSION devel)
 
-set(CODENAME "Harder, Better, Faster, Stronger")
-
-project(${PROJECT_AWE_NAME} C)
+set(CODENAME "Human after all")
 
 option(WITH_DBUS "build with D-BUS" ON)
 option(GENERATE_MANPAGES "generate manpages" ON)
@@ -67,6 +65,12 @@ a_find_program(CONVERT_EXECUTABLE convert TRUE)
 include(FindPkgConfig)
 # lua
 include(FindLua)
+if (NOT LUA_FOUND)
+    message(FATAL_ERROR
+        "Could not find Lua. See the error above.\n"
+        "You might want to hint it using the LUA_DIR environment variable, "
+        "or set the LUA_INCLUDE_DIR / LUA_LIBRARY CMake variables.")
+endif()
 # }}}
 
 # {{{ Check if documentation can be build
@@ -124,6 +128,7 @@ pkg_check_modules(AWESOME_COMMON_REQUIRED REQUIRED
 
 set(AWESOME_DEPENDENCIES
     glib-2.0
+    glib-2.0>=2.40
     gdk-pixbuf-2.0
     cairo
     x11
@@ -132,8 +137,11 @@ set(AWESOME_DEPENDENCIES
     xcb-xtest
     xcb-xinerama
     xcb-shape
+    xcb-util
     xcb-util>=0.3.8
+    xcb-keysyms
     xcb-keysyms>=0.3.4
+    xcb-icccm
     xcb-icccm>=0.3.8
     # NOTE: it's not clear what version is required, but 1.10 works at least.
     # See https://github.com/awesomeWM/awesome/pull/149#issuecomment-94208356.
@@ -141,68 +149,15 @@ set(AWESOME_DEPENDENCIES
     xkbcommon
     xkbcommon-x11
     cairo-xcb
+    libstartup-notification-1.0
     libstartup-notification-1.0>=0.10
+    xproto
     xproto>=7.0.15
+    libxdg-basedir
     libxdg-basedir>=1.0.0
     xcb-xrm
 )
-
-# Check the deps one by one
-foreach(dependency ${AWESOME_DEPENDENCIES})
-    unset(TMP_DEP_FOUND CACHE)
-    pkg_check_modules(TMP_DEP REQUIRED ${dependency})
-
-    if(NOT TMP_DEP_FOUND)
-        message(FATAL_ERROR)
-    endif()
-endforeach()
-
-# Do it again, but this time with the CFLAGS/LDFLAGS
 pkg_check_modules(AWESOME_REQUIRED REQUIRED ${AWESOME_DEPENDENCIES})
-
-# On Mac OS X, the executable of Awesome has to be linked against libiconv
-# explicitly.  Unfortunately, libiconv doesn't have its pkg-config file,
-# and CMake doesn't provide a module for looking up the library.  Thus, we
-# have to do everything for ourselves...
-if(APPLE)
-    if(NOT DEFINED AWESOME_ICONV_SEARCH_PATHS)
-        set(AWESOME_ICONV_SEARCH_PATHS /opt/local /opt /usr/local /usr)
-    endif()
-
-    if(NOT DEFINED AWESOME_ICONV_INCLUDE_DIR)
-        find_path(AWESOME_ICONV_INCLUDE_DIR
-                  iconv.h
-                  PATHS ${AWESOME_ICONV_SEARCH_PATHS}
-                  PATH_SUFFIXES include
-                  NO_CMAKE_SYSTEM_PATH)
-    endif()
-
-    if(NOT DEFINED AWESOME_ICONV_LIBRARY_PATH)
-        get_filename_component(AWESOME_ICONV_BASE_DIRECTORY ${AWESOME_ICONV_INCLUDE_DIR} DIRECTORY)
-        find_library(AWESOME_ICONV_LIBRARY_PATH
-                     NAMES iconv
-                     HINTS ${AWESOME_ICONV_BASE_DIRECTORY}
-                     PATH_SUFFIXES lib)
-    endif()
-
-    if(NOT DEFINED AWESOME_ICONV_LIBRARY_PATH)
-        message(FATAL_ERROR "Looking for iconv library - not found.")
-    else()
-        message(STATUS "Looking for iconv library - found: ${AWESOME_ICONV_LIBRARY_PATH}")
-    endif()
-
-    set(AWESOME_REQUIRED_LDFLAGS
-        ${AWESOME_REQUIRED_LDFLAGS} ${AWESOME_ICONV_LIBRARY_PATH})
-    set(AWESOME_REQUIRED_INCLUDE_DIRS
-        ${AWESOME_REQUIRED_INCLUDE_DIRS} ${AWESOME_ICONV_INCLUDE_DIR})
-endif(APPLE)
-
-macro(a_find_library variable library)
-    find_library(${variable} ${library})
-    if(NOT ${variable})
-        message(FATAL_ERROR ${library} " library not found.")
-    endif()
-endmacro()
 
 # Check for backtrace_symbols()
 include(CheckFunctionExists)
@@ -388,6 +343,16 @@ endif()
 
 #}}}
 
+# {{{ Check for LGI
+add_executable(lgi-check build-utils/lgi-check.c)
+target_link_libraries(lgi-check ${LUA_LIBRARIES})
+target_include_directories(lgi-check PRIVATE ${LUA_INCLUDE_DIR})
+add_custom_target(lgi-check-run ALL
+    COMMAND lgi-check
+    DEPENDS lgi-check
+    COMMENT "Checking for LGI...")
+# }}}
+
 # {{{ Generate some aggregated documentation from lua script
 
 file(MAKE_DIRECTORY ${BUILD_DIR}/script_files/)
@@ -396,7 +361,7 @@ add_custom_command(
         OUTPUT ${BUILD_DIR}/docs/06-appearance.md
         COMMAND lua ${SOURCE_DIR}/docs/06-appearance.md.lua
         ${BUILD_DIR}/docs/06-appearance.md
-        DEPENDS lgi-check
+        DEPENDS lgi-check-run
 )
 
 add_custom_command(

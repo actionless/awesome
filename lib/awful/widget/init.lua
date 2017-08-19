@@ -20,6 +20,9 @@ return
     keyboardlayout = require("awful.widget.keyboardlayout");
     watch = require("awful.widget.watch");
     only_on_screen = require("awful.widget.only_on_screen");
+    clienticon = require("awful.widget.clienticon");
+    calendar_popup = require("awful.widget.calendar_popup");
+    common = require("awful.widget.common");
 }
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

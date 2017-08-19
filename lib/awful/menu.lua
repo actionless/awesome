@@ -10,7 +10,8 @@
 
 local wibox = require("wibox")
 local button = require("awful.button")
-local util = require("awful.util")
+local gstring = require("gears.string")
+local gtable = require("gears.table")
 local spawn = require("awful.spawn")
 local tags = require("awful.tag")
 local keygrabber = require("awful.keygrabber")
@@ -49,6 +50,11 @@ end
 
 --- The icon used for sub-menus.
 -- @beautiful beautiful.menu_submenu_icon
+
+--- The menu text font.
+-- @beautiful beautiful.menu_font
+-- @param string
+-- @see string
 
 --- The item height.
 -- @beautiful beautiful.menu_height
@@ -115,7 +121,7 @@ local function load_theme(a, b)
     ret.border = a.border_color or b.menu_border_color or b.border_normal or
                  fallback.menu_border_color or fallback.border_normal
     ret.border_width= a.border_width or b.menu_border_width or b.border_width or
-                      fallback.menu_border_width or fallback.border_width or 0
+                      fallback.menu_border_width or fallback.border_width or dpi(0)
     ret.fg_focus = a.fg_focus or b.menu_fg_focus or b.fg_focus or
                    fallback.menu_fg_focus or fallback.fg_focus
     ret.bg_focus = a.bg_focus or b.menu_bg_focus or b.bg_focus or
@@ -129,10 +135,10 @@ local function load_theme(a, b)
     ret.submenu = a.submenu or b.menu_submenu or b.submenu or
                       fallback.menu_submenu or fallback.submenu or "▶"
     ret.height = a.height or b.menu_height or b.height or
-                 fallback.menu_height or 16
+                 fallback.menu_height or dpi(16)
     ret.width = a.width or b.menu_width or b.width or
-                fallback.menu_width or 100
-    ret.font = a.font or b.font or fallback.font
+                fallback.menu_width or dpi(100)
+    ret.font = a.font or b.font or fallback.menu_font or fallback.font
     for _, prop in ipairs({"width", "height", "menu_width"}) do
         if type(ret[prop]) ~= "number" then ret[prop] = tonumber(ret[prop]) end
     end
@@ -146,7 +152,7 @@ local function item_position(_menu, child)
     if dir == "x" then  a, b = b, a  end
 
     local in_dir, other = 0, _menu[b]
-    local num = util.table.hasitem(_menu.child, child)
+    local num = gtable.hasitem(_menu.child, child)
     if num then
         for i = 0, num - 1 do
             local item = _menu.items[i]
@@ -237,19 +243,19 @@ local function grabber(_menu, _, key, event)
     if event ~= "press" then return end
 
     local sel = _menu.sel or 0
-    if util.table.hasitem(menu.menu_keys.up, key) then
+    if gtable.hasitem(menu.menu_keys.up, key) then
         local sel_new = sel-1 < 1 and #_menu.items or sel-1
         _menu:item_enter(sel_new)
-    elseif util.table.hasitem(menu.menu_keys.down, key) then
+    elseif gtable.hasitem(menu.menu_keys.down, key) then
         local sel_new = sel+1 > #_menu.items and 1 or sel+1
         _menu:item_enter(sel_new)
-    elseif sel > 0 and util.table.hasitem(menu.menu_keys.enter, key) then
+    elseif sel > 0 and gtable.hasitem(menu.menu_keys.enter, key) then
         _menu:exec(sel)
-    elseif sel > 0 and util.table.hasitem(menu.menu_keys.exec, key) then
+    elseif sel > 0 and gtable.hasitem(menu.menu_keys.exec, key) then
         _menu:exec(sel, { exec = true })
-    elseif util.table.hasitem(menu.menu_keys.back, key) then
+    elseif gtable.hasitem(menu.menu_keys.back, key) then
         _menu:hide()
-    elseif util.table.hasitem(menu.menu_keys.close, key) then
+    elseif gtable.hasitem(menu.menu_keys.close, key) then
         menu.get_root(_menu):hide()
     else
         check_access_key(_menu, key)
@@ -433,17 +439,17 @@ function menu:add(args, index)
 
 
     -- Create bindings
-    item._background:buttons(util.table.join(
+    item._background:buttons(gtable.join(
         button({}, 3, function () self:hide() end),
         button({}, 1, function ()
-            local num = util.table.hasitem(self.items, item)
+            local num = gtable.hasitem(self.items, item)
             self:item_enter(num, { mouse = true })
             self:exec(num, { exec = true, mouse = true })
         end )))
 
 
     item._mouse = function ()
-        local num = util.table.hasitem(self.items, item)
+        local num = gtable.hasitem(self.items, item)
         self:item_enter(num, { hover = true, moue = true })
     end
     item.widget:connect_signal("mouse::enter", item._mouse)
@@ -468,7 +474,7 @@ end
 -- @param num The position in the table of the menu entry to be deleted; can be also the menu entry itself
 function menu:delete(num)
     if type(num) == "table" then
-        num = util.table.hasitem(self.items, num)
+        num = gtable.hasitem(self.items, num)
     end
     local item = self.items[num]
     if not item then return end
@@ -511,6 +517,7 @@ function menu.clients(args, item_args, filter)
         cls_t[#cls_t + 1] = {
             c.name or "",
             function ()
+                if not c.valid then return end
                 if not c:isvisible() then
                     tags.viewmore(c:tags(), c.screen)
                 end
@@ -519,15 +526,15 @@ function menu.clients(args, item_args, filter)
             c.icon }
         if item_args then
             if type(item_args) == "function" then
-                util.table.merge(cls_t[#cls_t], item_args(c))
+                gtable.merge(cls_t[#cls_t], item_args(c))
             else
-                util.table.merge(cls_t[#cls_t], item_args)
+                gtable.merge(cls_t[#cls_t], item_args)
             end
         end
     end
     args = args or {}
     args.items = args.items or {}
-    util.table.merge(args.items, cls_t)
+    gtable.merge(args.items, cls_t)
 
     local m = menu.new(args)
     m:show(args)
@@ -551,7 +558,7 @@ function menu.entry(parent, args) -- luacheck: no unused args
     local key = ''
     label:set_font(args.theme.font)
     label:set_markup(string.gsub(
-        util.escape(args.text), "&amp;(%w)",
+        gstring.xml_escape(args.text), "&amp;(%w)",
         function (l)
             key = string.lower(l)
             return "<u>" .. l .. "</u>"

@@ -8,10 +8,11 @@
 
 local error = error
 local type = type
-local util = require("awful.util")
+local gmath = require("gears.math")
 local abutton = require("awful.button")
 local aclient = require("awful.client")
 local atooltip = require("awful.tooltip")
+local clienticon = require("awful.widget.clienticon")
 local beautiful = require("beautiful")
 local drawable = require("wibox.drawable")
 local imagebox = require("wibox.widget.imagebox")
@@ -464,7 +465,7 @@ end
 local function new(c, args)
     args = args or {}
     local position = args.position or "top"
-    local size = args.size or util.round(beautiful.get_font_height(args.font) * 1.5)
+    local size = args.size or gmath.round(beautiful.get_font_height(args.font) * 1.5)
     local d = get_titlebar_function(c, position)(c, size)
 
     -- Make sure that there is never more than one titlebar for any given client
@@ -572,14 +573,7 @@ end
 -- @param c The client for which an icon widget should be created.
 -- @return The icon widget.
 function titlebar.widget.iconwidget(c)
-    local ret = imagebox()
-    local function update()
-        ret:set_image(c.icon)
-    end
-    c:connect_signal("property::icon", update)
-    update()
-
-    return ret
+    return clienticon(c)
 end
 
 --- Create a new button widget. A button widget displays an image and reacts to
@@ -621,13 +615,14 @@ function titlebar.widget.button(c, name, selector, action)
             if img ~= "" then
                 prefix = prefix .. "_"
             end
-            if ret.state ~= "" then
-                img = img .. "_"
+            local state = ret.state
+            if state ~= "" then
+                state = "_" .. state
             end
             -- First try with a prefix based on the client's focus state,
             -- then try again without that prefix if nothing was found,
             -- and finally, try a fallback for compatibility with Awesome 3.5 themes
-            local theme = beautiful["titlebar_" .. name .. "_button_" .. prefix .. img .. ret.state]
+            local theme = beautiful["titlebar_" .. name .. "_button_" .. prefix .. img .. state]
                        or beautiful["titlebar_" .. name .. "_button_" .. prefix .. img]
                        or beautiful["titlebar_" .. name .. "_button_" .. img]
                        or beautiful["titlebar_" .. name .. "_button_" .. prefix .. "_inactive"]

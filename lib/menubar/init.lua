@@ -25,17 +25,22 @@ local capi = {
     mouse = mouse,
     screen = screen
 }
+local gmath = require("gears.math")
 local awful = require("awful")
+local gfs = require("gears.filesystem")
 local common = require("awful.widget.common")
 local theme = require("beautiful")
 local wibox = require("wibox")
+local gcolor = require("gears.color")
+local gstring = require("gears.string")
+local gdebug = require("gears.debug")
 
 local function get_screen(s)
     return s and capi.screen[s]
 end
 
 -- menubar
-local menubar = { mt = {}, menu_entries = {} }
+local menubar = { menu_entries = {} }
 menubar.menu_gen = require("menubar.menu_gen")
 menubar.utils = require("menubar.utils")
 local compute_text_width = menubar.utils.compute_text_width
@@ -103,7 +108,7 @@ local common_args = { w = wibox.layout.fixed.horizontal(),
 -- @param c The desired text color.
 -- @return the text wrapped in a span tag.
 local function colortext(s, c)
-    return "<span color='" .. awful.util.ensure_pango_color(c) .. "'>" .. s .. "</span>"
+    return "<span color='" .. gcolor.ensure_pango_color(c) .. "'>" .. s .. "</span>"
 end
 
 --- Get how the menu item should be displayed.
@@ -125,7 +130,7 @@ local function load_count_table()
         return instance.count_table
     end
     instance.count_table = {}
-    local count_file_name = awful.util.getdir("cache") .. "/menu_count_file"
+    local count_file_name = gfs.get_dir("cache") .. "/menu_count_file"
     local count_file = io.open (count_file_name, "r")
     if count_file then
         for line in count_file:lines() do
@@ -141,8 +146,8 @@ end
 
 local function write_count_table(count_table)
     count_table = count_table or instance.count_table
-    local count_file_name = awful.util.getdir("cache") .. "/menu_count_file"
-    local count_file = io.open (count_file_name, "w")
+    local count_file_name = gfs.get_dir("cache") .. "/menu_count_file"
+    local count_file = assert(io.open(count_file_name, "w"))
     for name, count in pairs(count_table) do
         local str = string.format("%s;%d\n", name, count)
         count_file:write(str)
@@ -222,7 +227,7 @@ end
 local function menulist_update(scr)
     local query = instance.query or ""
     shownitems = {}
-    local pattern = awful.util.query_to_pattern(query)
+    local pattern = gstring.query_to_pattern(query)
 
     -- All entries are added to a list that will be sorted
     -- according to the priority (first) and weight (second) of its
@@ -391,9 +396,18 @@ end
 -- @param scr Screen.
 function menubar.show(scr)
     if not instance then
+        -- Add to each category the name of its key in all_categories
+        for k, v in pairs(menubar.menu_gen.all_categories) do
+            v.key = k
+        end
+
+        if menubar.cache_entries then
+            menubar.refresh(scr)
+        end
+
         instance = {
             wibox = wibox({ ontop = true }),
-            widget = menubar.get(scr),
+            widget = common_args.w,
             prompt = awful.widget.prompt(),
             query = nil,
             count_table = nil,
@@ -417,7 +431,7 @@ function menubar.show(scr)
     local geometry = menubar.geometry
     instance.geometry = {x = geometry.x or scrgeom.x,
                              y = geometry.y or scrgeom.y,
-                             height = geometry.height or awful.util.round(theme.get_font_height() * 1.5),
+                             height = geometry.height or gmath.round(theme.get_font_height() * 1.5),
                              width = geometry.width or scrgeom.width}
     instance.wibox:geometry(instance.geometry)
 
@@ -431,7 +445,7 @@ function menubar.show(scr)
         prompt              = "Run: ",
         textbox             = instance.prompt.widget,
         completion_callback = awful.completion.shell,
-        history_path        = awful.util.get_cache_dir() .. "/history_menu",
+        history_path        = gfs.get_cache_dir() .. "/history_menu",
         done_callback       = menubar.hide,
         changed_callback    = function(query)
             instance.query = query
@@ -454,7 +468,9 @@ end
 --- Get a menubar wibox.
 -- @tparam[opt] screen scr Screen.
 -- @return menubar wibox.
+-- @deprecated get
 function menubar.get(scr)
+    gdebug.deprecate("Use menubar.show() instead", { deprecated_in = 5 })
     menubar.refresh(scr)
     -- Add to each category the name of its key in all_categories
     for k, v in pairs(menubar.menu_gen.all_categories) do
@@ -463,10 +479,11 @@ function menubar.get(scr)
     return common_args.w
 end
 
-function menubar.mt.__call(_, ...)
+local mt = {}
+function mt.__call(_, ...)
     return menubar.get(...)
 end
 
-return setmetatable(menubar, menubar.mt)
+return setmetatable(menubar, mt)
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

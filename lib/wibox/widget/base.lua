@@ -8,7 +8,7 @@ local object = require("gears.object")
 local cache = require("gears.cache")
 local matrix = require("gears.matrix")
 local protected_call = require("gears.protected_call")
-local util = require("awful.util")
+local gtable = require("gears.table")
 local setmetatable = setmetatable
 local pairs = pairs
 local type = type
@@ -162,14 +162,16 @@ end
 -- forward the signal. This is useful to track signals when there is a dynamic
 -- set of containers and layouts wrapping the widget.
 --
--- Note that this function has two flaws:
+-- Note that this function has some flaws:
 --
 -- 1. The signal is only forwarded once the widget tree has been built. This
 --    happens after all currently scheduled functions have been executed.
 --    Therefore, it will not start to work right away.
 -- 2. In case the widget is present multiple times in a single widget tree,
---    this function will also forward the signal multiple time (one per upward
+--    this function will also forward the signal multiple times (once per upward
 --    tree path).
+-- 3. If the widget is removed from the widget tree, the signal is still
+--    forwarded for some time, similar to the first case.
 --
 -- @tparam string signal_name
 -- @param ... Other arguments
@@ -440,7 +442,7 @@ local function parse_table(t, leave_empty)
 
     -- Pack the sparse table, if the container doesn't support sparse tables.
     if not leave_empty then
-        widgets = util.table.from_sparse(widgets)
+        widgets = gtable.from_sparse(widgets)
         max = #widgets
     end
 
@@ -504,7 +506,9 @@ local function drill(ids, content)
         end
     end
     -- Replace all children (if any) with the new ones.
-    l:set_children(widgets)
+    if widgets then
+        l:set_children(widgets)
+    end
     return l, id
 end
 

@@ -8,6 +8,13 @@ The
 you might have added to your `rc.lua`.
 This avoids most of the possible errors due to missing important changes.
 
+To do this, you can download the default rc.lua for 3.5.9
+[here](https://github.com/awesomeWM/awesome/blob/v3.5.9/awesomerc.lua.in), and
+then compare your existing rc.lua with the 3.5.9 default using your diff tool of
+choice. Write down the changes, then apply these to the 4.0 default rc.lua,
+which you can find at /etc/xdg/awesome/rc.lua after the upgrade, or
+[here](../sample%20files/rc.lua.html) if you have not yet performed the upgrade.
+
 If you still wish to ignore this advice, first read the
 <a href="89-NEWS.md.html#v4">NEWS</a> section about the breaking changes. This
 document assumes you did.
@@ -20,12 +27,12 @@ Here is a diff of the 3.5.9 `rc.lua` with the 4.0 one. All changes due to
 new features and new syntaxes have been removed. A `-` in front of the line
 correspond to content of the 3.5 `rc.lua` and `+` its replacement in 4.0.
 
-This document does not cover the new features added in the Awesome 4 `rc.lua`,
+This document does not cover the new features added in the Awesome v4 `rc.lua`,
 it only covers the minimal required changes to have a properly behaving config.
 
 To test during the port, we recommend the `Xephyr` X11 server.
 
-If Awesome4 **is not installed yet**, we recommand to install it in its own
+If Awesome v4 **is not installed yet**, we recommend to install it in its own
 prefix to avoid conflicts in case you wish to stay on 3.5 for a little
 longer:
 
@@ -49,7 +56,7 @@ longer:
         -c $HOME/.config/awesome4/rc.lua \
         --search $HOME/awesome4_test/share/awesome/lib
 
-If Awesome 4 is **already installed**, then backup your old `rc.lua` and overwrite
+If Awesome v4 is **already installed**, then backup your old `rc.lua` and overwrite
 `~/.config/awesome/rc.lua` (replace this by another path if you use a custom
 XDH config local directory). And only execute:
 
@@ -95,7 +102,7 @@ work. Remove this section.
     --- }}}
 
 The `quit` menu command must be wrapped in a function, otherwise an error
-occurs due to mismatched argument types from the v4.0 `awful.menu` library.
+occurs due to mismatched argument types from the v4 `awful.menu` library.
 
      -- {{{ Menu
      -- Create a laucher widget and a main menu

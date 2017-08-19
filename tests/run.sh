@@ -15,8 +15,31 @@ set -e
 export SHELL=/bin/sh
 export HOME=/dev/null
 
-VERBOSE=${VERBOSE-0}
-if [ "$VERBOSE" = 1 ]; then
+# Parse options.
+usage() {
+    cat >&2 <<EOF
+Usage: $0 [OPTION]... [FILE]...
+
+Options:
+  -v: verbose mode
+  -W: warnings become errors
+  -h: show this help
+EOF
+    exit "$1"
+}
+fail_on_warning=
+verbose=${VERBOSE:-0}
+while getopts vWh opt; do
+    case $opt in
+        v) verbose=1 ;;
+        W) fail_on_warning=1 ;;
+        h) usage 0 ;;
+        *) usage 64 ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if (( verbose )); then
     set -x
 fi
 
@@ -34,6 +57,7 @@ if [ -z "$build_dir" ]; then
         build_dir="$source_dir"
     fi
 fi
+export build_dir
 
 # Get test files: test*, or the ones provided as args (relative to tests/).
 if [ $# != 0 ]; then
@@ -81,17 +105,16 @@ else
 fi
 
 # Add test dir (for _runner.lua).
-awesome_options=($AWESOME_OPTIONS --search lib --search $this_dir)
+# shellcheck disable=SC2206
+awesome_options=($AWESOME_OPTIONS --search lib --search "$this_dir")
 export XDG_CONFIG_HOME="$build_dir"
 
 # Cleanup on errors / aborting.
 cleanup() {
     for p in $awesome_pid $xserver_pid; do
         kill -TERM "$p" 2>/dev/null || true
+        wait "$p"
     done
-    if [ -n "$DO_COVERAGE" ] && [ "$DO_COVERAGE" != 0 ]; then
-        mv "$RC_FILE.coverage.bak" "$RC_FILE"
-    fi
     rm -rf "$tmp_files" || true
 }
 trap "cleanup" 0 2 3 15
@@ -101,9 +124,7 @@ awesome_log=$tmp_files/_awesome_test.log
 echo "awesome_log: $awesome_log"
 
 wait_until_success() {
-    if [ "$VERBOSE" = 1 ]; then
-        set +x
-    fi
+    if (( verbose )); then set +x; fi
     wait_count=60  # 60*0.05s => 3s.
     while true; do
         set +e
@@ -126,9 +147,7 @@ wait_until_success() {
         fi
         sleep 0.05
     done
-    if [ "$VERBOSE" = 1 ]; then
-        set -x
-    fi
+    if (( verbose )); then set -x; fi
 }
 
 # Wait for DISPLAY to be available, and setup xrdb,
@@ -162,14 +181,19 @@ wait_until_success "setup xrdb" "printf 'Xft.dpi: 96
 # Use a separate D-Bus session; sets $DBUS_SESSION_BUS_PID.
 eval "$(DISPLAY="$D" dbus-launch --sh-syntax --exit-with-session)"
 
-RC_FILE=${source_dir}/awesomerc.lua
-export AWESOME_THEMES_PATH="$source_dir/themes"
-export AWESOME_ICON_PATH="$source_dir/icons"
+RC_FILE=${AWESOME_RC_FILE:-${source_dir}/awesomerc.lua}
+AWESOME_THEMES_PATH="${AWESOME_THEMES_PATH:-${source_dir}/themes}"
+AWESOME_ICON_PATH="${AWESOME_ICON_PATH:-${source_dir}/icons}"
 
-# Inject coverage runner to RC file, which will be restored on exit/cleanup.
+# Inject coverage runner via temporary RC file.
 if [ -n "$DO_COVERAGE" ] && [ "$DO_COVERAGE" != 0 ]; then
-    cp -a "$RC_FILE" "$RC_FILE.coverage.bak"
-    sed -i "1 s~^~require('luacov.runner')('$source_dir/.luacov'); \0~" "$RC_FILE"
+    # Handle old filename of config files (useful for git-bisect).
+    if [ -f "${RC_FILE}.in" ]; then
+        RC_FILE="${RC_FILE}.in"
+    fi
+    sed "1 s~^~require('luacov.runner')('$source_dir/.luacov'); \0~" \
+        "$RC_FILE" > "$tmp_files/awesomerc.lua"
+    RC_FILE=$tmp_files/awesomerc.lua
 fi
 
 # Start awesome.
@@ -177,7 +201,10 @@ start_awesome() {
     cd "$build_dir"
     # Kill awesome after $timeout_stale seconds (e.g. for errors during test setup).
     # SOURCE_DIRECTORY is used by .luacov.
-    DISPLAY="$D" SOURCE_DIRECTORY="$source_dir" timeout "$timeout_stale" "$AWESOME" -c "$RC_FILE" "${awesome_options[@]}" > "$awesome_log" 2>&1 &
+    DISPLAY="$D" SOURCE_DIRECTORY="$source_dir" \
+        AWESOME_THEMES_PATH="$AWESOME_THEMES_PATH" \
+        AWESOME_ICON_PATH="$AWESOME_ICON_PATH" \
+        timeout "$timeout_stale" "$AWESOME" -c "$RC_FILE" "${awesome_options[@]}" > "$awesome_log" 2>&1 &
     awesome_pid=$!
     cd - >/dev/null
 
@@ -186,13 +213,22 @@ start_awesome() {
     wait_until_success "wait for awesome startup via awesome-client" "dbus-send --reply-timeout=100 --dest=org.awesomewm.awful --print-reply / org.awesomewm.awful.Remote.Eval 'string:return 1' 2>&1"
 }
 
-# Count errors.
-errors=0
+if command -v tput >/dev/null; then
+    color_red() { tput setaf 1; }
+    color_reset() { tput sgr0; }
+else
+    color_red() { :; }
+    color_reset() { :; }
+fi
+
+count_tests=0
+errors=()
 # Seconds after when awesome gets killed.
 timeout_stale=180 # FIXME This should be no more than 60s
 
 for f in $tests; do
     echo "== Running $f =="
+    (( ++count_tests ))
 
     start_awesome
 
@@ -201,7 +237,7 @@ for f in $tests; do
             f=${f#tests/}
         else
             echo "===> ERROR $f is not readable! <==="
-            ((errors++))
+            errors+=("$f is not readable.")
             continue
         fi
     fi
@@ -210,7 +246,9 @@ for f in $tests; do
     DISPLAY=$D "$AWESOME_CLIENT" 2>&1 < "$f"
 
     # Tail the log and quit, when awesome quits.
-    tail -n 100000 -f --pid "$awesome_pid" "$awesome_log"
+    # Use a single `grep`, otherwise `--line-buffered` would be required.
+    tail -n 100000 -s 0.1 -f --pid "$awesome_pid" "$awesome_log" \
+        | grep -vE '^(.{19} W: awesome: a_dbus_connect:[0-9]+: Could not connect to D-Bus system bus:|Test finished successfully\.$)' || true
 
     set +e
     wait $awesome_pid
@@ -222,20 +260,43 @@ for f in $tests; do
         *) echo "Awesome exited with status code $code" ;;
     esac
 
-    if ! grep -q -E '^Test finished successfully$' "$awesome_log" ||
-            grep -q -E '[Ee]rror|assertion failed' "$awesome_log"; then
+    # Parse any error from the log.
+    pattern='.*[Ee]rror.*|.*assertion failed.*|^Step .* failed:'
+    if [[ $fail_on_warning ]]; then
+        pattern+='|^.{19} W: awesome:.*'
+    fi
+    error="$(grep --color -o --binary-files=text -E "$pattern" "$awesome_log" || true)"
+    if [[ $fail_on_warning ]]; then
+        # Filter out ignored warnings.
+        error="$(echo "$error" | grep -vE '.{19} W: awesome: (a_glib_poll|Cannot reliably detect EOF)' || true)"
+    fi
+    if [[ -n "$error" ]]; then
+        color_red
         echo "===> ERROR running $f <==="
-        grep --color -o --binary-files=text -E '.*[Ee]rror.*|.*assertion failed.*' "$awesome_log" || true
-        ((++errors))
+        echo "$error"
+        color_reset
+        errors+=("$f: $error")
+    elif ! grep -q -E '^Test finished successfully\.$' "$awesome_log"; then
+        color_red
+        echo "===> ERROR running $f <==="
+        color_reset
+        errors+=("$f: test did not indicate success. See the output above.")
     fi
 done
 
-if ((errors)); then
+echo "$count_tests tests finished."
+
+if (( "${#errors[@]}" )); then
     if [ "$TEST_PAUSE_ON_ERRORS" = 1 ]; then
         echo "Pausing... press Enter to continue."
         read -r
     fi
-    echo "There were $errors errors!"
+    color_red
+    echo "There were ${#errors[@]} errors:"
+    for error in "${errors[@]}"; do
+        echo " - $error"
+    done
+    color_reset
     exit 1
 fi
 exit 0

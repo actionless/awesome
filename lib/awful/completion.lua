@@ -9,6 +9,8 @@
 -- @module awful.completion
 ---------------------------------------------------------------------------
 
+local gfs = require("gears.filesystem")
+
 -- Grab environment we need
 local io = io
 local os = os
@@ -17,6 +19,8 @@ local math = math
 local print = print
 local pairs = pairs
 local string = string
+
+local gears_debug = require("gears.debug")
 
 local completion = {}
 
@@ -54,12 +58,17 @@ local function bash_escape(str)
     return str
 end
 
---- Use shell completion system to complete command and filename.
--- @param command The command line.
--- @param cur_pos The cursor position.
--- @param ncomp The element number to complete.
--- @param shell The shell to use for completion (bash (default) or zsh).
--- @return The new command, the new cursor position, the table of all matches.
+completion.default_shell = nil
+
+--- Use shell completion system to complete commands and filenames.
+-- @tparam string command The command line.
+-- @tparam number cur_pos The cursor position.
+-- @tparam number ncomp The element number to complete.
+-- @tparam[opt=based on SHELL] string shell The shell to use for completion.
+--   Supports "bash" and "zsh".
+-- @treturn string The new command.
+-- @treturn number The new cursor position.
+-- @treturn table The table with all matches.
 function completion.shell(command, cur_pos, ncomp, shell)
     local wstart = 1
     local wend = 1
@@ -69,6 +78,10 @@ function completion.shell(command, cur_pos, ncomp, shell)
     local cword_end = 0
     local i = 1
     local comptype = "file"
+
+    local function str_starts(str, start)
+        return string.sub(str, 1, string.len(start)) == start
+    end
 
     -- do nothing if we are on a letter, i.e. not at len + 1 or on a space
     if cur_pos ~= #command + 1 and command:sub(cur_pos, cur_pos) ~= " " then
@@ -90,25 +103,41 @@ function completion.shell(command, cur_pos, ncomp, shell)
         i = i + 1
     end
 
-    if cword_index == 1 and not string.find(words[cword_index], "/") then
+    if cword_index == 1 then
         comptype = "command"
     end
 
     local shell_cmd
-    if shell == "zsh" or (not shell and os.getenv("SHELL"):match("zsh$")) then
+    if not shell then
+        if not completion.default_shell then
+            local env_shell = os.getenv('SHELL')
+            if not env_shell then
+                gears_debug.print_warning('SHELL not set in environment, falling back to bash.')
+                completion.default_shell = 'bash'
+            elseif env_shell:match('zsh$') then
+                completion.default_shell = 'zsh'
+            else
+                completion.default_shell = 'bash'
+            end
+        end
+        shell = completion.default_shell
+    end
+    if shell == 'zsh' then
         if comptype == "file" then
             -- NOTE: ${~:-"..."} turns on GLOB_SUBST, useful for expansion of
             -- "~/" ($HOME).  ${:-"foo"} is the string "foo" as var.
             shell_cmd = "/usr/bin/env zsh -c 'local -a res; res=( ${~:-"
-                .. string.format('%q', words[cword_index]) .. "}* ); "
+                .. string.format('%q', words[cword_index]) .. "}*(N) ); "
                 .. "print -ln -- ${res[@]}'"
         else
-            -- check commands, aliases, builtins, functions and reswords
-            shell_cmd = "/usr/bin/env zsh -c 'local -a res; "..
+            -- Check commands, aliases, builtins, functions and reswords.
+            -- Adds executables and non-empty dirs from $PWD (pwd_exe).
+            shell_cmd = "/usr/bin/env zsh -c 'local -a res pwd_exe; "..
+            "pwd_exe=(*(N*:t) *(NF:t)); "..
             "res=( "..
             "\"${(k)commands[@]}\" \"${(k)aliases[@]}\" \"${(k)builtins[@]}\" \"${(k)functions[@]}\" "..
             "\"${(k)reswords[@]}\" "..
-            "${PWD}/*(:t)"..
+            "./${^${pwd_exe}} "..
             "); "..
             "print -ln -- ${(M)res[@]:#" .. string.format('%q', words[cword_index]) .. "*}'"
         end
@@ -131,7 +160,7 @@ function completion.shell(command, cur_pos, ncomp, shell)
         while true do
             local line = c:read("*line")
             if not line then break end
-            if os.execute("test -d " .. string.format('%q', line)) == 0 then
+            if str_starts(line, "./") and gfs.is_dir(line) then
                 line = line .. "/"
             end
             table.insert(output, bash_escape(line))
@@ -153,7 +182,7 @@ function completion.shell(command, cur_pos, ncomp, shell)
     end
 
     local str = command:sub(1, cword_start - 1) .. output[ncomp] .. command:sub(cword_end)
-    cur_pos = cword_end + #output[ncomp] + 1
+    cur_pos = cword_start + #output[ncomp]
 
     return str, cur_pos, output
 end

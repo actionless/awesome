@@ -12,7 +12,7 @@ local color = nil
 local gdebug = require("gears.debug")
 local hierarchy = require("wibox.hierarchy")
 
--- Keep this in sync with build-utils/lgi-check.sh!
+-- Keep this in sync with build-utils/lgi-check.c!
 local ver_major, ver_minor, ver_patch = string.match(require('lgi.version'), '(%d)%.(%d)%.(%d)')
 if tonumber(ver_major) <= 0 and (tonumber(ver_minor) < 8 or (tonumber(ver_minor) == 8 and tonumber(ver_patch) < 0)) then
     error("lgi too old, need at least version 0.8.0")
@@ -204,6 +204,7 @@ function surface.apply_shape_bounding(draw, shape, ...)
   cr:fill()
 
   draw.shape_bounding = img._native
+  img:finish()
 end
 
 local function no_op() end
@@ -218,6 +219,7 @@ end
 --- Create an SVG file with this widget content.
 -- This is dynamic, so the SVG will be updated along with the widget content.
 -- because of this, the painting may happen hover multiple event loop cycles.
+-- @deprecated wibox.widget.draw_to_svg_file
 -- @tparam widget widget A widget
 -- @tparam string path The output file path
 -- @tparam number width The surface width
@@ -225,6 +227,8 @@ end
 -- @return The cairo surface
 -- @return The hierarchy
 function surface.widget_to_svg(widget, path, width, height)
+    gdebug.deprecate("Use wibox.widget.draw_to_svg_file instead of "..
+        "gears.surface.render_to_svg", {deprecated_in=5})
     local img = cairo.SvgSurface.create(path, width, height)
     local cr = cairo.Context(img)
 
@@ -234,6 +238,7 @@ end
 --- Create a cairo surface with this widget content.
 -- This is dynamic, so the SVG will be updated along with the widget content.
 -- because of this, the painting may happen hover multiple event loop cycles.
+-- @deprecated wibox.widget.draw_to_image_surface
 -- @tparam widget widget A widget
 -- @tparam number width The surface width
 -- @tparam number height The surface height
@@ -241,6 +246,8 @@ end
 -- @return The cairo surface
 -- @return The hierarchy
 function surface.widget_to_surface(widget, width, height, format)
+    gdebug.deprecate("Use wibox.widget.draw_to_image_surface instead of "..
+        "gears.surface.render_to_surface", {deprecated_in=5})
     local img = cairo.ImageSurface(format or cairo.Format.ARGB32, width, height)
     local cr = cairo.Context(img)
 

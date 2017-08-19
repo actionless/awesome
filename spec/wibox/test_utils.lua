@@ -83,6 +83,26 @@ assert:register("assertion",
                 "assertion.widget_layout.positive")
 -- }}}
 
+local function test_container(container)
+    local w1 = base.empty_widget()
+
+    assert.is.same({}, container:get_children())
+
+    container:set_widget(w1)
+    assert.is.same({ w1 }, container:get_children())
+
+    container:set_widget(nil)
+    assert.is.same({}, container:get_children())
+
+    container:set_widget(w1)
+    assert.is.same({ w1 }, container:get_children())
+
+    if container.reset then
+        container:reset()
+        assert.is.same({}, container:get_children())
+    end
+end
+
 return {
     widget_stub = function(width, height)
         local w = object()
@@ -96,9 +116,17 @@ return {
             end
         end
         w._private.widget_caches = {}
+        w:connect_signal("widget::layout_changed", function()
+            -- TODO: This is not completely correct, since our parent's caches
+            -- are not cleared. For the time being, tests just have to handle
+            -- this clearing-part themselves.
+            w._private.widget_caches = {}
+        end)
 
         return w
     end,
+
+    test_container = test_container,
 }
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

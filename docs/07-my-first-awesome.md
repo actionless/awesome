@@ -1,31 +1,31 @@
-# My first awesome
+# My first Awesome
 
 This little tutorial is for people who never used a tiling window manager before
 and don't have fancy hacking skills. We will explore the awesome world of
-awesome step by step and finally come up with a working desktop, providing some
-basic knowledge on how to configure awesome in the process. We will start with
-the default `rc.lua` that comes with awesome, play around a little and try to
+Awesome step by step and finally come up with a working desktop, providing some
+basic knowledge on how to configure Awesome in the process. We will start with
+the default `rc.lua` that comes with Awesome, play around a little and try to
 make it more beautiful and useful with widgets. For this tutorial you don't need
 any programming skills besides using a text editor.
 
-## Explore awesome
+## Explore Awesome
 
-I will assume that you properly installed awesome through your distribution's
+I will assume that you properly installed Awesome through your distribution's
 package manager or compiled it from source. You should now add `exec awesome` to
-your `~/.xinitrc`. As already mentioned, awesome provides a default config file
+your `~/.xinitrc`. As already mentioned, Awesome provides a default config file
 which will be our starting point. You will usually find this `rc.lua` file in
 `/etc/xdg/awesome/`. Copy it to `~/.config/awesome/`, and then start X (for
 example by running `startx`).
 
-Move your mouse to the upper left corner and click on the awesome logo. A little
+Move your mouse to the upper left corner and click on the Awesome logo. A little
 menu opens. Browse through the menu, then click the logo again to close it. Next
-to the awesome menu you see numbers 1-9. These are your tags (or desktops if you
+to the Awesome menu you see numbers 1-9. These are your tags (or desktops if you
 want). You can click on these to change them but nothing will happen because we
 have not opened any programs. On the top right you see the time/date and a
 symbol showing the current layout. You can also click on the symbol to change
 the active layout.
 
-One of awesome's big advantages over other tiling window managers is its good
+One of the big advantages of Awesome over other tiling window managers is its good
 mouse support. Awesome can act as a full floating window manager (almost like
 openbox) if you want. For this basic tutorial we will mainly focus on keyboard
 control, so let's learn some key bindings now.
@@ -54,7 +54,7 @@ and *Mod4+Right* moves to the next tag in the specified direction.
 Use *Mod4+k* and *Mod4+j* to change your focused client - moving your mouse will
 also do that.
 
-*Mod4+Shift+q* quits awesome, but don't do that now.
+*Mod4+Shift+q* quits Awesome, but don't do that now.
 
 For an overview of all key bindings, press *Mod4+s*. Pressing any key closes
 this overview again.
@@ -71,7 +71,7 @@ Awesome has four themes you can choose from: *default*, *sky*, *xresources*, and
 To change the theme, open your rc.lua and edit this line near the beginning of
 the file:
 
-    beautiful.init(awful.util.getdir("config") .. "/themes/default/theme.lua")
+    beautiful.init(gears.filesystem.get_dir("config") .. "/themes/default/theme.lua")
 
 For this tutorial we will stick with the default theme.
 
@@ -87,7 +87,7 @@ user name):
 Your desktop background image is handled in your theme file. To change it, edit
 this line in your theme file:
 
-    theme.wallpaper = "/usr/share/awesome/themes/default/background.png"
+    beautiful.get().wallpaper = "/usr/share/awesome/themes/default/background.png"
 
 ## Personalize your layouts
 
@@ -114,7 +114,7 @@ Open your `rc.lua` and find the layouts section. It should look like this:
         -- awful.layout.suit.corner.se,
     }
 
-These are all possible tiling and floating layouts awesome has. If you don't
+These are all possible tiling and floating layouts Awesome has. If you don't
 find all of them useful, you can comment some of them out by adding "--"
 to the beginning of the line. Awesome already comes with three layouts which are
 not used in the default config, as you can see above.
@@ -171,7 +171,28 @@ A new window will appear and a new awesome instance runs inside of it.
 
 ## Add widgets
 
-TODO: Write this section.
+Before the following line:
+
+    mylauncher = awful.widget.launcher({ image = beautiful.awesome_icon,
+
+Add this to create a new widget:
+
+    praisewidget = wibox.widget.textbox()
+    praisewidget.text = "You are great!"
+
+The widget still needs to be added to a wibar. For this, find the definition of
+your wibar and change it as follows:
+
+    { -- Left widgets
+        layout = wibox.layout.fixed.horizontal,
+        mylauncher,
+        praisewidget, -- This line is new
+        s.mytaglist,
+        s.mypromptbox,
+    },
+
+This gives you a basic idea on how to add a widget. For an overview of available
+widgets and how to arrange them, please read @{03-declarative-layout.md}.
 
 ## Further reading
 

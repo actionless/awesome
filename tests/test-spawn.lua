@@ -4,6 +4,7 @@ local runner = require("_runner")
 local spawn = require("awful.spawn")
 
 local spawns_done = 0
+local async_spawns_done = 0
 local exit_yay, exit_snd = nil, nil
 
 -- * Using spawn with array is already covered by the test client.
@@ -40,6 +41,16 @@ local steps = {
 
     function(count)
         if count == 1 then
+            spawn.easy_async("echo yay", function(stdout)
+                if stdout:match("yay") then
+                    async_spawns_done = async_spawns_done + 1
+                end
+            end)
+            spawn.easy_async_with_shell("true && echo yay", function(stdout)
+                if stdout:match("yay") then
+                    async_spawns_done = async_spawns_done + 1
+                end
+            end)
             local steps_yay = 0
             spawn.with_line_callback("echo yay", {
                                      stdout = function(line)
@@ -59,6 +70,28 @@ local steps = {
                                          exit_yay = code
                                      end
                                  })
+
+            -- Test that setting env vars works and that the env is cleared
+            local read_line = false
+            local pid, _, _, stdout = awesome.spawn({ "sh", "-c", "echo $AWESOME_SPAWN_TEST_VAR $HOME $USER" },
+                    false, false, true, false, nil, { "AWESOME_SPAWN_TEST_VAR=42" })
+            assert(type(pid) ~= "string", pid)
+            spawn.read_lines(require("lgi").Gio.UnixInputStream.new(stdout, true),
+                    function(line)
+                        assert(not read_line)
+                        read_line = true
+                        assert(line == "42", line)
+                        spawns_done = spawns_done + 1
+                    end, nil, true)
+
+            -- Test error in parse_table_array.
+            pid = awesome.spawn({"true"}, false, false, true, false, nil, { 0 })
+            assert(pid == 'spawn: environment parse error: Non-string argument at table index 1', pid)
+
+            -- Test error in parse_command.
+            pid = awesome.spawn({0}, false, false, true, false, nil, {})
+            assert(pid == 'spawn: parse error: Non-string argument at table index 1', pid)
+
 
             local steps_count = 0
             local err_count = 0
@@ -87,12 +120,13 @@ local steps = {
                                      end
                                  })
         end
-        if spawns_done == 2 then
+        if spawns_done == 3 then
             assert(exit_yay == 0)
             assert(exit_snd == 42)
+            assert(async_spawns_done == 2)
             return true
         end
-    end,
+    end
 }
 
 runner.run_steps(steps)

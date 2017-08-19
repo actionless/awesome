@@ -1,8 +1,6 @@
 local awful = require("awful")
 local beautiful = require("beautiful")
 
-awful.util.deprecate = function() end
-
 local function check_order()
     local tags = mouse.screen.tags
 
@@ -40,7 +38,7 @@ local steps = {
 
             check_order()
 
-            awful.tag.move(5, tags[7])
+            tags[7].index = 5
             assert(tags[7].index == 5)
 
             check_order()
@@ -54,7 +52,7 @@ local steps = {
 
             check_order()
 
-            awful.tag.swap(tags[1], tags[3])
+            tags[3]:swap(tags[1])
 
             assert(tags[3].index == 3)
             assert(tags[1].index == 1)
@@ -69,6 +67,7 @@ local steps = {
             assert(beautiful.awesome_icon)
 
             local t = awful.tag.add("Test", {clients={c}, icon = beautiful.awesome_icon})
+            assert(t.layout == awful.layout.suit.floating)
 
             check_order()
 
