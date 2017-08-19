@@ -21,7 +21,7 @@ optdepends=('rlwrap: readline support for awesome-client'
 provides=('notification-daemon' 'awesome')
 conflicts=('awesome')
 backup=('etc/xdg/awesome/rc.lua')
-source=("$pkgname::git+https://github.com/awesomeWM/awesome.git"
+source=("$pkgname::git+https://github.com/actionless/awesome.git#branch=local"
         awesome.desktop
         awesomeksm.desktop)
 sha256sums=('SKIP'
@@ -37,9 +37,12 @@ prepare() {
   cd $pkgname
   sed -i 's/COMMAND lua\b/COMMAND luajit/' awesomeConfig.cmake tests/examples/CMakeLists.txt
   sed -i 's/LUA_COV_RUNNER lua\b/LUA_COV_RUNNER luajit/' tests/examples/CMakeLists.txt
+
+  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i -e 's/default\/theme/xresources\/theme/g'
 }
 
 build() {
+    rm -r build || true
   mkdir -p build
   cd build
 
@@ -56,8 +59,17 @@ package() {
   cd build
   make DESTDIR="$pkgdir" install
 
+  install -Dm755 "$srcdir"/$pkgname/awesome_argb \
+    "$pkgdir/usr/bin/awesome_argb"
+
+  install -Dm755 "$srcdir"/$pkgname/awesome_no_argb \
+    "$pkgdir/usr/bin/awesome_no_argb"
+
   install -Dm644 "$srcdir"/$pkgname/awesome.desktop \
     "$pkgdir/usr/share/xsessions/awesome.desktop"
+
+  install -Dm644 "$srcdir"/$pkgname/awesome_no_argb.desktop \
+    "$pkgdir/usr/share/xsessions/awesome_no_argb.desktop"
 
   install -Dm644 "$srcdir"/awesomeksm.desktop \
     "$pkgdir/usr/share/apps/ksmserver/windowmanagers/awesome.desktop"
