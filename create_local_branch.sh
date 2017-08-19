@@ -6,7 +6,7 @@ branches=(
 	'actionless'
 
 	# my branches
-	'xresources-titlebar-hover-press'
+	#'xresources-titlebar-hover-press'
 
 	# psychon
 
