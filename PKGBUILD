@@ -38,7 +38,9 @@ prepare() {
   sed -i 's/COMMAND lua\b/COMMAND luajit/' awesomeConfig.cmake tests/examples/CMakeLists.txt
   sed -i 's/LUA_COV_RUNNER lua\b/LUA_COV_RUNNER luajit/' tests/examples/CMakeLists.txt
 
-  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i -e 's/default\/theme/xresources\/theme/g'
+  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i \
+      -e 's/default\/theme/xresources\/theme/g' \
+      -e 's/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }, s, awful.layout.layouts[1])/g'
 }
 
 build() {
