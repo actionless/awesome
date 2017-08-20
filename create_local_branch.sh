@@ -8,6 +8,7 @@ branches=(
 	# my branches
 	#'xresources-titlebar-hover-press'
     'onhover_calendar'
+    'calendar-margin'
 
 	# psychon
 
