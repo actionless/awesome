@@ -2,6 +2,7 @@
 .version_stamp
 .*.sw?
 build
+.luacheckcache
 .build*
 /awesome
 *.diff
