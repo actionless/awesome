@@ -25,7 +25,7 @@ source=("$pkgname::git+https://github.com/actionless/awesome.git#branch=local"
         awesome.desktop
         awesomeksm.desktop)
 sha256sums=('SKIP'
-            '5c5437448cc9f01be6ccbb298f5c86d0f8c4bcae23a22e6af699aff0d10f642f'
+            'SKIP'
             '8f25957ef5453f825e05a63a74e24843aad945af86ddffcc0a84084ca2cf9928')
 
 pkgver() {
@@ -38,9 +38,6 @@ prepare() {
   sed -i 's/COMMAND lua\b/COMMAND luajit/' awesomeConfig.cmake tests/examples/CMakeLists.txt
   sed -i 's/LUA_COV_RUNNER lua\b/LUA_COV_RUNNER luajit/' tests/examples/CMakeLists.txt
 
-  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i \
-      -e 's/default\/theme/xresources\/theme/g' \
-      -e 's/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" },/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" },/g'
 }
 
 build() {
@@ -60,6 +57,10 @@ build() {
 package() {
   cd build
   make DESTDIR="$pkgdir" install
+
+  sed ${pkgdir}/etc/xdg/awesome/rc.lua -i \
+      -e 's/default\/theme/xresources\/theme/g' \
+      -e 's/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" },/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" },/g'
 
   install -Dm755 "$srcdir"/$pkgname/awesome_argb \
     "$pkgdir/usr/bin/awesome_argb"
