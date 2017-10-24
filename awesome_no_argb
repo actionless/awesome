@@ -1,9 +1,9 @@
 #!/bin/sh
 while $(true) ; do
     code=0
-	awesome --no-argb $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr || code=$?
+	awesome --no-argb $@ >> $HOME/.cache/awesome_stdout  2>> $HOME/.cache/awesome_stderr || code=$?
     if [[ ${code} -eq 2 ]] ; then
-        awesome $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr
+        awesome $@ >> $HOME/.cache/awesome_stdout  2>> $HOME/.cache/awesome_stderr
     elif [[ ${code} -ne 0 ]] ; then
         (sleep 2 ; openbox) ||
             xterm

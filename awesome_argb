@@ -1,6 +1,6 @@
 #!/bin/sh
 while $(true) ; do
-	awesome $@ >> /home/lie/.cache/awesome_stdout  2>> /home/lie/.cache/awesome_stderr ||
+	awesome $@ >> $HOME/.cache/awesome_stdout  2>> $HOME/.cache/awesome_stderr ||
         (sleep 2 ; openbox) ||
             xterm
 	sleep 2
