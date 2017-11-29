@@ -245,6 +245,8 @@ for f in $tests; do
         pattern+='|^.{19} W: awesome:.*'
     fi
     error="$(grep --color -o --binary-files=text -E "$pattern" "$awesome_log" || true)"
+    # Filter out false positive errors:
+    error="$(echo "$error" | grep -vE ".{19} W: awesome: (Can't read color .* from GTK)" || true)"
     if [[ $fail_on_warning ]]; then
         # Filter out ignored warnings.
         error="$(echo "$error" | grep -vE ".{19} W: awesome: (a_glib_poll|Cannot reliably detect EOF|beautiful: can't get colorscheme from xrdb)" || true)"
