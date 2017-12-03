@@ -76,7 +76,9 @@ function gtk.get_theme_variables()
     }
   end)
   if not window then
-    gears_debug.print_warning("Seems like GTK+3 theme is not set correctly or luajit was built with an incomptible GTK+3 version.")
+    gears_debug.print_warning(
+      "Seems like GTK+3 theme is not set correctly or luajit was built with an incomptible GTK+3 version."
+    )
     return nil
   end
   --window:set_override_redirect(true)
