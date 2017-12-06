@@ -17,7 +17,7 @@ local gtk = {
 
 
 local function convert_gtk_channel_to_hex(channel_value)
-    return string.format("%02x", gears_math.round(channel_value * 255))
+  return string.format("%02x", gears_math.round(channel_value * 255))
 end
 
 local function convert_gtk_color_to_hex(gtk_color)
@@ -37,14 +37,12 @@ local function lookup_gtk_color_to_hex(_style_context, color_name)
 end
 
 local function get_gtk_color_property_to_hex(_style_context, property_name)
-    local state = _style_context:get_state()
-    local property = _style_context:get_property(property_name, state)
-    if not property then
-      return nil
-    end
-    local result = convert_gtk_color_to_hex(property.value)
-    property:unset()
-    return result
+  local state = _style_context:get_state()
+  local property = _style_context:get_property(property_name, state)
+  if not property then
+    return nil
+  end
+  return convert_gtk_color_to_hex(property.value)
 end
 
 local function read_gtk_color_properties_from_widget(gtk_widget, properties)
@@ -52,7 +50,7 @@ local function read_gtk_color_properties_from_widget(gtk_widget, properties)
   local result = {}
   for result_key, style_context_property in pairs(properties) do
     result[result_key] = get_gtk_color_property_to_hex(
-        _style_context, style_context_property
+      _style_context, style_context_property
     )
   end
   return result
@@ -158,7 +156,7 @@ function gtk.get_theme_variables()
     result[result_key] = lookup_gtk_color_to_hex(style_context, style_context_key) or
       (result[result_key] ~= "#000000" and result[result_key] or result[fallback_key] or result[result_key])
     if not result[result_key] then
-        gears_debug.print_warning("Can't read color '" .. style_context_key .. "' from GTK+3 theme.")
+      gears_debug.print_warning("Can't read color '" .. style_context_key .. "' from GTK+3 theme.")
     end
   end
 
