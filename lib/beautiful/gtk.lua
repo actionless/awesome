@@ -24,8 +24,8 @@ local function convert_gtk_color_to_hex(gtk_color)
   return "#" ..
     convert_gtk_channel_to_hex(gtk_color.red) ..
     convert_gtk_channel_to_hex(gtk_color.green) ..
-    convert_gtk_channel_to_hex(gtk_color.blue) --..
-  --convert_gtk_channel_to_hex(gtk_color.alpha)
+    convert_gtk_channel_to_hex(gtk_color.blue) ..
+    convert_gtk_channel_to_hex(gtk_color.alpha)
 end
 
 local function lookup_gtk_color_to_hex(_style_context, color_name)
@@ -159,7 +159,7 @@ function gtk.get_theme_variables()
   }) do
     local result_key, style_context_key, fallback_key = unpack(color_data)
     result[result_key] = lookup_gtk_color_to_hex(style_context, style_context_key) or
-      (result[result_key] ~= "#000000" and result[result_key] or result[fallback_key] or result[result_key])
+      (result[result_key] ~= "#00000000" and result[result_key] or result[fallback_key] or result[result_key])
     if not result[result_key] then
       gears_debug.print_warning("Can't read color '" .. style_context_key .. "' from GTK+3 theme.")
     end
