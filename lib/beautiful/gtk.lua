@@ -65,21 +65,26 @@ function gtk.get_theme_variables()
   end
 
   local result = {}
-  local lgi = require('lgi')
-  local Gtk = lgi.Gtk
-  local window
-  pcall(function()
-    window = Gtk.Window{
-      --on_destroy = Gtk.main_quit,
-    }
+  local _gtk_status, Gtk = pcall(function()
+    return require('lgi').Gtk
   end)
-  if not window then
+  if not _gtk_status or not Gtk then
     gears_debug.print_warning(
-      "Seems like GTK+3 theme is not set correctly or luajit was built with an incomptible GTK+3 version."
+      "Can't load GTK+3 introspection. "..
+      "Seems like GTK+3 is not installed or `lua-lgi` was built with an incompatible GTK+3 version."
     )
     return nil
   end
-  --window:set_override_redirect(true)
+  local _window_status, window = pcall(function()
+    return Gtk.Window{}
+  end)
+  if not _window_status or not window then
+    gears_debug.print_warning(
+      "Can't create GTK+3 window. "..
+      "Seems like GTK+3 theme is not set correctly or `lua-lgi` was built with an incompatible GTK+3 version."
+    )
+    return nil
+  end
   local style_context = window:get_style_context()
 
   local font = style_context:get_font(Gtk.StateFlags.NORMAL)
