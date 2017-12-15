@@ -9,6 +9,7 @@ local dpi = xresources.apply_dpi
 local gtk = require("beautiful.gtk")
 local gfs = require("gears.filesystem")
 local themes_path = gfs.get_themes_dir()
+local gears_shape = require("gears.shape")
 
 
 -- inherit xresources theme
@@ -20,6 +21,8 @@ if not theme.gtk then
     gears_debug.print_warning("Can't load GTK+3 theme. Using 'xresources' theme as a fallback.")
     return theme
 end
+theme.gtk.border_radius = dpi(theme.gtk.border_radius)
+theme.gtk.border_width = dpi(theme.gtk.border_width)
 
 theme.font          = theme.gtk.font
 
@@ -39,6 +42,13 @@ theme.border_width  = dpi(theme.gtk.border_width or 1)
 theme.border_normal = theme.gtk.wm_border_unfocused_color
 theme.border_focus  = theme.gtk.wm_border_focused_color
 theme.border_marked = theme.xrdb.color10
+theme.border_radius = theme.gtk.border_radius
+
+local rounded_rect_shape = function(cr,w,h)
+gears_shape.rounded_rect(
+  cr, w, h, theme.border_radius
+)
+end
 
 -- There are other variable sets
 -- overriding the default one when
@@ -50,11 +60,20 @@ theme.border_marked = theme.xrdb.color10
 -- mouse_finder_[color|timeout|animate_timeout|radius|factor]
 -- Example:
 --theme.taglist_bg_focus = "#ff0000"
+--
+theme.tasklist_shape_focus = rounded_rect_shape
+theme.tasklist_shape_border_color_focus = theme.bg_normal
+theme.tasklist_shape_border_width_focus = theme.gtk.border_width * 2
+theme.tasklist_shape_urgent = rounded_rect_shape
+theme.tasklist_shape_border_color_urgent = theme.bg_normal
+theme.tasklist_shape_border_width_urgent = theme.gtk.border_width * 2
 
-theme.taglist_bg_empty = theme.gtk.header_button_bg_color
-theme.taglist_bg_occupied = theme.gtk.header_button_bg_color
-theme.taglist_fg_empty = theme.gtk.header_button_fg_color
-theme.taglist_fg_occupied = theme.gtk.header_button_fg_color
+theme.taglist_shape_focus = rounded_rect_shape
+theme.taglist_shape_border_color_focus = theme.bg_normal
+theme.taglist_shape_border_width_focus = theme.gtk.border_width * 2
+theme.taglist_shape_urgent = rounded_rect_shape
+theme.taglist_shape_border_color_urgent = theme.bg_normal
+theme.taglist_shape_border_width_urgent = theme.gtk.border_width * 2
 
 theme.titlebar_bg_normal = theme.gtk.wm_border_unfocused_color
 theme.titlebar_bg_focus = theme.gtk.wm_border_focused_color
