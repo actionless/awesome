@@ -206,9 +206,10 @@ function gtk.get_theme_variables()
 
   -- @TODO: remove this debug block
   ---------------------------------------------------------------------
-  for k,v in pairs(result) do
-    print(k..' = '..tostring(v))
-  end
+  --print("Direct widget properties (no style context)")
+  --for k,v in pairs(result) do
+    --print(k..' = '..tostring(v))
+  --end
   ---------------------------------------------------------------------
 
   for _, color_data in ipairs({
