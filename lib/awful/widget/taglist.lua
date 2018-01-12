@@ -55,6 +55,7 @@ local gcolor = require("gears.color")
 local gstring = require("gears.string")
 local gdebug = require("gears.debug")
 local base = require("wibox.widget.base")
+local wibox_container = require("wibox.container")
 
 local function get_screen(s)
     return s and capi.screen[s]
@@ -149,9 +150,27 @@ taglist.filter = {}
 -- @beautiful beautiful.taglist_spacing
 -- @tparam[opt=0] number spacing The spacing between tags.
 
+--- The shape used for taglist widget container itself.
+-- @beautiful beautiful.taglist_shape_container
+-- @param[opt=rectangle] gears.shape
+
+--- Whatever to clip shape of taglist widget container.
+-- @beautiful beautiful.taglist_shape_clip_container
+-- @see wibox.container.background
+
+--- The taglist container shape border width.
+-- @beautiful beautiful.taglist_shape_border_width_container
+-- @param[opt=0] number
+-- @see wibox.container.background
+
+--- The taglist container shape border color.
+-- @beautiful beautiful.taglist_shape_border_color_container
+-- @param color
+-- @see gears.color
+
 --- The main shape used for the elements.
 -- This will be the fallback for state specific shapes.
--- To get a shape for the whole taglist, use `wibox.container.background`.
+-- To get a shape for the whole taglist, use `beautiful.taglist_shape_container`.
 -- @beautiful beautiful.taglist_shape
 -- @param[opt=rectangle] gears.shape
 -- @see gears.shape
@@ -485,6 +504,24 @@ function taglist.new(args, filter, buttons, style, update_function, base_widget)
     if w.set_spacing and (args.style and args.style.spacing or beautiful.taglist_spacing) then
         w:set_spacing(args.style and args.style.spacing or beautiful.taglist_spacing)
     end
+    local background_shape_wrapper
+    if args.style and args.style.shape or beautiful.taglist_shape_container then
+        local target_widget
+        if not w.set_shape then
+            background_shape_wrapper = wibox_container.background(w)
+            target_widget = background_shape_wrapper
+        else
+            target_widget = w
+        end
+        target_widget.shape = args.style and args.style.shape_container or
+            beautiful.taglist_shape_container
+        target_widget.shape_clip = args.style and args.style.shape_clip_container or
+            beautiful.taglist_shape_clip_container
+        target_widget.shape_border_width = args.style and args.style.shape_border_width_container or
+            beautiful.taglist_shape_border_width_container
+        target_widget.shape_border_color = args.style and args.style.shape_border_color_container or
+            beautiful.taglist_shape_border_color_container
+    end
 
     local data = setmetatable({}, { __mode = 'k' })
 
@@ -544,7 +581,7 @@ function taglist.new(args, filter, buttons, style, update_function, base_widget)
         instances[screen] = list
     end
     table.insert(list, w)
-    return w
+    return background_shape_wrapper or w
 end
 
 --- Filtering function to include all nonempty tags on the screen.
