@@ -504,24 +504,6 @@ function taglist.new(args, filter, buttons, style, update_function, base_widget)
     if w.set_spacing and (args.style and args.style.spacing or beautiful.taglist_spacing) then
         w:set_spacing(args.style and args.style.spacing or beautiful.taglist_spacing)
     end
-    local background_shape_wrapper
-    if args.style and args.style.shape or beautiful.taglist_shape_container then
-        local target_widget
-        if not w.set_shape then
-            background_shape_wrapper = wibox_container.background(w)
-            target_widget = background_shape_wrapper
-        else
-            target_widget = w
-        end
-        target_widget.shape = args.style and args.style.shape_container or
-            beautiful.taglist_shape_container
-        target_widget.shape_clip = args.style and args.style.shape_clip_container or
-            beautiful.taglist_shape_clip_container
-        target_widget.shape_border_width = args.style and args.style.shape_border_width_container or
-            beautiful.taglist_shape_border_width_container
-        target_widget.shape_border_color = args.style and args.style.shape_border_color_container or
-            beautiful.taglist_shape_border_color_container
-    end
 
     local data = setmetatable({}, { __mode = 'k' })
 
@@ -541,6 +523,28 @@ function taglist.new(args, filter, buttons, style, update_function, base_widget)
             queued_update[screen] = true
         end
     end
+
+    local background_shape_wrapper
+    if args.style and args.style.shape or beautiful.taglist_shape_container then
+        local target_widget
+        if not w.set_shape then
+            background_shape_wrapper = wibox_container.background(w)
+            background_shape_wrapper._do_taglist_update_now = w._do_taglist_update_now
+            background_shape_wrapper._do_taglist_update = w._do_taglist_update
+            target_widget = background_shape_wrapper
+        else
+            target_widget = w
+        end
+        target_widget.shape = args.style and args.style.shape_container or
+            beautiful.taglist_shape_container
+        target_widget.shape_clip = args.style and args.style.shape_clip_container or
+            beautiful.taglist_shape_clip_container
+        target_widget.shape_border_width = args.style and args.style.shape_border_width_container or
+            beautiful.taglist_shape_border_width_container
+        target_widget.shape_border_color = args.style and args.style.shape_border_color_container or
+            beautiful.taglist_shape_border_color_container
+    end
+
     if instances == nil then
         instances = setmetatable({}, { __mode = "k" })
         local function u(s)
