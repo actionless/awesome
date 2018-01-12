@@ -10,6 +10,7 @@ local themes_path = gfs.get_themes_dir()
 local gears_shape = require("gears.shape")
 local wibox = require("wibox")
 local awful_widget_clienticon = require("awful.widget.clienticon")
+local gtk = require("beautiful.gtk")
 
 
 -- Helper functions for modifying hex colors:
@@ -68,7 +69,6 @@ end
 -- inherit xresources theme:
 local theme = dofile(themes_path.."xresources/theme.lua")
 -- load and prepare for use gtk theme:
-local gtk = require("gtk")
 theme.gtk = gtk.get_theme_variables()
 if not theme.gtk then
     local gears_debug = require("gears.debug")
