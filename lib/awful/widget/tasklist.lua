@@ -192,6 +192,11 @@ local instances
 -- @beautiful beautiful.tasklist_spacing
 -- @tparam[opt=0] number spacing The spacing between tasks.
 
+--- A custom widget to be used for each client.
+-- @beautiful beautiful.tasklist_widget_template
+-- @tparam[opt=nil] table spacing A custom widget to be used for each client.
+-- @see awful.tasklist
+
 --- The default tasklist elements shape.
 -- @beautiful beautiful.tasklist_shape
 -- @tparam[opt=nil] gears.shape shape
@@ -499,6 +504,7 @@ function tasklist.new(args, filter, buttons, style, update_function, base_widget
         args[k] = v
     end
 
+    args.widget_template = args.widget_template or beautiful.tasklist_widget_template
     screen = screen or get_screen(args.screen)
     local uf = args.update_function or common.list_update
     local w = base.make_widget_from_value(args.layout or flex.horizontal)
