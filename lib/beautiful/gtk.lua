@@ -150,22 +150,22 @@ function gtk.get_theme_variables()
 
   -- @TODO: remove this debug block
   ---------------------------------------------------------------------
-  local headerbar_style_context = headerbar:get_style_context()
-  local cairo = require('lgi').cairo
-  local menubar_bg_image_surfacepattern = get_gtk_property(
-    headerbar_style_context, "background-image"
-  )
-  if menubar_bg_image_surfacepattern then
-    local surface = gears_surface.duplicate_surface(
-      cairo.ImageSurface.create(cairo.Format.ARGB32, 22, 22)
-    )
-    menubar_bg_image_surfacepattern:get_surface(surface)
-    result.menubar_bg_image = surface
-    print(
-      --result.menubar_bg_image:get_rgba()
-      result.menubar_bg_image
-    )
-  end
+  --local headerbar_style_context = headerbar:get_style_context()
+  --local cairo = require('lgi').cairo
+  --local menubar_bg_image_surfacepattern = get_gtk_property(
+    --headerbar_style_context, "background-image"
+  --)
+  --if menubar_bg_image_surfacepattern then
+    --local surface = gears_surface.duplicate_surface(
+      --cairo.ImageSurface.create(cairo.Format.ARGB32, 22, 22)
+    --)
+    --menubar_bg_image_surfacepattern:get_surface(surface)
+    --result.menubar_bg_image = surface
+    --print(
+      ----result.menubar_bg_image:get_rgba()
+      --result.menubar_bg_image
+    --)
+  --end
   ---------------------------------------------------------------------
 
   -- @TODO: remove if condition here:
