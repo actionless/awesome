@@ -232,7 +232,6 @@ theme.tooltip_bg = theme.gtk.tooltip_bg_color
 -- Variables set for theming the menu:
 -- menu_[bg|fg]_[normal|focus]
 -- menu_[border_color|border_width]
-theme.menu_submenu_icon = themes_path.."default/submenu.png"
 
 theme.menu_border_width = theme.gtk.border_width
 theme.menu_border_color = theme.gtk.menubar_border_color
