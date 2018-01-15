@@ -6,6 +6,7 @@ branches=(
 	'actionless'
 
 	# my branches
+    'gtk-theme'
 
 	# psychon
 
