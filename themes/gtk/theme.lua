@@ -78,12 +78,20 @@ end
 theme.gtk.border_radius = dpi(theme.gtk.border_radius)
 theme.gtk.border_width = dpi(theme.gtk.border_width)
 theme.gtk.bold_font = theme.gtk.font_family .. ' Bold ' .. theme.gtk.font_size
+theme.gtk.menubar_border_color = mix(
+    theme.gtk.menubar_bg_color,
+    theme.gtk.menubar_fg_color,
+    0.7
+)
 
 
 theme.font          = theme.gtk.font_family .. ' ' .. theme.gtk.font_size
 
-theme.bg_normal     = theme.gtk.menubar_bg_color
-theme.fg_normal     = theme.gtk.menubar_fg_color
+theme.bg_normal     = theme.gtk.bg_color
+theme.fg_normal     = theme.gtk.fg_color
+
+theme.wibar_bg      = theme.gtk.menubar_bg_color
+theme.wibar_fg      = theme.gtk.menubar_fg_color
 
 theme.bg_focus      = theme.gtk.selected_bg_color
 theme.fg_focus      = theme.gtk.selected_fg_color
@@ -91,10 +99,10 @@ theme.fg_focus      = theme.gtk.selected_fg_color
 theme.bg_urgent     = theme.gtk.error_bg_color
 theme.fg_urgent     = theme.gtk.error_fg_color
 
-theme.bg_minimize   = mix(theme.fg_normal, theme.bg_normal, 0.3)
-theme.fg_minimize   = mix(theme.fg_normal, theme.bg_normal, 0.9)
+theme.bg_minimize   = mix(theme.wibar_fg, theme.wibar_bg, 0.3)
+theme.fg_minimize   = mix(theme.wibar_fg, theme.wibar_bg, 0.9)
 
-theme.bg_systray    = theme.bg_normal
+theme.bg_systray    = theme.wibar_bg
 
 theme.border_normal = theme.gtk.wm_border_unfocused_color
 theme.border_focus  = theme.gtk.wm_border_focused_color
@@ -120,8 +128,10 @@ end
 -- tooltip_[font|opacity|fg_color|bg_color|border_width|border_color]
 -- mouse_finder_[color|timeout|animate_timeout|radius|factor]
 
-theme.tasklist_fg_focus = theme.fg_normal
-theme.tasklist_bg_focus = theme.bg_normal
+theme.tasklist_fg_normal = theme.wibar_fg
+theme.tasklist_bg_normal = theme.wibar_bg
+theme.tasklist_fg_focus = theme.tasklist_fg_normal
+theme.tasklist_bg_focus = theme.tasklist_bg_normal
 
 theme.tasklist_font_focus = theme.gtk.bold_font
 theme.tasklist_shape_minimized = rounded_rect_shape
@@ -172,7 +182,8 @@ theme.taglist_fg_occupied = theme.gtk.header_button_fg_color
 
 theme.taglist_bg_empty = mix(
     theme.gtk.menubar_bg_color,
-    theme.gtk.header_button_bg_color
+    theme.gtk.header_button_bg_color,
+    0.3
 )
 theme.taglist_fg_empty = mix(
     theme.gtk.menubar_bg_color,
@@ -182,7 +193,9 @@ theme.wibar_bgimage = theme.gtk.menubar_bg_image
 --print(theme.wibar_bgimage)
 
 theme.titlebar_bg_normal = theme.gtk.wm_border_unfocused_color
+theme.titlebar_fg_normal = theme.gtk.menubar_fg_color
 theme.titlebar_bg_focus = theme.gtk.wm_border_focused_color
+theme.titlebar_fg_focus = theme.gtk.selected_fg_color
 theme.titlebar_font_normal = theme.gtk.bold_font
 theme.titlebar_font_focus = theme.gtk.bold_font
 
@@ -195,9 +208,15 @@ theme.tooltip_bg = theme.gtk.tooltip_bg_color
 theme.menu_submenu_icon = themes_path.."default/submenu.png"
 
 theme.menu_border_width = theme.gtk.border_width
+theme.menu_border_color = theme.gtk.menubar_border_color
+theme.menu_bg_normal = theme.gtk.menubar_bg_color
+theme.menu_fg_normal = theme.gtk.menubar_fg_color
+
 -- @TODO: get from gtk menu height
 theme.menu_height = dpi(24)
 theme.menu_width  = dpi(150)
+theme.menu_submenu_icon = nil
+theme.menu_submenu = "▸ "
 
 -- You can add as many variables as
 -- you wish and access them by using
@@ -206,24 +225,24 @@ theme.menu_width  = dpi(150)
 
 
 -- Recolor Layout icons:
-theme = theme_assets.recolor_layout(theme, theme.fg_normal)
+theme = theme_assets.recolor_layout(theme, theme.wibar_fg)
 
 -- Recolor titlebar icons:
 --
 theme = theme_assets.recolor_titlebar(
-    theme, theme.fg_normal, "normal"
+    theme, theme.titlebar_fg_normal, "normal"
 )
 theme = theme_assets.recolor_titlebar(
-    theme, reduce_contrast(theme.fg_normal, 50), "normal", "hover"
+    theme, reduce_contrast(theme.titlebar_fg_normal, 50), "normal", "hover"
 )
 theme = theme_assets.recolor_titlebar(
     theme, theme.gtk.error_bg_color, "normal", "press"
 )
 theme = theme_assets.recolor_titlebar(
-    theme, theme.fg_focus, "focus"
+    theme, theme.titlebar_fg_focus, "focus"
 )
 theme = theme_assets.recolor_titlebar(
-    theme, reduce_contrast(theme.fg_focus, 50), "focus", "hover"
+    theme, reduce_contrast(theme.titlebar_fg_focus, 50), "focus", "hover"
 )
 theme = theme_assets.recolor_titlebar(
     theme, theme.gtk.error_bg_color, "focus", "press"
@@ -235,16 +254,16 @@ theme.icon_theme = nil
 
 -- Generate Awesome icon:
 theme.awesome_icon = theme_assets.awesome_icon(
-    theme.menu_height, mix(theme.bg_focus, theme.fg_normal), theme.bg_normal
+    theme.menu_height, mix(theme.bg_focus, theme.fg_normal), theme.wibar_bg
 )
 
 -- Generate taglist squares:
 --local taglist_square_size = dpi(4)
 --theme.taglist_squares_sel = theme_assets.taglist_squares_sel(
-    --taglist_square_size, theme.fg_normal
+    --taglist_square_size, theme.gtk.header_button_border_color
 --)
 --theme.taglist_squares_unsel = theme_assets.taglist_squares_unsel(
-    --taglist_square_size, theme.fg_normal
+    --taglist_square_size, theme.gtk.header_button_border_color
 --)
 -- Or disable them:
 theme.taglist_squares_sel = nil
