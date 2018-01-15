@@ -212,19 +212,21 @@ theme.wibar_bgimage = theme.gtk.menubar_bg_image
 
 theme.titlebar_font_normal = theme.gtk.bold_font
 theme.titlebar_bg_normal = theme.gtk.wm_border_unfocused_color
-theme.titlebar_fg_normal = choose_contrast_color(
-    theme.titlebar_bg_normal,
-    theme.gtk.menubar_fg_color,
-    theme.gtk.menubar_bg_color
-)
+theme.titlebar_fg_normal = theme.gtk.wm_title_unfocused_color
+--theme.titlebar_fg_normal = choose_contrast_color(
+    --theme.titlebar_bg_normal,
+    --theme.gtk.menubar_fg_color,
+    --theme.gtk.menubar_bg_color
+--)
 
 theme.titlebar_font_focus = theme.gtk.bold_font
 theme.titlebar_bg_focus = theme.gtk.wm_border_focused_color
-theme.titlebar_fg_focus = choose_contrast_color(
-    theme.titlebar_bg_focus,
-    theme.gtk.menubar_fg_color,
-    theme.gtk.menubar_bg_color
-)
+theme.titlebar_fg_focus = theme.gtk.wm_title_focused_color
+--theme.titlebar_fg_focus = choose_contrast_color(
+    --theme.titlebar_bg_focus,
+    --theme.gtk.menubar_fg_color,
+    --theme.gtk.menubar_bg_color
+--)
 
 theme.tooltip_fg = theme.gtk.tooltip_fg_color
 theme.tooltip_bg = theme.gtk.tooltip_bg_color

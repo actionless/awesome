@@ -235,11 +235,11 @@ function gtk.get_theme_variables()
     --
     {"wm_bg_color", "wm_bg", "menubar_bg_color"},
     {"wm_border_focused_color", "wm_border_focused", "selected_bg_color"},
-    {"wm_title_focused_color", "wm_title_focused", "menubar_bg_color"},
-    {"wm_icons_focused_color", "wm_icons_focused", "menubar_fg_color"},
-    {"wm_border_unfocused_color", "wm_border_unfocused", "wm_bg_color"},
-    {"wm_title_unfocused_color", "wm_title_unfocused", "menubar_bg_color"},
-    {"wm_icons_unfocused_color", "wm_icons_unfocused", "menubar_fg_color"},
+    {"wm_border_unfocused_color", "wm_border_unfocused", "wm_border", "menubar_bg_color"},
+    {"wm_title_focused_color", "wm_title_focused", "wm_title", "selected_fg_color"},
+    {"wm_title_unfocused_color", "wm_title_unfocused", "wm_unfocused_title", "menubar_fg_color"},
+    {"wm_icons_focused_color", "wm_icons_focused", "wm_title_focused_color", "selected_fg_color"},
+    {"wm_icons_unfocused_color", "wm_icons_unfocused", "wm_title_unfocused_color", "menubar_fg_color"},
     --
     {"error_color", "error_color"},
     {"error_bg_color", "error_bg_color", "error_color"},
@@ -254,11 +254,12 @@ function gtk.get_theme_variables()
     {"success_fg_color", "success_fg_color", "selected_fg_color"},
     {"success_color", "success_color", "success_bg_color"},
   }) do
-    local result_key, style_context_key, fallback_key = unpack(color_data)
+    local result_key, style_context_key, fallback_key, fallback_key2 = unpack(color_data)
     result[result_key] = lookup_gtk_color_to_hex(style_context, style_context_key) or (
       result[result_key] ~= "#00000000" and
       result[result_key] or
       result[fallback_key] or
+      result[fallback_key2] or
       result[result_key]  -- <-- here is for case if it was meant to be a fully transparent color on purpose
     )
     if not result[result_key] then
