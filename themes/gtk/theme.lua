@@ -65,6 +65,22 @@ local function reduce_contrast(color, ratio)
     return darker(color, is_dark(color) and -ratio or ratio)
 end
 
+local function choose_contrast_color(reference, candidate1, candidate2)
+    if is_dark(reference) then
+        if not is_dark(candidate1) then
+            return candidate1
+        else
+            return candidate2
+        end
+    else
+        if is_dark(candidate1) then
+            return candidate1
+        else
+            return candidate2
+        end
+    end
+end
+
 
 -- inherit xresources theme:
 local theme = dofile(themes_path.."xresources/theme.lua")
@@ -134,6 +150,7 @@ theme.tasklist_fg_focus = theme.tasklist_fg_normal
 theme.tasklist_bg_focus = theme.tasklist_bg_normal
 
 theme.tasklist_font_focus = theme.gtk.bold_font
+
 theme.tasklist_shape_minimized = rounded_rect_shape
 theme.tasklist_shape_border_color_minimized = mix(
     theme.bg_minimize,
@@ -189,15 +206,25 @@ theme.taglist_fg_empty = mix(
     theme.gtk.menubar_bg_color,
     theme.gtk.header_button_fg_color
 )
+
 theme.wibar_bgimage = theme.gtk.menubar_bg_image
 --print(theme.wibar_bgimage)
 
-theme.titlebar_bg_normal = theme.gtk.wm_border_unfocused_color
-theme.titlebar_fg_normal = theme.gtk.menubar_fg_color
-theme.titlebar_bg_focus = theme.gtk.wm_border_focused_color
-theme.titlebar_fg_focus = theme.gtk.selected_fg_color
 theme.titlebar_font_normal = theme.gtk.bold_font
+theme.titlebar_bg_normal = theme.gtk.wm_border_unfocused_color
+theme.titlebar_fg_normal = choose_contrast_color(
+    theme.titlebar_bg_normal,
+    theme.gtk.menubar_fg_color,
+    theme.gtk.menubar_bg_color
+)
+
 theme.titlebar_font_focus = theme.gtk.bold_font
+theme.titlebar_bg_focus = theme.gtk.wm_border_focused_color
+theme.titlebar_fg_focus = choose_contrast_color(
+    theme.titlebar_bg_focus,
+    theme.gtk.menubar_fg_color,
+    theme.gtk.menubar_bg_color
+)
 
 theme.tooltip_fg = theme.gtk.tooltip_fg_color
 theme.tooltip_bg = theme.gtk.tooltip_bg_color
