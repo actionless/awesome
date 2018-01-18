@@ -7,7 +7,6 @@
 ---------------------------------------------------------------------------
 local gears_debug = require("gears.debug")
 local gears_math = require("gears.math")
-local gears_surface = require("gears.surface")
 local join = require("gears.table").join
 local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 
@@ -150,6 +149,7 @@ function gtk.get_theme_variables()
 
   -- @TODO: remove this debug block
   ---------------------------------------------------------------------
+  --local gears_surface = require("gears.surface")
   --local headerbar_style_context = headerbar:get_style_context()
   --local cairo = require('lgi').cairo
   --local menubar_bg_image_surfacepattern = get_gtk_property(
