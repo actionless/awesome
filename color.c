@@ -39,15 +39,18 @@
  */
 static bool
 color_parse(const char *colstr, ssize_t len,
-            uint8_t *red, uint8_t *green, uint8_t *blue)
+            uint8_t *red, uint8_t *green, uint8_t *blue, uint8_t *alpha)
 {
     unsigned long colnum;
     char *p;
 
+    *alpha = 0xff;
+
     colnum = strtoul(colstr + 1, &p, 16);
     if(len == 9 && (p - colstr) == 9)
     {
-        /* We ignore the alpha component */
+        /* Parse alpha */
+        *alpha = colnum & 0xff;
         colnum >>= 8;
         len -= 2;
         p -= 2;
@@ -77,7 +80,7 @@ color_init_request_t
 color_init_unchecked(color_t *color, const char *colstr, ssize_t len)
 {
     color_init_request_t req;
-    uint8_t red, green, blue;
+    uint8_t red, green, blue, alpha;
 
     p_clear(&req, 1);
 
@@ -90,21 +93,29 @@ color_init_unchecked(color_t *color, const char *colstr, ssize_t len)
     req.color = color;
 
     /* The color is given in RGB value */
-    if(!color_parse(colstr, len, &red, &green, &blue))
+    if(!color_parse(colstr, len, &red, &green, &blue, &alpha))
     {
         warn("awesome: error, invalid color '%s'", colstr);
         req.has_error = true;
         return req;
     }
 
+    /*
     req.cookie_hexa = xcb_alloc_color_unchecked(globalconf.connection,
                                                 globalconf.default_cmap,
                                                 RGB_8TO16(red),
                                                 RGB_8TO16(green),
                                                 RGB_8TO16(blue));
+                                                */
 
     req.has_error = false;
     req.colstr = colstr;
+
+    color->initialized = true;
+    color->red = red;
+    color->green = green;
+    color->blue = blue;
+    color->pixel = alpha << 24 | red << 16 | green << 8 | blue;
 
     return req;
 }
@@ -119,6 +130,7 @@ color_init_reply(color_init_request_t req)
     if(req.has_error)
         return false;
 
+    /*
     xcb_alloc_color_reply_t *hexa_color;
 
     if((hexa_color = xcb_alloc_color_reply(globalconf.connection,
@@ -135,6 +147,8 @@ color_init_reply(color_init_request_t req)
 
     warn("awesome: error, cannot allocate color '%s'", req.colstr);
     return false;
+    */
+    return true;
 }
 
 /** Push a color as a string onto the stack
