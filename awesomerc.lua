@@ -201,6 +201,7 @@ awful.screen.connect_for_each_screen(function(s)
 
     -- Create a promptbox for each screen
     s.mypromptbox = awful.widget.prompt()
+
     -- Create an imagebox widget which will contain an icon indicating which layout we're using.
     -- We need one layoutbox per screen.
     s.mylayoutbox = awful.widget.layoutbox(s)
@@ -209,12 +210,24 @@ awful.screen.connect_for_each_screen(function(s)
                            awful.button({ }, 3, function () awful.layout.inc(-1) end),
                            awful.button({ }, 4, function () awful.layout.inc( 1) end),
                            awful.button({ }, 5, function () awful.layout.inc(-1) end)))
+
     -- Create a taglist widget
     s.mytaglist = awful.widget.taglist {
         screen  = s,
         filter  = awful.widget.taglist.filter.all,
         buttons = taglist_buttons
     }
+    -- and apply shape to it
+    if beautiful.taglist_shape_container then
+        local background_shape_wrapper = wibox.container.background(s.mytaglist)
+        background_shape_wrapper._do_taglist_update_now = s.mytaglist._do_taglist_update_now
+        background_shape_wrapper._do_taglist_update = s.mytaglist._do_taglist_update
+        background_shape_wrapper.shape = beautiful.taglist_shape_container
+        background_shape_wrapper.shape_clip = beautiful.taglist_shape_clip_container
+        background_shape_wrapper.shape_border_width = beautiful.taglist_shape_border_width_container
+        background_shape_wrapper.shape_border_color = beautiful.taglist_shape_border_color_container
+        s.mytaglist = background_shape_wrapper
+    end
 
     -- Create a tasklist widget
     s.mytasklist = awful.widget.tasklist {
