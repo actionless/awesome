@@ -9,6 +9,7 @@ branches=(
     'gtk-theme'
 
 	# psychon
+    'test-argb-patch2'
 
 	# elv13
     #'pr/644'
