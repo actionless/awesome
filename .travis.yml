@@ -18,7 +18,8 @@ env:
     # Note: luarocks does not work with Lua 5.0.
     - LUA=5.1 LUANAME=lua5.1 BUILD_IN_DIR=/tmp/awesome-build
     # Lua 5.2 with older lgi and screen size not divisible by 2.
-    - LUA=5.2 LUANAME=lua5.2 LGIVER=0.8.0 TESTS_SCREEN_SIZE=1921x1079 BUILD_APIDOC=true DO_CHECKQA=1 EMPTY_THEME_WHILE_LOADING=1
+    # SOURCE_DATE_EPOCH: used for stable dates during build.
+    - LUA=5.2 LUANAME=lua5.2 LGIVER=0.8.0 TESTS_SCREEN_SIZE=1921x1079 BUILD_APIDOC=true DO_CHECKQA=1 EMPTY_THEME_WHILE_LOADING=1 SOURCE_DATE_EPOCH=1893456000
   global:
     # Secure GH_APIDOC_TOKEN to push to awesomeWM/apidoc.
     - secure: "R/HYDclnws1I1+v9Yjt+RKa4CsFhbBT9tiwE3EfPhEj2KCYX4sFRMxuZvLf5sq0XWdrQaPhQ54fgAZGr3f054JKRXcTB0g9J6nhSHz9kIjPh446gafUhEeDQcZRwM/MeCWiwFIkiZm6smYoDFE9JTWu6quNV+lQ4kcVDOp2ibEc="
@@ -63,7 +64,7 @@ install:
        wget http://www.lua.org/ftp/lua-5.3.4.tar.gz -O lua.tar.gz
        tar -xvzf lua.tar.gz
        cd lua-5.3.*/src \
-        && make SYSCFLAGS="-DLUA_USE_LINUX -ULUA_COMPAT_5_2 -DLUA_USE_APICHECK" SYSLIBS="-Wl,-E -ldl -lreadline" LUA_A=liblua.so MYCFLAGS="-fPIC" RANLIB=: AR="/tmp/myar" liblua.so \
+        && make SYSCFLAGS="-DLUA_USE_LINUX -ULUA_COMPAT_5_2 -DLUA_USE_APICHECK -Dlua_assert=assert" SYSLIBS="-Wl,-E -ldl -lreadline" LUA_A=liblua.so MYCFLAGS="-fPIC" RANLIB=: AR="/tmp/myar" liblua.so \
         && cd .. \
         && sudo make INSTALL_TOP=/usr/ INSTALL_INC=${LUAINCLUDE} TO_LIB=liblua.so linux install)
     elif [[ "$LUANAME" == "luajit-2.0" ]]; then
@@ -105,8 +106,7 @@ install:
     fi
 
   # Install dependencies for code coverage testing.
-  - if [ "$DO_COVERAGE" = "" ]; then export DO_COVERAGE=0; fi
-  - if [ "$DO_COVERAGE" != "0" ]; then sudo luarocks install cluacov; fi
+  - if [ -n "$DO_COVERAGE" ]; then sudo luarocks install cluacov; fi
   - if [ "$DO_COVERAGE" = "coveralls" ]; then sudo luarocks install luacov-coveralls; fi
 
   # Determine custom version.
@@ -125,7 +125,7 @@ install:
       if [ "$DO_COVERAGE" = "codecov" ]; then
         test -f build/luacov.stats.out || { echo 'build/luacov.stats.out does not exist.'; return 1; }
         luacov || return 1
-        travis_retry bash /tmp/codecov-bash -X gcov -X coveragepy -c -F "$1" || return 1
+        travis_retry bash /tmp/codecov-bash -X gcov -X coveragepy -c -F "$1,${LUANAME//./}" || return 1
         rm build/luacov.stats.out
       fi
       return 0
@@ -156,13 +156,7 @@ install:
       return 0
     }
 script:
-  - export CMAKE_ARGS="-DLUA_LIBRARY=${LUALIBRARY} -DLUA_INCLUDE_DIR=${LUAINCLUDE} -D OVERRIDE_VERSION=$AWESOME_VERSION -DSTRICT_TESTS=true"
-  - |
-    if [ "$DO_COVERAGE" = "codecov" ]; then
-      export CXXFLAGS="-fprofile-arcs -ftest-coverage"
-      export CFLAGS="-fprofile-arcs -ftest-coverage"
-      export LDFLAFS="-fprofile-arcs -ftest-coverage"
-    fi
+  - export CMAKE_ARGS="-DLUA_LIBRARY=${LUALIBRARY} -DLUA_INCLUDE_DIR=${LUAINCLUDE} -D OVERRIDE_VERSION=$AWESOME_VERSION -DSTRICT_TESTS=true -D DO_COVERAGE=$DO_COVERAGE"
   - |
     if [ "$EMPTY_THEME_WHILE_LOADING" = 1 ]; then
       # Break beautiful so that trying to access the theme before beautiful.init() causes an error
@@ -187,9 +181,9 @@ script:
     fi
   # Run checks.
   - |
-    set -ex
     if [ "$TRAVIS_TEST_RESULT" = 0 ]; then
-      if [ "$DO_COVERAGE" != "0" ]; then
+      set -ex
+      if [ -n "$DO_COVERAGE" ]; then
         travis_fold_start "DO_COVERAGE"
 
         # Run tests/examples explicitly.
@@ -211,6 +205,7 @@ script:
         travis_run_in_fold "make.check-integration" make check-integration
         travis_run_in_fold "make.check-themes" make check-themes
       fi
+      set +x
     fi
   # Run check-qa.
   - |
@@ -218,8 +213,8 @@ script:
       travis_run_in_fold "make.check-qa" make check-qa
     fi
   - |
-    set -e
     if [ "$TEST_PREV_COMMITS" = 1 ] && ! [ "$TRAVIS_PULL_REQUEST" = false ]; then
+      set -e
       # Check each commit separately (to make git-bisect less annoying).
       # Fix Travis' commit range (https://github.com/travis-ci/travis-ci/issues/4596).
       commit_range="${TRAVIS_COMMIT_RANGE/.../..}"
@@ -237,7 +232,7 @@ script:
         echo "Testing commit $commit"
         git checkout "$commit"
         git --no-pager show --stat
-        if ! DO_COVERAGE=0 make all check; then
+        if ! make all check CMAKE_ARGS+="-D DO_COVERAGE=0"; then
           failed="$failed $commit"
         fi
         travis_fold_end

@@ -51,32 +51,40 @@ function xresources.get_current_theme()
     for i=0,15 do table.insert(keys, "color"..i) end
     local colors = {}
     for _, key in ipairs(keys) do
-        colors[key] = awesome.xrdb_get_value("", key)
-        if not colors[key] then
-            gears_debug.print_warning("beautiful: can't get colorscheme from xrdb (using fallback).")
-            return fallback
+        local color = awesome.xrdb_get_value("", key)
+        if color then
+            if color:find("rgb:") then
+                color = "#"..color:gsub("[a]?rgb:", ""):gsub("/", "")
+            end
+        else
+            gears_debug.print_warning(
+                "beautiful: can't get colorscheme from xrdb for value '"..key.."' (using fallback)."
+            )
+            color = fallback[key]
         end
-        if colors[key]:find("rgb:") then
-            colors[key] = "#"..colors[key]:gsub("[a]?rgb:", ""):gsub("/", "")
-        end
+        colors[key] = color
     end
     return colors
 end
 
-
-local dpi_per_screen = {}
 
 local function get_screen(s)
     return s and screen[s]
 end
 
 --- Get global or per-screen DPI value falling back to xrdb.
+--
+-- This function is deprecated. Use `s.dpi` and avoid getting the DPI without
+-- a screen.
+--
+-- @deprecated xresources.get_dpi
 -- @tparam[opt] integer|screen s The screen.
 -- @treturn number DPI value.
+
 function xresources.get_dpi(s)
     s = get_screen(s)
-    if dpi_per_screen[s] then
-        return dpi_per_screen[s]
+    if s then
+        return s.dpi
     end
     if not xresources.dpi then
         -- Might not be present when run under unit tests
@@ -115,7 +123,7 @@ function xresources.set_dpi(dpi, s)
     if not s then
         xresources.dpi = dpi
     else
-        dpi_per_screen[s] = dpi
+        s.dpi = dpi
     end
 end
 

@@ -173,7 +173,7 @@ local function get_geometry(widget, screen, position)
     local pos, s = position or "cc", screen or ascreen.focused()
     local margin = widget._calendar_margin or 0
     local wa = s.workarea
-    local width, height = widget:fit({screen=s, dpi=beautiful.xresources.get_dpi(s)}, wa.width, wa.height)
+    local width, height = widget:fit({screen=s, dpi=s.dpi}, wa.width, wa.height)
 
     width  = width  < wa.width  and width  or wa.width
     height = height < wa.height and height or wa.height
@@ -216,9 +216,9 @@ function calendar_popup:call_calendar(offset, position, screen)
     local raw_date = os.date("*t")
     local date = {day=raw_date.day, month=raw_date.month, year=raw_date.year}
     if widget._private.type == "month" and self.offset ~= 0 then
-        raw_date.month = raw_date.month + self.offset
-        raw_date = os.date("*t", os.time(raw_date))
-        date = {month=raw_date.month, year=raw_date.year}
+        local month_offset = (raw_date.month + self.offset - 1) % 12 + 1
+        local year_offset = raw_date.year + math.floor((raw_date.month + self.offset - 1) / 12)
+        date = {month=month_offset, year=year_offset }
     elseif widget._private.type == "year" then
         date = {year=raw_date.year + self.offset}
     end
@@ -247,17 +247,37 @@ end
 --
 -- @param widget Widget to attach the calendar
 -- @tparam[opt="tr"] string position Two characters string defining the position on the screen
+-- @tparam[opt={}] table args Additional options
+-- @tparam[opt=true] bool args.on_hover Show popup during mouse hover
 -- @treturn wibox The wibox calendar
-function calendar_popup:attach(widget, position)
+function calendar_popup:attach(widget, position, args)
     position = position or "tr"
+    args = args or {}
+    if args.on_hover == nil then args.on_hover=true end
     widget:buttons(gears.table.join(
         abutton({ }, 1, function ()
-                              self:call_calendar(0, position)
-                              self.visible = not self.visible
+                              if not self.visible or self._calendar_clicked_on then
+                                  self:call_calendar(0, position)
+                                  self.visible = not self.visible
+                              end
+                              self._calendar_clicked_on = self.visible
                         end),
         abutton({ }, 4, function () self:call_calendar(-1) end),
         abutton({ }, 5, function () self:call_calendar( 1) end)
     ))
+    if args.on_hover then
+        widget:connect_signal("mouse::enter", function ()
+            if not self._calendar_clicked_on then
+                self:call_calendar(0, position)
+                self.visible = true
+            end
+        end)
+        widget:connect_signal("mouse::leave", function ()
+            if not self._calendar_clicked_on then
+                self.visible = false
+            end
+        end)
+    end
     return self
 end
 
@@ -312,8 +332,14 @@ local function get_cal_wibox(caltype, args)
     ret:set_widget(widget)
 
     ret:buttons(gears.table.join(
-            abutton({ }, 1, function () ret.visible=false end),
-            abutton({ }, 3, function () ret.visible=false end),
+            abutton({ }, 1, function ()
+                ret.visible=false
+                ret._calendar_clicked_on=false
+            end),
+            abutton({ }, 3, function ()
+                ret.visible=false
+                ret._calendar_clicked_on=false
+            end),
             abutton({ }, 4, function () ret:call_calendar(-1) end),
             abutton({ }, 5, function () ret:call_calendar( 1) end)
     ))

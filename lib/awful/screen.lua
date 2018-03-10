@@ -341,7 +341,7 @@ end
 --
 -- This is used by `screen.clients` internally (with `stacked=true`).
 --
--- @function client:get_clients
+-- @function screen:get_clients
 -- @tparam[opt=true] boolean stacked Use stacking order? (top to bottom)
 -- @treturn table The clients list.
 function screen.object.get_clients(s, stacked)
@@ -388,7 +388,7 @@ end
 --
 -- This is used by `all_clients` internally (with `stacked=true`).
 --
--- @function client:get_all_clients
+-- @function screen:get_all_clients
 -- @tparam[opt=true] boolean stacked Use stacking order? (top to bottom)
 -- @treturn table The clients list.
 function screen.object.get_all_clients(s, stacked)
@@ -410,7 +410,7 @@ end
 --
 -- This is used by `tiles_clients` internally (with `stacked=true`).
 --
--- @function client:get_tiled_clients
+-- @function screen:get_tiled_clients
 -- @tparam[opt=true] boolean stacked Use stacking order? (top to bottom)
 -- @treturn table The clients list.
 function screen.object.get_tiled_clients(s, stacked)
@@ -502,6 +502,104 @@ end
 
 function screen.object.get_selected_tag(s)
     return screen.object.get_selected_tags(s)[1]
+end
+
+--- Enable the automatic calculation of the screen DPI (experimental).
+--
+-- This will cause many elements such as the font and some widgets to be scaled
+-- so they look the same (physical) size on different devices with different
+-- pixel density.
+--
+-- It is calculated using the information provided from `xrandr`.
+--
+-- When enabled, the theme and configuration must avoid using pixel sizes for
+-- different elements as this will cause misalignment or hidden content on some
+-- devices.
+--
+-- Note that it has to be called early in `rc.lua` and requires restarting
+-- awesome to take effect. It is disabled by default and changes introduced in
+-- minor releases of Awesome may slightly break the behavior as more components
+-- gain support for HiDPI.
+--
+-- When disabled the DPI is acquired from the `Xft.dpi` X resource (xrdb),
+-- defaulting to 96.
+--
+-- @tparam boolean enabled Enable or disable automatic DPI support.
+function screen.set_auto_dpi_enabled(enabled)
+    for s in capi.screen do
+        s.data.dpi_cache = nil
+    end
+    data.autodpi = enabled
+end
+
+
+--- The number of pixels per inch of the screen.
+-- @property dpi
+-- @treturn number the DPI value.
+
+local xft_dpi, fallback_dpi
+
+local function get_fallback()
+    local mm_per_inch = 25.4
+
+    -- Following Keith Packard's whitepaper on Xft,
+    -- https://keithp.com/~keithp/talks/xtc2001/paper/xft.html#sec-editing
+    -- the proper fallback for Xft.dpi is the vertical DPI reported by
+    -- the X server. This will generally be 96 on Xorg, unless the user
+    -- has configured it differently
+    if root and not fallback_dpi then
+        local _, h = root.size()
+        local _, hmm = root.size_mm()
+        fallback_dpi = hmm ~= 0 and h * mm_per_inch / hmm
+    end
+
+    return fallback_dpi or 96
+end
+
+function screen.object.get_dpi(s)
+    local mm_per_inch = 25.4
+
+    if s.data.dpi or s.data.dpi_cache then
+        return s.data.dpi or s.data.dpi_cache
+    end
+
+    -- Xft.dpi is explicit user configuration, so honor it
+    if not xft_dpi and awesome and awesome.xrdb_get_value then
+        xft_dpi = tonumber(awesome.xrdb_get_value("", "Xft.dpi")) or false
+    end
+
+    if xft_dpi then
+        s.data.dpi_cache = xft_dpi
+        return s.data.dpi_cache
+    end
+
+    if not data.autodpi then
+        s.data.dpi_cache = get_fallback()
+        return s.data.dpi_cache
+    end
+
+    -- Try to compute DPI based on outputs (use the minimum)
+    local dpi = nil
+    local geo = s.geometry
+    for _, o in pairs(s.outputs) do
+        -- Ignore outputs with width/height 0
+        if o.mm_width ~= 0 and o.mm_height ~= 0 then
+            local dpix = geo.width * mm_per_inch / o.mm_width
+            local dpiy = geo.height * mm_per_inch / o.mm_height
+            dpi = math.min(dpix, dpiy, dpi or dpix)
+        end
+    end
+    if dpi then
+        s.data.dpi_cache = dpi
+        return dpi
+    end
+
+    s.data.dpi_cache = get_fallback()
+    return s.data.dpi_cache
+end
+
+function screen.object.set_dpi(s, dpi)
+    s.data.dpi = dpi
 end
 
 

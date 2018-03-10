@@ -17,7 +17,7 @@ $(BUILDDIR)/Makefile:
 	$(ECHO)
 	mkdir -p $(BUILDDIR)
 	$(ECHO) "Running cmake…"
-	cd $(BUILDDIR) && cmake $(CMAKE_ARGS) "$(@D)" ..
+	cd $(BUILDDIR) && cmake $(CMAKE_ARGS) "$(CURDIR)"
 
 cmake-build: $(BUILDDIR)/Makefile
 	$(ECHO) "Building…"
@@ -32,8 +32,10 @@ install:
 
 distclean:
 	$(ECHO) -n "Cleaning up build directory…"
-	$(RM) -r $(BUILDDIR) $(TARGETS)
-	$(ECHO) " done"
+	$(RM) -r $(BUILDDIR)
+
+# Use an explicit rule to not "update" the Makefile via the implicit rule below.
+Makefile: ;
 
 %: $(BUILDDIR)/Makefile
 	$(ECHO) "Running make $@ in $(BUILDDIR)…"

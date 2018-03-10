@@ -3,7 +3,7 @@
 --
 -- @author Yauheni Kirylau &lt;yawghen@gmail.com&gt;
 -- @copyright 2014-2015 Yauheni Kirylau
--- @module awful.hotkeys_popup.keys
+-- @submodule awful.hotkeys_popup
 ---------------------------------------------------------------------------
 
 
@@ -12,6 +12,7 @@ local keys = {
   firefox = require("awful.hotkeys_popup.keys.firefox"),
   tmux = require("awful.hotkeys_popup.keys.tmux"),
   qutebrowser = require("awful.hotkeys_popup.keys.qutebrowser"),
+  termite = require("awful.hotkeys_popup.keys.termite"),
 }
 return keys
 

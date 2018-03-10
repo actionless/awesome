@@ -305,7 +305,7 @@
  *
  * If the client has multiple classes, the first one is used.
  *
- * To get a client class from the command line, use te `xprop` command.
+ * To get a client class from the command line, use the `xprop` command.
  *
  * **Signal:**
  *
@@ -700,7 +700,7 @@
  *
  *  * *property::shape\_client\_bounding*
  *
- * @property shape_client_bounding
+ * @property client_shape_bounding
  * @param surface
  */
 
@@ -711,7 +711,7 @@
  *
  *  * *property::shape\_client\_clip*
  *
- * @property shape_client_clip
+ * @property client_shape_clip
  * @param surface
  */
 
@@ -1498,14 +1498,14 @@ client_manage(xcb_window_t w, xcb_get_geometry_reply_t *wgeom, xcb_get_window_at
         if ((*oc)->transient_for_window == w)
             client_find_transient_for(*oc);
 
+    /* Put the window in normal state. */
+    xwindow_set_state(c->window, XCB_ICCCM_WM_STATE_NORMAL);
+
     /* Then check clients hints */
     ewmh_client_check_hints(c);
 
     /* Push client in stack */
     stack_client_push(c);
-
-    /* Put the window in normal state. */
-    xwindow_set_state(c->window, XCB_ICCCM_WM_STATE_NORMAL);
 
     /* Request our response */
     xcb_get_property_reply_t *reply =

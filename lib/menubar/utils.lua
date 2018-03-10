@@ -7,7 +7,6 @@
 ---------------------------------------------------------------------------
 
 -- Grab environment
-local io = io
 local table = table
 local ipairs = ipairs
 local string = string
@@ -21,6 +20,7 @@ local w_textbox = require("wibox.widget.textbox")
 local gdebug = require("gears.debug")
 local protected_call = require("gears.protected_call")
 local gstring = require("gears.string")
+local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 
 local utils = {}
 
@@ -38,8 +38,66 @@ utils.terminal = 'xterm'
 -- their .desktop files.
 local default_icon = nil
 
---- Name of the WM for the OnlyShownIn entry in the .desktop file.
+--- Name of the WM for the OnlyShowIn entry in the .desktop file.
 utils.wm_name = "awesome"
+
+--- Possible escape characters (not including the preceding backslash) in
+--.desktop files and their equates.
+local escape_sequences = {
+    [ [[\\]] ]  = [[\]],
+    [ [[\n]] ]  = '\n',
+    [ [[\r]] ]  = '\r',
+    [ [[\s]] ]  = ' ',
+    [ [[\t]] ]  = '\t',
+}
+
+-- Maps keys in desktop entries to suitable getter function.
+-- The order of entries is as in the spec.
+-- https://standards.freedesktop.org/desktop-entry-spec/latest/ar01s05.html
+local keys_getters
+do
+    local function get_string(kf, key)
+        return kf:get_string("Desktop Entry", key)
+    end
+    local function get_strings(kf, key)
+        return kf:get_string_list("Desktop Entry", key, nil)
+    end
+    local function get_localestring(kf, key)
+        return kf:get_locale_string("Desktop Entry", key, nil)
+    end
+    local function get_localestrings(kf, key)
+        return kf:get_locale_string_list("Desktop Entry", key, nil, nil)
+    end
+    local function get_boolean(kf, key)
+        return kf:get_boolean("Desktop Entry", key)
+    end
+
+    keys_getters = {
+        Type = get_string,
+        Version = get_string,
+        Name = get_localestring,
+        GenericName = get_localestring,
+        NoDisplay = get_boolean,
+        Comment = get_localestring,
+        Icon = get_localestring,
+        Hidden = get_boolean,
+        OnlyShowIn = get_strings,
+        NotShowIn = get_strings,
+        DBusActivatable = get_boolean,
+        TryExec = get_string,
+        Exec = get_string,
+        Path = get_string,
+        Terminal = get_boolean,
+        Actions = get_strings,
+        MimeType = get_strings,
+        Categories = get_strings,
+        Implements = get_strings,
+        Keywords = get_localestrings,
+        StartupNotify = get_boolean,
+        StartupWMClass = get_string,
+        URL = get_string,
+    }
+end
 
 -- Private section
 
@@ -66,7 +124,8 @@ do
 end
 
 local all_icon_sizes = {
-    '128x128' ,
+    'scalable',
+    '128x128',
     '96x96',
     '72x72',
     '64x64',
@@ -97,48 +156,63 @@ local icon_lookup_path = nil
 --- Get a list of icon lookup paths.
 -- @treturn table A list of directories, without trailing slash.
 local function get_icon_lookup_path()
-    if not icon_lookup_path then
-        local add_if_readable = function(t, path)
+    if icon_lookup_path then return icon_lookup_path end
+
+    local function ensure_args(t, paths)
+        if type(paths) == 'string' then paths = { paths } end
+        return t or {}, paths
+    end
+
+    local function add_if_readable(t, paths)
+        t, paths = ensure_args(t, paths)
+
+        for _, path in ipairs(paths) do
             if gfs.dir_readable(path) then
                 table.insert(t, path)
             end
         end
-        icon_lookup_path = {}
-        local icon_theme_paths = {}
-        local icon_theme = theme.icon_theme
-        local paths = glib.get_system_data_dirs()
-        table.insert(paths, 1, glib.get_user_data_dir())
-        table.insert(paths, 1, glib.build_filenamev({glib.get_home_dir(),
-                                                     '.icons'}))
-        for _,dir in ipairs(paths) do
-            local icons_dir = glib.build_filenamev({dir, 'icons'})
-            if gfs.dir_readable(icons_dir) then
-                if icon_theme then
-                    add_if_readable(icon_theme_paths,
-                                    glib.build_filenamev({icons_dir,
-                                                         icon_theme}))
-                end
-                -- Fallback theme.
-                add_if_readable(icon_theme_paths,
-                                glib.build_filenamev({icons_dir, 'hicolor'}))
-            end
+        return t
+    end
+
+    local function add_with_dir(t, paths, dir)
+        t, paths = ensure_args(t, paths)
+        dir = { nil, dir }
+
+        for _, path in ipairs(paths) do
+            dir[1] = path
+            table.insert(t, glib.build_filenamev(dir))
         end
-        for _, icon_theme_directory in ipairs(icon_theme_paths) do
-            for _, size in ipairs(all_icon_sizes) do
-                add_if_readable(icon_lookup_path,
-                                glib.build_filenamev({icon_theme_directory,
-                                                      size, 'apps'}))
-            end
-        end
-        for _,dir in ipairs(paths)do
-            -- lowest priority fallbacks
-            add_if_readable(icon_lookup_path,
-                            glib.build_filenamev({dir, 'pixmaps'}))
-            add_if_readable(icon_lookup_path,
-                            glib.build_filenamev({dir, 'icons'}))
+        return t
+    end
+
+    icon_lookup_path = {}
+    local theme_priority = { 'hicolor' }
+    if theme.icon_theme then table.insert(theme_priority, 1, theme.icon_theme) end
+
+    local paths = add_with_dir({}, glib.get_home_dir(), '.icons')
+    add_with_dir(paths, {
+        glib.get_user_data_dir(),           -- $XDG_DATA_HOME, typically $HOME/.local/share
+        unpack(glib.get_system_data_dirs()) -- $XDG_DATA_DIRS, typically /usr/{,local/}share
+    }, 'icons')
+    add_with_dir(paths, glib.get_system_data_dirs(), 'pixmaps')
+
+    local icon_theme_paths = {}
+    for _, theme_dir in ipairs(theme_priority) do
+        add_if_readable(icon_theme_paths,
+                        add_with_dir({}, paths, theme_dir))
+    end
+
+    local app_in_theme_paths = {}
+    for _, icon_theme_directory in ipairs(icon_theme_paths) do
+        for _, size in ipairs(all_icon_sizes) do
+            table.insert(app_in_theme_paths,
+                         glib.build_filenamev({ icon_theme_directory,
+                                                size, 'apps' }))
         end
     end
-    return icon_lookup_path
+    add_if_readable(icon_lookup_path, app_in_theme_paths)
+
+    return add_if_readable(icon_lookup_path, paths)
 end
 
 --- Remove CR newline from the end of the string.
@@ -149,6 +223,49 @@ function utils.rtrim(s)
         return string.sub(s, 1, #s - 1)
     end
     return s
+end
+
+--- Unescape strings read from desktop files.
+-- Possible sequences are \n, \r, \s, \t, \\, which have the usual meanings.
+-- @tparam string s String to unescape
+-- @treturn string The unescaped string
+function utils.unescape(s)
+    if not s then return end
+
+    -- Ignore the second return value of string.gsub() (number replaced)
+    s = string.gsub(s, "\\.", function(sequence)
+        return escape_sequences[sequence] or sequence
+    end)
+    return s
+end
+
+--- Separate semi-colon separated lists.
+-- Semi-colons in lists are escaped as '\;'.
+-- @tparam string s String to parse
+-- @treturn table A table containing the separated strings. Each element is
+-- unescaped by utils.unescape().
+function utils.parse_list(s)
+    if not s then return end
+
+    -- Append terminating semi-colon if not already there.
+    if string.sub(s, -1) ~= ';' then
+        s = s .. ';'
+    end
+
+    local segments = {}
+    local part = ""
+    -- Iterate over sub-strings between semicolons
+    for word, backslashes in string.gmatch(s, "([^;]-(\\*));") do
+        if #backslashes % 2 ~= 0 then
+            -- The semicolon was escaped, remember this part for later
+            part = part .. word:sub(1, -2) .. ";"
+        else
+            table.insert(segments, utils.unescape(part .. word))
+            part = ""
+        end
+    end
+
+    return segments
 end
 
 --- Lookup an icon in different folders of the filesystem.
@@ -200,45 +317,58 @@ end
 -- @return A table with file entries.
 function utils.parse_desktop_file(file)
     local program = { show = true, file = file }
-    local desktop_entry = false
 
     -- Parse the .desktop file.
     -- We are interested in [Desktop Entry] group only.
-    for line in io.lines(file) do
-        line = utils.rtrim(line)
-        if line:find("^%s*#") then
-            -- Skip comments.
-            (function() end)() -- I haven't found a nice way to silence luacheck here
-        elseif not desktop_entry and line == "[Desktop Entry]" then
-            desktop_entry = true
-        else
-            if line:sub(1, 1) == "[" and line:sub(-1) == "]" then
-                -- A declaration of new group - stop parsing
-                break
-            end
-
-            -- Grab the values
-            for key, value in line:gmatch("(%w+)%s*=%s*(.+)") do
-                program[key] = value
-            end
-        end
+    local keyfile = glib.KeyFile()
+    if not keyfile:load_from_file(file, glib.KeyFileFlags.NONE) then
+        return nil
     end
 
     -- In case [Desktop Entry] was not found
-    if not desktop_entry then return nil end
+    if not keyfile:has_group("Desktop Entry") then
+        return nil
+    end
+
+    for _, key in pairs(keyfile:get_keys("Desktop Entry")) do
+        local getter = keys_getters[key] or function(kf, k)
+            return kf:get_string("Desktop Entry", k)
+        end
+        program[key] = getter(keyfile, key)
+    end
 
     -- In case the (required) 'Name' entry was not found
     if not program.Name or program.Name == '' then return nil end
 
-    -- Don't show program if NoDisplay attribute is false
-    if program.NoDisplay and string.lower(program.NoDisplay) == "true" then
+    -- Don't show program if NoDisplay attribute is true
+    if program.NoDisplay then
         program.show = false
-    end
+    else
+        -- Only check these values is NoDisplay is true (or non-existent)
 
-    -- Only show the program if there is no OnlyShowIn attribute
-    -- or if it's equal to utils.wm_name
-    if program.OnlyShowIn ~= nil and not program.OnlyShowIn:match(utils.wm_name) then
-        program.show = false
+        -- Only show the program if there is no OnlyShowIn attribute
+        -- or if it contains wm_name
+        if program.OnlyShowIn then
+            program.show = false -- Assume false until found
+            for _, wm in ipairs(program.OnlyShowIn) do
+                if wm == utils.wm_name then
+                    program.show = true
+                    break
+                end
+            end
+        else
+            program.show = true
+        end
+
+        -- Only need to check NotShowIn if the program is being shown
+        if program.show and program.NotShowIn then
+            for _, wm in ipairs(program.NotShowIn) do
+                if wm == utils.wm_name then
+                    program.show = false
+                    break
+                end
+            end
+        end
     end
 
     -- Look up for a icon.
@@ -246,13 +376,9 @@ function utils.parse_desktop_file(file)
         program.icon_path = utils.lookup_icon(program.Icon)
     end
 
-    -- Split categories into a table. Categories are written in one
-    -- line separated by semicolon.
+    -- Make the variable lower-case like the rest of them
     if program.Categories then
-        program.categories = {}
-        for category in program.Categories:gmatch('[^;]+') do
-            table.insert(program.categories, category)
-        end
+        program.categories = program.Categories
     end
 
     if program.Exec then
