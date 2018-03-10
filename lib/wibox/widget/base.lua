@@ -210,7 +210,7 @@ end
 -- {{{ Caches
 
 -- Indexes are widgets, allow them to be garbage-collected.
-local widget_dependencies = setmetatable({}, { __mode = "kv" })
+local widget_dependencies = setmetatable({}, { __mode = "k" })
 
 -- Get the cache of the given kind for this widget. This returns a gears.cache
 -- that calls the callback of kind `kind` on the widget.
@@ -239,7 +239,7 @@ local function record_dependency(parent, child)
     base.check_widget(parent)
     base.check_widget(child)
 
-    local deps = widget_dependencies[child] or {}
+    local deps = widget_dependencies[child] or setmetatable({}, {__mode="v"})
     deps[parent] = true
     widget_dependencies[child] = deps
 end
@@ -248,7 +248,7 @@ end
 local clear_caches
 function clear_caches(widget)
     local deps = widget_dependencies[widget] or {}
-    widget_dependencies[widget] = {}
+    widget_dependencies[widget] = setmetatable({}, {__mode="v"})
     widget._private.widget_caches = {}
     for w in pairs(deps) do
         clear_caches(w)
