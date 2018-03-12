@@ -163,8 +163,8 @@ theme.tasklist_spacing = theme.gtk.border_width
 
 --[[ Advanced taglist and tasklist styling: {{{
 
- In order to get taglist and tasklist to follow GTK theme you need to
- modify your rc.lua in the following way:
+--- In order to get taglist and tasklist to follow GTK theme you need to
+-- modify your rc.lua in the following way:
 
 diff --git a/rc.lua b/rc.lua
 index 231a2f68c..533a859d2 100644
