@@ -7,9 +7,12 @@ branches=(
 
 	# my branches
     'gtk-theme'
+    'pr/2033'
 
 	# psychon
-    'test-argb-patch2'
+    #'test-argb-patch2'
+    'pr/2207'
+    'check-revert-bd47'
 
 	# elv13
     #'pr/644'
@@ -21,6 +24,7 @@ branches=(
 
     # PR
     #'pr/596'
+    #'snapper-gap'
 
 )
 
