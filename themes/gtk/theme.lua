@@ -161,6 +161,41 @@ theme.tasklist_shape_border_width_minimized = theme.gtk.border_width
 
 theme.tasklist_spacing = theme.gtk.border_width
 
+--[[ Advanced taglist and tasklist styling: {{{
+
+ In order to get taglist and tasklist to follow GTK theme you need to
+ modify your rc.lua in the following way:
+
+diff --git a/rc.lua b/rc.lua
+index 231a2f68c..533a859d2 100644
+--- a/rc.lua
++++ b/rc.lua
+@@ -217,24 +217,12 @@ awful.screen.connect_for_each_screen(function(s)
+         filter  = awful.widget.taglist.filter.all,
+         buttons = taglist_buttons
+     }
+-    -- and apply shape to it
+-    if beautiful.taglist_shape_container then
+-        local background_shape_wrapper = wibox.container.background(s.mytaglist)
+-        background_shape_wrapper._do_taglist_update_now = s.mytaglist._do_taglist_update_now
+-        background_shape_wrapper._do_taglist_update = s.mytaglist._do_taglist_update
+-        background_shape_wrapper.shape = beautiful.taglist_shape_container
+-        background_shape_wrapper.shape_clip = beautiful.taglist_shape_clip_container
+-        background_shape_wrapper.shape_border_width = beautiful.taglist_shape_border_width_container
+-        background_shape_wrapper.shape_border_color = beautiful.taglist_shape_border_color_container
+-        s.mytaglist = background_shape_wrapper
+-    end
+
+     -- Create a tasklist widget
+     s.mytasklist = awful.widget.tasklist {
+         screen  = s,
+         filter  = awful.widget.tasklist.filter.currenttags,
+-        buttons = tasklist_buttons,
+-        widget_template = beautiful.tasklist_widget_template
++        buttons = tasklist_buttons
+     }
+
+--]]
 theme.tasklist_widget_template = {
     {
         {
@@ -193,6 +228,7 @@ theme.taglist_shape_container = rounded_rect_shape
 theme.taglist_shape_clip_container = true
 theme.taglist_shape_border_width_container = theme.gtk.border_width * 2
 theme.taglist_shape_border_color_container = theme.gtk.header_button_border_color
+-- }}}
 
 theme.taglist_bg_occupied = theme.gtk.header_button_bg_color
 theme.taglist_fg_occupied = theme.gtk.header_button_fg_color
@@ -314,4 +350,4 @@ end
 
 return theme
 
--- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80
+-- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80:foldmethod=marker
