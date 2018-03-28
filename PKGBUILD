@@ -42,6 +42,7 @@ prepare() {
 
 build() {
     rm -r build || true
+    rm -fr themes/zenburn themes/sky
   mkdir -p build
   cd build
 
@@ -49,6 +50,8 @@ build() {
     -DCMAKE_BUILD_TYPE=RELEASE \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DSYSCONFDIR=/etc \
+    -DGENERATE_MANPAGES=false \
+    -DGENERATE_DOC=false \
     -DLUA_INCLUDE_DIR=/usr/include/luajit-2.0 \
     -DLUA_LIBRARY=/usr/lib/libluajit-5.1.so
   make

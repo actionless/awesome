@@ -24,6 +24,8 @@ branches=(
 
     # PR
     #'pr/596'
+    'pr/2224'
+    'pr/2232'
     #'snapper-gap'
 
 )
