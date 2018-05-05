@@ -64,6 +64,7 @@ end
 
 
 -- luacheck: max comment line length 200
+
 --- Get GTK+3 theme variables from GtkStyleContext
 -- @treturn table Key-value table with the following structure:
 -- <table class='widget_list' border=1>
