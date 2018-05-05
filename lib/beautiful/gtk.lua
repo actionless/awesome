@@ -68,7 +68,7 @@ end
 --- Get GTK+3 theme variables from GtkStyleContext
 -- @treturn table Key-value table with the following structure:
 -- <table class='widget_list' border=1>
--- <tr style='font-weight: bold;'> <th align='center'>Result key</th> <th align='center'>StyleContext key</th> <th align='center'>StyleContext fallback #1</th> <th align='center'>StyleContext fallback #2</th> <th align='center'>GTK Widget fallback #1</th> </tr>
+-- <tr style='font-weight: bold;'> <th align='center'>Result key</th> <th align='center'>StyleContext key</th> <th align='center'>StyleContext fallback #1</th> <th align='center'>StyleContext fallback #2</th> <th align='center'>GTK Widget fallback</th> </tr>
 -- <tr> <td>`font_size`</td> <td></td> <td></td> <td></td> <td>Label font-size</td> </tr>
 -- <tr> <td>`font_family`</td> <td></td> <td></td> <td></td> <td>Label font-family</td> </tr>
 -- <tr> <td>`bg_color`</td> <td>`theme_bg_color`</td> <td></td> <td></td> <td>Window bg</td> </tr>
