@@ -5,6 +5,7 @@
 -- @copyright 2016-2017 Yauheni Kirylau
 -- @module beautiful.gtk
 ---------------------------------------------------------------------------
+local dpi = require("beautiful.xresources").apply_dpi
 local gears_debug = require("gears.debug")
 local gears_math = require("gears.math")
 local join = require("gears.table").join
@@ -148,7 +149,7 @@ function gtk.get_theme_variables()
     local label_style_context = label:get_style_context()
     result["font_size"] = get_gtk_property(
         label_style_context, "font-size"
-    ) / (1+1/3)    -- i have no clue why it's 1.(3) times bigger than real
+    ) / dpi(1000) * 1000 / (1+1/3)    -- i have no clue why it's 1.(3) times bigger than real
     result["font_family"] = get_gtk_property(
         label_style_context, "font-family"
     )[1]
