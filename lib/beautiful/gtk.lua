@@ -147,36 +147,12 @@ function gtk.get_theme_variables()
     }
   ))
 
-  -- @TODO: remove this debug block
-  ---------------------------------------------------------------------
-  --local gears_surface = require("gears.surface")
-  --local headerbar_style_context = headerbar:get_style_context()
-  --local cairo = require('lgi').cairo
-  --local menubar_bg_image_surfacepattern = get_gtk_property(
-    --headerbar_style_context, "background-image"
-  --)
-  --if menubar_bg_image_surfacepattern then
-    --local surface = gears_surface.duplicate_surface(
-      --cairo.ImageSurface.create(cairo.Format.ARGB32, 22, 22)
-    --)
-    --menubar_bg_image_surfacepattern:get_surface(surface)
-    --result.menubar_bg_image = surface
-    --print(
-      ----result.menubar_bg_image:get_rgba()
-      --result.menubar_bg_image
-    --)
-  --end
-  ---------------------------------------------------------------------
-
-  -- @TODO: remove if condition here:
-  if result.menubar_bg_color and result.menubar_bg_color ~= "#00000000" then
-    headerbar:add(label)
-    result = join(result, read_gtk_color_properties_from_widget(
-      label, {
-        menubar_fg_color="color",
-      }
-    ))
-  end
+  headerbar:add(label)
+  result = join(result, read_gtk_color_properties_from_widget(
+    label, {
+      menubar_fg_color="color",
+    }
+  ))
 
   headerbar:add(button)
   result = join(result, read_gtk_color_properties_from_widget(
@@ -186,14 +162,11 @@ function gtk.get_theme_variables()
       header_button_border_color="border-color",
     }
   ))
-  -- @TODO: remove if condition here:
-  if result.header_button_bg_color and result.header_button_bg_color ~= "#00000000" then
-    result = join(result, read_gtk_color_properties_from_widget(
-      button, {
-        header_button_fg_color="color",
-      }
-    ))
-  end
+  result = join(result, read_gtk_color_properties_from_widget(
+    button, {
+      header_button_fg_color="color",
+    }
+  ))
 
   local error_button = Gtk.Button()
   error_button:get_style_context():add_class("destructive-action")
@@ -203,14 +176,6 @@ function gtk.get_theme_variables()
       error_fg_color="color",
     }
   ))
-
-  -- @TODO: remove this debug block
-  ---------------------------------------------------------------------
-  --print("Direct widget properties (no style context)")
-  --for k,v in pairs(result) do
-    --print(k..' = '..tostring(v))
-  --end
-  ---------------------------------------------------------------------
 
   for _, color_data in ipairs({
     {"bg_color", "theme_bg_color"},
