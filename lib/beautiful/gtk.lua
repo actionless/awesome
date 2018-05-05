@@ -179,8 +179,8 @@ function gtk.get_theme_variables()
     ))
     local button_style_context = button:get_style_context()
     for result_key, style_context_property in pairs({
-        border_radius="border-radius",
-        border_width="border-top-width",
+        button_border_radius="border-radius",
+        button_border_width="border-top-width",
     }) do
         local state = style_context:get_state()
         local property = button_style_context:get_property(style_context_property, state)
