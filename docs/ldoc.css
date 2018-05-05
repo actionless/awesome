@@ -1,4 +1,4 @@
-body { 
+body {
     color: #47555c;
     font-size: 16px;
     font-family: sans-serif;
@@ -177,10 +177,6 @@ table.index td { text-align: left; vertical-align: top; }
     padding-left: 15px;
     padding-right: 15px;
     background-color: white;
-}
-
-#content p, #content table, #content ol, #content ul, #content dl {
-    max-width: 900px;
 }
 
 #about {
