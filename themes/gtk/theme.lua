@@ -91,8 +91,8 @@ if not theme.gtk then
     gears_debug.print_warning("Can't load GTK+3 theme. Using 'xresources' theme as a fallback.")
     return theme
 end
-theme.gtk.border_radius = dpi(theme.gtk.border_radius)
-theme.gtk.border_width = dpi(theme.gtk.border_width)
+theme.gtk.button_border_radius = dpi(theme.gtk.button_border_radius)
+theme.gtk.button_border_width = dpi(theme.gtk.button_border_width)
 theme.gtk.bold_font = theme.gtk.font_family .. ' Bold ' .. theme.gtk.font_size
 theme.gtk.menubar_border_color = mix(
     theme.gtk.menubar_bg_color,
@@ -124,8 +124,8 @@ theme.border_normal = theme.gtk.wm_border_unfocused_color
 theme.border_focus  = theme.gtk.wm_border_focused_color
 theme.border_marked = theme.gtk.success_color
 
-theme.border_width  = dpi(theme.gtk.border_width or 1)
-theme.border_radius = theme.gtk.border_radius
+theme.border_width  = dpi(theme.gtk.button_border_width or 1)
+theme.border_radius = theme.gtk.button_border_radius
 
 theme.useless_gap   = dpi(3)
 
@@ -157,9 +157,9 @@ theme.tasklist_shape_border_color_minimized = mix(
     theme.fg_minimize,
     0.85
 )
-theme.tasklist_shape_border_width_minimized = theme.gtk.border_width
+theme.tasklist_shape_border_width_minimized = theme.gtk.button_border_width
 
-theme.tasklist_spacing = theme.gtk.border_width
+theme.tasklist_spacing = theme.gtk.button_border_width
 
 --[[ Advanced taglist and tasklist styling: {{{
 
@@ -226,7 +226,7 @@ theme.tasklist_widget_template = {
 
 theme.taglist_shape_container = rounded_rect_shape
 theme.taglist_shape_clip_container = true
-theme.taglist_shape_border_width_container = theme.gtk.border_width * 2
+theme.taglist_shape_border_width_container = theme.gtk.button_border_width * 2
 theme.taglist_shape_border_color_container = theme.gtk.header_button_border_color
 -- }}}
 
@@ -271,7 +271,7 @@ theme.tooltip_bg = theme.gtk.tooltip_bg_color
 -- menu_[bg|fg]_[normal|focus]
 -- menu_[border_color|border_width]
 
-theme.menu_border_width = theme.gtk.border_width
+theme.menu_border_width = theme.gtk.button_border_width
 theme.menu_border_color = theme.gtk.menubar_border_color
 theme.menu_bg_normal = theme.gtk.menubar_bg_color
 theme.menu_fg_normal = theme.gtk.menubar_fg_color
