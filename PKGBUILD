@@ -51,7 +51,7 @@ build() {
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DSYSCONFDIR=/etc \
     -DGENERATE_MANPAGES=false \
-    -DGENERATE_DOC=false \
+    -DGENERATE_DOC=true \
     -DLUA_INCLUDE_DIR=/usr/include/luajit-2.0 \
     -DLUA_LIBRARY=/usr/lib/libluajit-5.1.so
   make
