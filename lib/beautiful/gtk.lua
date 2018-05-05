@@ -73,20 +73,8 @@ end
 --  <th align='center'>StyleContext fallback #2</th>
 --  <th align='center'>GTK Widget fallback #1</th>
 -- </tr>
--- <tr>
---     <td>font_size</td>
---     <td></td>
---     <td></td>
---     <td></td>
---     <td>Label font-size</td>
--- </tr>
--- <tr>
---     <td>font_famimly</td>
---     <td></td>
---     <td></td>
---     <td></td>
---     <td>Label font-family</td>
--- </tr>
+-- <tr> <td>font_size</td> <td></td> <td></td> <td></td> <td>Label font-size</td> </tr>
+-- <tr> <td>font_famimly</td> <td></td> <td></td> <td></td> <td>Label font-family</td> </tr>
 -- <tr>
 --     <td>bg_color</td>
 --     <td>theme_bg_color</td>
