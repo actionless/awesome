@@ -76,7 +76,7 @@ end
 -- <tr> <td>`fg_color`</td> <td>`theme_fg_color`</td> <td></td> <td></td> <td>Window fg</td> </tr>
 -- <tr> <td>`base_color`</td> <td>`theme_base_color`</td> <td></td> <td></td> <td>Entry bg</td> </tr>
 -- <tr> <td>`text_color`</td> <td>`theme_text_color`</td> <td></td> <td></td> <td>Entry fg</td> </tr>
--- <tr> <td>`button_bg_color`</td> <td>`theme_buton_bg_color`</td> <td>`theme_bg_color`</td> <td></td> <td>Button bg</td> </tr>
+-- <tr> <td>`button_bg_color`</td> <td>`theme_button_bg_color`</td> <td>`theme_bg_color`</td> <td></td> <td>Button bg</td> </tr>
 -- <tr> <td>`button_fg_color`</td> <td>`theme_button_fg_color`</td> <td>`theme_fg_color`</td> <td></td> <td>Button fg</td> </tr>
 -- <tr> <td>`button_border_color`</td> <td></td> <td></td> <td></td> <td>Button border-color</td> </tr>
 -- <tr> <td>`button_border_radius`</td> <td></td> <td></td> <td></td> <td>Button border-radius</td> </tr>
