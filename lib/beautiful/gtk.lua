@@ -193,21 +193,29 @@ function gtk.get_theme_variables()
         }
     ))
 
-    headerbar:add(label)
-    result = join(result, read_gtk_color_properties_from_widget(
-        label, {
-            menubar_fg_color="color",
-        }
-    ))
+    if result.menubar_bg_color and result.menubar_bg_color ~= "#00000000" then
+        headerbar:add(label)
+        result = join(result, read_gtk_color_properties_from_widget(
+            label, {
+                menubar_fg_color="color",
+            }
+        ))
+    end
 
     headerbar:add(button)
     result = join(result, read_gtk_color_properties_from_widget(
         button, {
             header_button_bg_color="background-color",
-            header_button_fg_color="color",
             header_button_border_color="border-color",
         }
     ))
+    if result.header_button_bg_color and result.header_button_bg_color ~= "#00000000" then
+        result = join(result, read_gtk_color_properties_from_widget(
+            button, {
+                header_button_fg_color="color",
+            }
+        ))
+    end
 
     local error_button = Gtk.Button()
     error_button:get_style_context():add_class("destructive-action")
