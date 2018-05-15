@@ -147,9 +147,12 @@ function gtk.get_theme_variables()
     ))
     local label = Gtk.Label()
     local label_style_context = label:get_style_context()
+    local gdk_scale = os.getenv("GDK_SCALE") or 1.0
+    local xrdb_scale = dpi(10000) / 10000
+    local pt_to_px_ratio = 1+1/3
     result["font_size"] = get_gtk_property(
         label_style_context, "font-size"
-    ) / dpi(1000) * 1000 / (1+1/3)    -- i have no clue why it's 1.(3) times bigger than real
+    ) * gdk_scale / xrdb_scale / pt_to_px_ratio
     result["font_family"] = get_gtk_property(
         label_style_context, "font-family"
     )[1]
