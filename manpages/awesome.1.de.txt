@@ -69,6 +69,11 @@ Veränderung der Anordnung
 
 TASTENKÜRZEL
 ------------
+Hilfe
+~~~~~
+*Mod4 + s*::
+    Zeige aktuell konfigurierte Tastenkürzel an.
+
 Fenstermanager kontrollieren
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 *Mod4 + Control + r*::

@@ -9,7 +9,7 @@ awesome-client - удалённое управление потрясающим 
 СИНОПСИС
 --------
 
-awesome-client
+awesome-client [-h|--help] [command [command...]]
 
 ОПИСАНИЕ
 --------
@@ -27,6 +27,35 @@ awesome через D-Bus. Если установлен «rlwrap», то он б
 В awesome должен быть загружен модуль «awful.remote», чтобы позволить удалённое
 выполнение кода.
 
+ПРИМЕРЫ
+-------
+....
+$ awesome-client 'return 1+1, "Hello, world"\
+   double 2
+   string "Hello, world"
+
+# Следующий пример не возвращает ничего в командную строку,
+# но показывает уведомление.
+$ awesome-client '
+> naughty = require("naughty")
+> naughty.notify({
+> title="CLI Notification",
+> text="Это уведомление было отправлено из командной строки!"})
+> '
+
+# Интерактивный режим (REPL)
+# В данном режиме каждая строка введенная пользователем
+# будет отправлена в awesome wm, точно так же, как если бы несколько команд
+# были бы переданы как аргументы командной строки.
+$ awesome-client
+awesome# return 1+1
+   double 2
+awesome# return 1+1, "Hello, world"
+   double 2
+   string "Hello, world"
+awesome#
+....
+
 СМОТРИ ТАКЖЕ
 ------------
 awesome(1) awesomerc(5)
@@ -41,6 +70,5 @@ https://awesomewm.org
 
 ПЕРЕВОД
 -------
-
 Это руководство переведено на русский язык Константином Степановым <kstep@p-nut.info>
 13 апреля 2011 года.
