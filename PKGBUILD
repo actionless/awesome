@@ -65,17 +65,8 @@ package() {
       -e 's/default\/theme/xresources\/theme/g' \
       -e 's/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" },/awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" },/g'
 
-  install -Dm755 "$srcdir"/$pkgname/awesome_argb \
-    "$pkgdir/usr/bin/awesome_argb"
-
-  install -Dm755 "$srcdir"/$pkgname/awesome_no_argb \
-    "$pkgdir/usr/bin/awesome_no_argb"
-
   install -Dm644 "$srcdir"/$pkgname/awesome.desktop \
     "$pkgdir/usr/share/xsessions/awesome.desktop"
-
-  install -Dm644 "$srcdir"/$pkgname/awesome_no_argb.desktop \
-    "$pkgdir/usr/share/xsessions/awesome_no_argb.desktop"
 
   install -Dm644 "$srcdir"/awesomeksm.desktop \
     "$pkgdir/usr/share/apps/ksmserver/windowmanagers/awesome.desktop"

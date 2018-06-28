@@ -1,7 +1,0 @@
-#!/bin/sh
-while $(true) ; do
-	awesome $@ >> $HOME/.cache/awesome_stdout  2>> $HOME/.cache/awesome_stderr ||
-        (sleep 2 ; openbox) ||
-            xterm
-	sleep 2
-done
