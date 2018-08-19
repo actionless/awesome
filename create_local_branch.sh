@@ -3,10 +3,10 @@ set -euo pipefail
 
 branches=(
 	# local overrides
-	'actionless'
+	#'actionless'
 
 	# my branches
-    'gtk-theme'
+    'second-try-no-offcreen'
     #'pr/2033'
 
 	# psychon
@@ -33,7 +33,6 @@ cd ~/projects
 rm -r tmp-awesome/awesome -f || true
 cp -prf awesome tmp-awesome/
 cp awesome/PKGBUILD ~/build/awesome-git/
-cp awesome/awesome_no_argb ~/build/awesome-git/
 
 cd tmp-awesome/awesome
 git reset --hard
