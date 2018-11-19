@@ -6,7 +6,8 @@ branches=(
 	#'actionless'
 
 	# my branches
-    'second-try-no-offcreen'
+    'shape-border'
+    'fallback-title'
     #'pr/2033'
 
 	# psychon
