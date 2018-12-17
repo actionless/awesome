@@ -7,7 +7,6 @@ branches=(
 
 	# my branches
     'shape-border'
-    'fallback-title'
     #'pr/2033'
 
 	# psychon
