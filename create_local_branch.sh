@@ -23,9 +23,7 @@ branches=(
 	# other
 
     # PR
-    #'pr/596'
-
-    #'snapper-gap'
+    'gcolor'
 
 )
 
