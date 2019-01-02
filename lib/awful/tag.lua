@@ -14,6 +14,7 @@ local gmath = require("gears.math")
 local object = require("gears.object")
 local timer = require("gears.timer")
 local gtable = require("gears.table")
+local alayout = nil
 local pairs = pairs
 local ipairs = ipairs
 local table = table
@@ -72,6 +73,68 @@ local function raw_tags(scr)
     end
 
     return tmp_tags
+end
+
+local function custom_layouts(self)
+    local cls = tag.getproperty(self, "_custom_layouts")
+
+    if not cls then
+        cls = {}
+        tag.setproperty(self, "_custom_layouts", cls)
+    end
+
+    return cls
+end
+
+-- Update the "user visible" list of layouts. If `from` and `to` are not the
+-- same, then `from` will be replaced. This is necessary for either the layouts
+-- defined as a function (called "template" below) and object oriented, stateful
+-- layouts where the original entry is only a constructor.
+local function update_layouts(self, from, to)
+    if not to then return end
+
+    alayout = alayout or require("awful.layout")
+    local override = tag.getproperty(self, "_layouts")
+
+    local pos = from and gtable.hasitem(override or {}, from) or nil
+
+    -- There is an override and the layout template is part of it, replace by
+    -- the instance.
+    if override and pos and from ~= to then
+        assert(type(pos) == 'number')
+        override[pos] = to
+        self:emit_signal("property::layouts")
+        return
+    end
+
+    -- Only add to the custom_layouts and preserve the ability to globally
+    -- set the layouts.
+    if override and not pos then
+        table.insert(override, to)
+        self:emit_signal("property::layouts")
+        return
+    end
+
+    pos = from and gtable.hasitem(alayout.layouts, from) or nil
+
+    local cls = custom_layouts(self)
+
+    -- The new layout is part of the global layouts. Fork the list.
+    if pos and from ~= to then
+        local cloned = gtable.clone(alayout.layouts, false)
+        cloned[pos] = to
+        gtable.merge(cloned, cls)
+        self.layouts = cloned
+        return
+    end
+
+    if pos then return end
+
+    if gtable.hasitem(cls, to) then return end
+
+    -- This layout is unknown, add it to the custom list
+    table.insert(cls, to)
+    self:emit_signal("property::layouts")
 end
 
 --- The number of elements kept in the history.
@@ -718,7 +781,26 @@ end
 -- @tparam layout|function layout A layout table or a constructor function
 -- @return The layout
 
+--- The (proposed) list of available layouts for this tag.
+--
+-- This property allows to define a subset (or superset) of layouts available
+-- in the "rotation table". In the default configuration file, `Mod4+Space`
+-- and `Mod4+Shift+Space` are used to switch between tags. The
+-- `awful.widget.layoutlist` also uses this as its default layout filter.
+--
+-- By default, it will be the same as `awful.layout.layouts` unless there the
+-- a layout not present is used. If that's the case they will be added at the
+-- front of the list.
+--
+-- @property layouts
+-- @param table
+-- @see awful.layout.layouts
+-- @see layout
+
 function tag.object.set_layout(t, layout)
+
+    local template = nil
+
     -- Check if the signature match a stateful layout
     if type(layout) == "function" or (
         type(layout) == "table"
@@ -741,12 +823,39 @@ function tag.object.set_layout(t, layout)
             t.dynamic_layout_cache[layout] = instance
         end
 
+        template = layout
         layout = instance
     end
 
     tag.setproperty(t, "layout", layout)
 
+    update_layouts(t, template or layout, layout)
+
     return layout
+end
+
+function tag.object.get_layouts(self)
+    local override = tag.getproperty(self, "_layouts")
+
+    if override then
+        return override
+    end
+
+    -- Required to get the default/fallback list of layouts
+    alayout = alayout or require("awful.layout")
+
+    local cls = custom_layouts(self)
+
+    -- Without the clone, the custom_layouts would grow
+    return #cls > 0 and gtable.merge(gtable.clone(cls, false), alayout.layouts) or
+        alayout.layouts
+end
+
+function tag.object.set_layouts(self, layouts)
+    tag.setproperty(self, "_custom_layouts", {})
+    tag.setproperty(self, "_layouts", gtable.clone(layouts, false))
+    update_layouts(self, self.layout, self.layout)
+    self:emit_signal("property::layouts")
 end
 
 function tag.object.get_layout(t)
@@ -1281,19 +1390,39 @@ function tag.viewonly(t)
 end
 
 --- View only a set of tags.
+--
+-- If `maximum` is set, there will be a limit on the number of new tag being
+-- selected. The tags already selected do not count. To do nothing if one or
+-- more of the tags are already selected, set `maximum` to zero.
+--
 -- @function awful.tag.viewmore
 -- @param tags A table with tags to view only.
 -- @param[opt] screen The screen of the tags.
-function tag.viewmore(tags, screen)
+-- @tparam[opt=#tags] number maximum The maximum number of tags to select.
+function tag.viewmore(tags, screen, maximum)
+    maximum = maximum or #tags
+    local selected = 0
     screen = get_screen(screen or ascreen.focused())
     local screen_tags = screen.tags
     for _, _tag in ipairs(screen_tags) do
         if not gtable.hasitem(tags, _tag) then
             _tag.selected = false
+        elseif _tag.selected then
+            selected = selected + 1
         end
     end
     for _, _tag in ipairs(tags) do
-        _tag.selected = true
+        if selected == 0 and maximum == 0 then
+            _tag.selected = true
+            break
+        end
+
+        if selected >= maximum then break end
+
+        if not _tag.selected then
+            selected = selected + 1
+            _tag.selected = true
+        end
     end
     screen:emit_signal("tag::history::update")
 end

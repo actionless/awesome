@@ -245,7 +245,7 @@ local instances
 -- @see gears.color
 
 -- Public structures
-tasklist.filter = {}
+tasklist.filter, tasklist.source = {}, {}
 
 local function tasklist_label(c, args, tb)
     if not args then args = {} end
@@ -401,7 +401,11 @@ end
 
 local function tasklist_update(s, w, buttons, filter, data, style, update_function, args)
     local clients = {}
-    for _, c in ipairs(capi.client.get()) do
+
+    local source = args and args.source or tasklist.source.all_clients or nil
+    local list   = source and source(s, args) or capi.client.get()
+
+    for _, c in ipairs(list) do
         if not (c.skip_taskbar or c.hidden
             or c.type == "splash" or c.type == "dock" or c.type == "desktop")
             and filter(c, s) then
@@ -430,6 +434,8 @@ end
 --   update. See `awful.widget.common.list_update`.
 -- @tparam[opt] table args.layout Container widget for tag widgets. Default
 --   is `wibox.layout.flex.horizontal`.
+-- @tparam[opt=awful.tasklist.source.all_clients] function args.source The
+--  function used to generate the list of client.
 -- @tparam[opt] table args.widget_template A custom widget to be used for each client
 -- @tparam[opt={}] table args.style The style overrides default theme.
 -- @tparam[opt=nil] string|pattern args.style.fg_normal
@@ -599,6 +605,7 @@ end
 
 --- Filtering function to include all clients.
 -- @return true
+-- @filterfunction awful.tasklist.filter.allscreen
 function tasklist.filter.allscreen()
     return true
 end
@@ -607,6 +614,7 @@ end
 -- @param c The client.
 -- @param screen The screen we are drawing on.
 -- @return true if c is on screen, false otherwise
+-- @filterfunction awful.tasklist.filter.alltags
 function tasklist.filter.alltags(c, screen)
     -- Only print client on the same screen as this widget
     return get_screen(c.screen) == get_screen(screen)
@@ -616,6 +624,7 @@ end
 -- @param c The client.
 -- @param screen The screen we are drawing on.
 -- @return true if c is in a selected tag on screen, false otherwise
+-- @filterfunction awful.tasklist.filter.currenttags
 function tasklist.filter.currenttags(c, screen)
     screen = get_screen(screen)
     -- Only print client on the same screen as this widget
@@ -640,6 +649,7 @@ end
 -- @param c The client.
 -- @param screen The screen we are drawing on.
 -- @return true if c is in a selected tag on screen and is minimized, false otherwise
+-- @filterfunction awful.tasklist.filter.minimizedcurrenttags
 function tasklist.filter.minimizedcurrenttags(c, screen)
     screen = get_screen(screen)
     -- Only print client on the same screen as this widget
@@ -667,9 +677,19 @@ end
 -- @param c The client.
 -- @param screen The screen we are drawing on.
 -- @return true if c is focused on screen, false otherwise
+-- @filterfunction awful.tasklist.filter.focused
 function tasklist.filter.focused(c, screen)
     -- Only print client on the same screen as this widget
     return get_screen(c.screen) == get_screen(screen) and capi.client.focus == c
+end
+
+--- Get all the clients in an undefined order.
+--
+-- This is the default source.
+--
+-- @sourcefunction awful.tasklist.source.all_clients
+function tasklist.source.all_clients()
+    return capi.client.get()
 end
 
 function tasklist.mt:__call(...)

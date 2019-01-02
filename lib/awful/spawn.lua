@@ -8,6 +8,9 @@
 -- program after it has been launched.  This requires currently that the
 -- applicaton supports them.
 --
+-- Frequently asked questions
+-- ===
+--
 -- **Rules of thumb when a shell is needed**:
 --
 -- * A shell is required when the commands contain `&&`, `;`, `||`, `&` or
@@ -33,7 +36,7 @@
 -- A *process* has a *PID* (process identifier). It can have 0, 1 or many
 -- *window*s.
 --
--- A *command* if what is used to start *process*(es). It has no direct relation
+-- A *command* is what is used to start *process*(es). It has no direct relation
 -- with *process*, *client* or *window*. When a command is executed, it will
 -- usually start a *process* which keeps running until it exits. This however is
 -- not always the case as some applications use scripts as command and others
@@ -45,44 +48,56 @@
 -- *instance*, a *role*, and a *type*. See `client.class`, `client.instance`,
 -- `client.role` and `client.type` for more information about these properties.
 --
--- **The startup notification protocol**:
+-- **Understanding blocking versus asynchronous execution**:
 --
--- The startup notification protocol is an optional specification implemented
--- by X11 applications to bridge the chain of knowledge between the moment a
--- program is launched to the moment its window (client) is shown. It can be
--- found [on the FreeDesktop.org website](https://www.freedesktop.org/wiki/Specifications/startup-notification-spec/).
+-- Awesome is single threaded, it means only one thing is executed at any time.
+-- But Awesome isn't doomed to be slow. It may not have multiple threads, but
+-- it has something called coroutine and also has callbacks. This means things
+-- that take time to execute can still do so in the background (using C threads
+-- or external process + sockets). When they are done, they can notify the
+-- Awesome thread. This works perfectly and avoid blocking Awesome.
 --
--- Awesome has support for the various events that are part of the protocol, but
--- the most useful is the identifier, usually identified by its `SNID` acronym in
--- the documentation. It isn't usually necessary to even know it exists, as it
--- is all done automatically. However, if more control is required, the
--- identifier can be specified by an environment variable called
--- `DESKTOP_STARTUP_ID`. For example, let us consider execution of the following
--- command:
+-- If you want to update the text of a `wibox.widget.textbox` with the output
+-- of a shell command, you should use the `awful.spawn.easy_async_with_shell`
+-- command. It is strongly recommanded not to use `io.popen` is explained in the
+-- "Getting a command's output" section. Asynchronous execution is at first a
+-- bit tricky to understand if you never used that before. The example below
+-- should demonstrate how it works.
 --
---    DESKTOP_STARTUP_ID="something_TIME$(date '+%s')" my_command
+-- If we do (but *really*, don't do that):
 --
--- This should (if the program correctly implements the protocol) result in
--- `c.startup_id` to at least match `something`.
--- This identifier can then be used in `awful.rules` to configure the client.
+--     -- **NEVER, EVER, DO THIS**: your computer will freeze
+--     os.execute("sleep 1; echo foo > /tmp/foo.txt")
+--     mylabel.text = io.popen("cat /tmp/foo.txt"):read("*all")
 --
--- Awesome can automatically set the `DESKTOP_STARTUP_ID` variable. This is used
--- by `awful.spawn` to specify additional rules for the startup. For example:
+-- The label will display `foo`. But If we do:
 --
---    awful.spawn("urxvt -e maxima -name CALCULATOR", {
---        floating  = true,
---        tag       = mouse.screen.selected_tag,
---        placement = awful.placement.bottom_right,
---    })
+--     -- Don't do this, it wont work.
+--     -- Assumes /tmp/foo.txt does not exist
+--     awful.spawn.with_shell("sleep 1; echo foo > /tmp/foo.txt")
+--     mylabel.text = io.popen("cat /tmp/foo.txt"):read("*all")
 --
--- This can also be used from the command line:
+-- Then the label will be **empty**. `awful.spawn` and `awful.spawn.with_shell`
+-- will **not** block and thus the `io.popen` will be executed before
+-- `sleep 1` finishes. This is why we have async functions to execute shell
+-- commands. There are many variants with difference characteristics and
+-- complexity. `awful.spawn.easy_async` is the most common as it is good enough
+-- for the general "I want to execute a command and do something with the
+-- output when it finishes".
 --
---    awesome-client 'awful=require("awful");
---      awful.spawn("urxvt -e maxima -name CALCULATOR", {
---        floating  = true,
---        tag       = mouse.screen.selected_tag,
---        placement = awful.placement.bottom_right,
---      })'
+--     -- This is the correct way
+--     local command = "sleep 1; echo foo > /tmp/foo.txt"
+--
+--     awful.spawn.easy_async_with_shell(command, function()
+--         awful.spawn.easy_async_with_shell("cat /tmp/foo.txt", function(out)
+--             mylabel.text = out
+--         end)
+--     end)
+--
+-- In this variant, Awesome will not block. Again, like other spawn, you
+-- cannot add code outside of the callback function to use the result of the
+-- command. The code will be executed before the command is finished so the
+-- result wont yet be available.
 --
 -- **Getting a command's output**:
 --
@@ -148,6 +163,53 @@
 -- [Desktop Entry](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html)
 -- specification.
 --
+-- Spawning applications with specific properties
+-- ===
+--
+-- **The startup notification protocol**:
+--
+-- The startup notification protocol is an optional specification implemented
+-- by X11 applications to bridge the chain of knowledge between the moment a
+-- program is launched to the moment its window (client) is shown. It can be
+-- found [on the FreeDesktop.org website](https://www.freedesktop.org/wiki/Specifications/startup-notification-spec/).
+--
+-- Awesome has support for the various events that are part of the protocol, but
+-- the most useful is the identifier, usually identified by its `SNID` acronym in
+-- the documentation. It isn't usually necessary to even know it exists, as it
+-- is all done automatically. However, if more control is required, the
+-- identifier can be specified by an environment variable called
+-- `DESKTOP_STARTUP_ID`. For example, let us consider execution of the following
+-- command:
+--
+--    DESKTOP_STARTUP_ID="something_TIME$(date '+%s')" my_command
+--
+-- This should (if the program correctly implements the protocol) result in
+-- `c.startup_id` to at least match `something`.
+-- This identifier can then be used in `awful.rules` to configure the client.
+--
+-- Awesome can automatically set the `DESKTOP_STARTUP_ID` variable. This is used
+-- by `awful.spawn` to specify additional rules for the startup. For example:
+--
+--    awful.spawn("urxvt -e maxima -name CALCULATOR", {
+--        floating  = true,
+--        tag       = mouse.screen.selected_tag,
+--        placement = awful.placement.bottom_right,
+--    })
+--
+-- This can also be used from the command line:
+--
+--    awesome-client 'awful=require("awful");
+--      awful.spawn("urxvt -e maxima -name CALCULATOR", {
+--        floating  = true,
+--        tag       = mouse.screen.selected_tag,
+--        placement = awful.placement.bottom_right,
+--      })'
+--
+-- This table contains the client properties that are valid when used the
+-- `sn_rules` or `prop` function argument. They are the same as in `awful.rules`.
+--
+--@DOC_rules_index_COMMON@
+--
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @author Emmanuel Lepage Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2008 Julien Danjou
@@ -165,7 +227,9 @@ local lgi = require("lgi")
 local Gio = lgi.Gio
 local GLib = lgi.GLib
 local util   = require("awful.util")
-local timer  = require("gears.timer")
+local gtable = require("gears.table")
+local gtimer = require("gears.timer")
+local aclient = require("awful.client")
 local protected_call = require("gears.protected_call")
 
 local spawn = {}
@@ -210,6 +274,39 @@ do
     end
 end
 
+local function hash_command(cmd, rules)
+    rules = rules or {}
+    cmd = type(cmd) == "string" and cmd or table.concat(cmd, ';')
+
+    -- Do its best at adding some entropy
+    local concat_rules = nil
+    concat_rules = function (r, depth)
+        if depth > 2 then return end
+
+        local keys = gtable.keys(rules)
+
+        for _, k in ipairs(keys) do
+            local v = r[k]
+            local t = type(v)
+
+            if t == "string" or t == "number" then
+                cmd = cmd..k..v
+            elseif t == "tag" then
+                cmd = cmd..k..v.name
+            elseif t == "table" and not t.connect_signal then
+                cmd = cmd .. k
+                concat_rules(v, depth + 1)
+            end
+        end
+    end
+
+    concat_rules(rules, 1)
+
+    local glibstr = GLib.String(cmd)
+
+    return string.format('%x', math.ceil(GLib.String.hash(glibstr)))
+end
+
 spawn.snid_buffer = {}
 
 function spawn.on_snid_callback(c)
@@ -220,7 +317,7 @@ function spawn.on_snid_callback(c)
         --TODO v5: Remove this signal
         c:emit_signal("spawn::completed_with_payload", props, callback)
 
-        timer.delayed_call(function()
+        gtimer.delayed_call(function()
             spawn.snid_buffer[c.startup_id] = nil
         end)
     end
@@ -433,6 +530,199 @@ function spawn.read_lines(input_stream, line_callback, done_callback, close)
         end
     end
     start_read()
+end
+
+-- When a command should only be executed once or only have a single instance,
+-- track the SNID set on them to prevent multiple execution.
+spawn.single_instance_manager = {
+    by_snid = {},
+    by_pid  = {},
+    by_uid  = {},
+}
+
+aclient.property.persist("single_instance_id", "string")
+
+-- Check if the client is running either using the rule source or the matcher.
+local function is_running(hash, matcher)
+    local status = spawn.single_instance_manager.by_uid[hash]
+    if not status then return false end
+
+    if #status.instances == 0 then return false end
+
+    for _, c in ipairs(status.instances) do
+        if c.valid then return true end
+    end
+
+    if matcher then
+        for _, c in ipairs(client.get()) do
+            if matcher(c) then return true end
+        end
+    end
+
+    return false
+end
+
+-- Keep the data related to this hash.
+local function register_common(hash, rules, matcher, callback)
+    local status = spawn.single_instance_manager.by_uid[hash]
+    if status then return status end
+
+    status = {
+        rules     = rules,
+        callback  = callback,
+        instances = setmetatable({}, {__mode = "v"}),
+        hash      = hash,
+        exec      = false,
+        matcher   = matcher,
+    }
+
+    spawn.single_instance_manager.by_uid[hash] = status
+
+    return status
+end
+
+local function run_once_common(hash, cmd, keep_pid)
+    local pid, snid = spawn.spawn(cmd)
+
+    if type(pid) == "string" or not snid then return pid, snid end
+
+    assert(spawn.single_instance_manager.by_uid[hash])
+
+    local status = spawn.single_instance_manager.by_uid[hash]
+    status.exec = true
+
+    spawn.single_instance_manager.by_snid[snid] = status
+
+    if keep_pid then
+        spawn.single_instance_manager.by_pid[pid] = status
+    end
+
+    -- Prevent issues related to PID being re-used and a memory leak
+    gtimer {
+        single_shot = true,
+        autostart   = true,
+        timeout     = 30,
+        callback    = function()
+            spawn.single_instance_manager.by_pid [pid ] = nil
+            spawn.single_instance_manager.by_snid[snid] = nil
+        end
+    }
+
+    return pid, snid
+end
+
+local function run_after_startup(f)
+    -- The clients are not yet managed during the first execution, so it will
+    -- miss existing instances.
+    if awesome.startup then
+        gtimer.delayed_call(f)
+    else
+        f()
+    end
+end
+
+--- Spawn a command if it has not been spawned before.
+--
+-- This function tries its best to preserve the state across `awesome.restart()`.
+--
+-- By default, when no `unique_id` is specified, this function will generate one by
+-- hashing the command and its rules. If you have multiple instance of the same
+-- command and rules, you need to specify an UID or only the first one will be
+-- executed.
+--
+-- The `rules` are standard `awful.rules`.
+--
+-- This function depends on the startup notification protocol to be correctly
+-- implemented by the command. See `client.startup_id` for more information.
+-- Note that this also wont work with shell or terminal commands.
+--
+-- @tparam string|table cmd The command.
+-- @tparam table rules The properties that need to be applied to the client.
+-- @tparam[opt] function matcher A matching function to find the instance
+--  among running clients.
+-- @tparam[opt] string unique_id A string to identify the client so it isn't executed
+--  multiple time.
+-- @tparam[opt] function callback A callback function when the client is created.
+-- @see awful.rules
+function spawn.once(cmd, rules, matcher, unique_id, callback)
+    local hash = unique_id or hash_command(cmd, rules)
+    local status = register_common(hash, rules, matcher, callback)
+    run_after_startup(function()
+        if not status.exec and not is_running(hash, matcher) then
+            run_once_common(hash, cmd, matcher ~= nil)
+        end
+    end)
+end
+
+--- Spawn a command if an instance is not already running.
+--
+-- This is like `awful.spawn.once`, but will spawn new instances if the previous
+-- has finished.
+--
+-- The `rules` are standard `awful.rules`.
+--
+-- This function depends on the startup notification protocol to be correctly
+-- implemented by the command. See `client.startup_id` for more information.
+-- Note that this also wont work with shell or terminal commands.
+--
+-- Note that multiple instances can still be spawned if the command is called
+-- faster than the client has time to start.
+--
+-- @tparam string|table cmd The command.
+-- @tparam table rules The properties that need to be applied to the client.
+-- @tparam[opt] function matcher A matching function to find the instance
+--  among running clients.
+-- @tparam[opt] string unique_id A string to identify the client so it isn't executed
+--  multiple time.
+-- @tparam[opt] function callback A callback function when the client is created.
+-- @see awful.rules
+function spawn.single_instance(cmd, rules, matcher, unique_id, callback)
+    local hash = unique_id or hash_command(cmd, rules)
+    register_common(hash, rules, matcher, callback)
+    run_after_startup(function()
+        if not is_running(hash, matcher) then
+            return run_once_common(hash, cmd, matcher ~= nil)
+        end
+    end)
+end
+
+local raise_rules = {focus = true, switch_to_tags = true, raise = true}
+
+--- Raise a client if it exists or spawn a new one then raise it.
+--
+-- This function depends on the startup notification protocol to be correctly
+-- implemented by the command. See `client.startup_id` for more information.
+-- Note that this also wont work with shell or terminal commands.
+--
+-- @tparam string|table cmd The command.
+-- @tparam table rules The properties that need to be applied to the client.
+-- @tparam[opt] function matcher A matching function to find the instance
+--  among running clients.
+-- @tparam[opt] string unique_id A string to identify the client so it isn't executed
+--  multiple time.
+-- @tparam[opt] function callback A callback function when the client is created.
+-- @see awful.rules
+-- @treturn client The client if it already exists.
+function spawn.raise_or_spawn(cmd, rules, matcher, unique_id, callback)
+    local hash = unique_id or hash_command(cmd, rules)
+
+    local status = spawn.single_instance_manager.by_uid[hash]
+    if status then
+        for _, c in ipairs(status.instances) do
+            if c.valid then
+                c:emit_signal("request::activate", "spawn.raise_or_spawn", raise_rules)
+                return c
+            end
+        end
+    end
+
+    -- Do not modify the original. It also can't be a metatable.__index due to
+    -- its "broken" `pairs()` support.
+    local props = gtable.join(rules, raise_rules)
+
+    spawn.single_instance(cmd, props, matcher, unique_id, callback)
+
+    return nil
 end
 
 capi.awesome.connect_signal("spawn::canceled" , spawn.on_snid_cancel   )

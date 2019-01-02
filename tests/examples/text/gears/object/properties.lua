@@ -1,3 +1,4 @@
+--DOC_GEN_OUTPUT --DOC_HIDE
 local gears = require("gears") --DOC_HIDE
 
 -- Create a class for this object. It will be used as a backup source for
@@ -22,7 +23,7 @@ function class:set_foo(value)
 end
 
 function class:method(a, b, c)
-    print("In a mathod", a, b, c)
+    print("In a method", a, b, c)
 end
 
 local o = gears.object {

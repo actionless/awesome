@@ -9,7 +9,6 @@
 local capi = {
     screen = screen,
     client = client,
-    keygrabber = keygrabber,
 }
 local awful = require("awful")
 local gtable = require("gears.table")
@@ -179,7 +178,7 @@ function widget.new(args)
         },
         _additional_hotkeys = {},
         _cached_wiboxes = {},
-        _cached_awful_keys = nil,
+        _cached_awful_keys = {},
         _colors_counter = {},
         _group_list = {},
         _widget_settings_loaded = false,
@@ -280,10 +279,9 @@ function widget.new(args)
 
 
     function widget_instance:_import_awful_keys()
-        if self._cached_awful_keys then
+        if next(self._cached_awful_keys) then
             return
         end
-        self._cached_awful_keys = {}
         for _, data in pairs(awful.key.hotkeys) do
             self:_add_hotkey(data.key, data, self._cached_awful_keys)
         end
@@ -309,7 +307,7 @@ function widget.new(args)
     end
 
 
-    function widget_instance:_create_wibox(s, available_groups)
+    function widget_instance:_create_wibox(s, available_groups, show_awesome_keys)
         s = get_screen(s)
         local wa = s.workarea
         local height = (self.height < wa.height) and self.height or
@@ -324,7 +322,10 @@ function widget.new(args)
         local max_height_px = height - group_label_height
         local column_layouts = {}
         for _, group in ipairs(available_groups) do
-            local keys = gtable.join(self._cached_awful_keys[group], self._additional_hotkeys[group])
+            local keys = gtable.join(
+                show_awesome_keys and self._cached_awful_keys[group] or nil,
+                self._additional_hotkeys[group]
+            )
             local joined_descriptions = ""
             for i, key in ipairs(keys) do
                 joined_descriptions = joined_descriptions .. key.description .. (i~=#keys and "\n" or "")
@@ -442,6 +443,10 @@ function widget.new(args)
             border_color = self.border_color,
             shape = self.shape,
         })
+        local widget_obj = {
+            current_page = 1,
+            wibox = mywibox,
+        }
         mywibox:geometry({
             x = wa.x + math.floor((wa.width - width - self.border_width*2) / 2),
             y = wa.y + math.floor((wa.height - height - self.border_width*2) / 2),
@@ -450,13 +455,10 @@ function widget.new(args)
         })
         mywibox:set_widget(pages[1])
         mywibox:buttons(gtable.join(
-                awful.button({ }, 1, function () mywibox.visible=false end),
-                awful.button({ }, 3, function () mywibox.visible=false end)
+                awful.button({ }, 1, function () widget_obj:hide() end),
+                awful.button({ }, 3, function () widget_obj:hide() end)
         ))
 
-        local widget_obj = {}
-        widget_obj.current_page = 1
-        widget_obj.wibox = mywibox
         function widget_obj.page_next(_self)
             if _self.current_page == #pages then return end
             _self.current_page = _self.current_page + 1
@@ -472,6 +474,9 @@ function widget.new(args)
         end
         function widget_obj.hide(_self)
             _self.wibox.visible = false
+            if _self.keygrabber then
+                awful.keygrabber.stop(_self.keygrabber)
+            end
         end
 
         return widget_obj
@@ -481,7 +486,13 @@ function widget.new(args)
     --- Show popup with hotkeys help.
     -- @tparam[opt] client c Client.
     -- @tparam[opt] screen s Screen.
-    function widget_instance:show_help(c, s)
+    -- @tparam[opt] table show_args Additional arguments.
+    -- @tparam[opt=true] boolean show_args.show_awesome_keys Show AwesomeWM hotkeys.
+    -- When set to `false` only app-specific hotkeys will be shown.
+    function widget_instance:show_help(c, s, show_args)
+        show_args = show_args or {}
+        local show_awesome_keys = show_args.show_awesome_keys ~= false
+
         self:_import_awful_keys()
         self:_load_widget_settings()
 
@@ -509,17 +520,17 @@ function widget.new(args)
             if not need_match then table.insert(available_groups, group) end
         end
 
-        local joined_groups = join_plus_sort(available_groups)
+        local joined_groups = join_plus_sort(available_groups)..tostring(show_awesome_keys)
         if not self._cached_wiboxes[s] then
             self._cached_wiboxes[s] = {}
         end
         if not self._cached_wiboxes[s][joined_groups] then
-            self._cached_wiboxes[s][joined_groups] = self:_create_wibox(s, available_groups)
+            self._cached_wiboxes[s][joined_groups] = self:_create_wibox(s, available_groups, show_awesome_keys)
         end
         local help_wibox = self._cached_wiboxes[s][joined_groups]
         help_wibox:show()
 
-        return capi.keygrabber.run(function(_, key, event)
+        help_wibox.keygrabber = awful.keygrabber.run(function(_, key, event)
             if event == "release" then return end
             if key then
                 if key == "Next" then
@@ -527,11 +538,11 @@ function widget.new(args)
                 elseif key == "Prior" then
                     help_wibox:page_prev()
                 else
-                    capi.keygrabber.stop()
                     help_wibox:hide()
                 end
             end
         end)
+        return help_wibox.keygrabber
     end
 
     --- Add hotkey descriptions for third-party applications.
@@ -576,6 +587,9 @@ end
 --- Show popup with hotkeys help (default widget instance will be used).
 -- @tparam[opt] client c Client.
 -- @tparam[opt] screen s Screen.
+-- @tparam[opt] table args Additional arguments.
+-- @tparam[opt=true] boolean args.show_awesome_keys Show AwesomeWM hotkeys.
+-- When set to `false` only app-specific hotkeys will be shown.
 function widget.show_help(...)
     return get_default_widget():show_help(...)
 end

@@ -450,7 +450,7 @@ function menu:add(args, index)
 
     item._mouse = function ()
         local num = gtable.hasitem(self.items, item)
-        self:item_enter(num, { hover = true, moue = true })
+        self:item_enter(num, { hover = true, mouse = true })
     end
     item.widget:connect_signal("mouse::enter", item._mouse)
 
@@ -640,7 +640,7 @@ end
 -- @param args Table containing the menu informations.
 --
 -- * Key items: Table containing the displayed items. Each element is a table by default (when element 'new' is
---   awful.menu.entry) containing: item name, triggered action, submenu table or function, item icon (optional).
+--   awful.menu.entry) containing: item name, triggered action (submenu table or function), item icon (optional).
 -- * Keys theme.[fg|bg]_[focus|normal], theme.border_color, theme.border_width, theme.submenu_icon, theme.height
 --   and theme.width override the default display for your menu and/or of your menu entry, each of them are optional.
 -- * Key auto_expand controls the submenu auto expand behaviour by setting it to true (default) or false.

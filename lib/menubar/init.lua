@@ -39,6 +39,27 @@ local function get_screen(s)
     return s and capi.screen[s]
 end
 
+
+--- Menubar normal text color.
+-- @beautiful beautiful.menubar_fg_normal
+
+--- Menubar normal background color.
+-- @beautiful beautiful.menubar_bg_normal
+
+--- Menubar border width.
+-- @beautiful beautiful.menubar_border_width
+-- @tparam[opt=0] number menubar_border_width
+
+--- Menubar border color.
+-- @beautiful beautiful.menubar_border_color
+
+--- Menubar selected item text color.
+-- @beautiful beautiful.menubar_fg_normal
+
+--- Menubar selected item background color.
+-- @beautiful beautiful.menubar_bg_normal
+
+
 -- menubar
 local menubar = { menu_entries = {} }
 menubar.menu_gen = require("menubar.menu_gen")
@@ -115,14 +136,16 @@ end
 -- @param o The menu item.
 -- @return item name, item background color, background image, item icon.
 local function label(o)
+    local fg_color = theme.menubar_fg_normal or theme.menu_fg_normal or theme.fg_normal
+    local bg_color = theme.menubar_bg_normal or theme.menu_bg_normal or theme.bg_normal
     if o.focused then
-        return colortext(o.name, (theme.menu_fg_focus or theme.fg_focus)),
-               (theme.menu_bg_focus or theme.bg_focus),
-               nil,
-               o.icon
-    else
-        return o.name, (theme.menu_bg_normal or theme.bg_normal), nil, o.icon
+        fg_color = theme.menubar_fg_focus or theme.menu_fg_focus or theme.fg_focus
+        bg_color = theme.menubar_bg_focus or theme.menu_bg_focus or theme.bg_focus
     end
+    return colortext(gstring.xml_escape(o.name), fg_color),
+           bg_color,
+           nil,
+           o.icon
 end
 
 local function load_count_table()
@@ -397,6 +420,11 @@ end
 -- @param[opt] scr Screen.
 function menubar.show(scr)
     scr = get_screen(scr or awful.screen.focused() or 1)
+    local fg_color = theme.menubar_fg_normal or theme.menu_fg_normal or theme.fg_normal
+    local bg_color = theme.menubar_bg_normal or theme.menu_bg_normal or theme.bg_normal
+    local border_width = theme.menubar_border_width or theme.menu_border_width or 0
+    local border_color = theme.menubar_border_color or theme.menu_border_color
+
     if not instance then
         -- Add to each category the name of its key in all_categories
         for k, v in pairs(menubar.menu_gen.all_categories) do
@@ -408,7 +436,13 @@ function menubar.show(scr)
         end
 
         instance = {
-            wibox = wibox({ ontop = true }),
+            wibox = wibox{
+                ontop = true,
+                bg = bg_color,
+                fg = fg_color,
+                border_width = border_width,
+                border_color = border_color,
+            },
             widget = common_args.w,
             prompt = awful.widget.prompt(),
             query = nil,
@@ -432,7 +466,7 @@ function menubar.show(scr)
     instance.geometry = {x = geometry.x or scrgeom.x,
                              y = geometry.y or scrgeom.y,
                              height = geometry.height or gmath.round(theme.get_font_height() * 1.5),
-                             width = geometry.width or scrgeom.width}
+                             width = (geometry.width or scrgeom.width) - border_width * 2}
     instance.wibox:geometry(instance.geometry)
 
     current_item = 1

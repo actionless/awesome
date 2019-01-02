@@ -27,9 +27,21 @@ local base = require("wibox.widget.base")
 local capi = {
     client = client
 }
+
+
 local titlebar = {
-    widget = {}
+    widget = {},
+    enable_tooltip = true,
+    fallback_name = '<unknown>'
 }
+
+
+--- Show tooltips when hover on titlebar buttons.
+-- @tfield[opt=true] boolean awful.titlebar.enable_tooltip
+
+--- Title to display if client name is not set.
+-- @field[opt='\<unknown\>'] awful.titlebar.fallback_name
+
 
 --- The titlebar foreground (text) color.
 -- @beautiful beautiful.titlebar_fg_normal
@@ -422,8 +434,6 @@ local titlebar = {
 -- @name setup
 -- @class function
 
---- Show tooltips when hover on titlebar buttons (defaults to 'true')
-titlebar.enable_tooltip = true
 
 local all_titlebars = setmetatable({}, { __mode = 'k' })
 
@@ -451,6 +461,32 @@ local function get_titlebar_function(c, position)
     else
         error("Invalid titlebar position '" .. position .. "'")
     end
+end
+
+--- Call `request::titlebars` to allow themes or rc.lua to create them even
+-- when `titlebars_enabled` is not set in the rules.
+-- @tparam client c The client.
+-- @tparam[opt=false] boolean hide_all Hide all titlebars except `keep`
+-- @tparam string keep Keep the titlebar at this position
+-- @treturn boolean If the titlebars were loaded
+local function load_titlebars(c, hide_all, keep)
+    if c._request_titlebars_called then return false end
+
+    c:emit_signal("request::titlebars", "awful.titlebar", {})
+
+    if hide_all then
+        -- Don't bother checking if it has been created, `.hide` don't works
+        -- anyway.
+        for _, tb in ipairs {"top", "bottom", "left", "right"} do
+            if tb ~= keep then
+                titlebar.hide(c, tb)
+            end
+        end
+    end
+
+    c._request_titlebars_called = true
+
+    return true
 end
 
 --- Get a client's titlebar.
@@ -530,6 +566,7 @@ end
 --   "right", "top", "bottom". Default is "top".
 function titlebar.show(c, position)
     position = position or "top"
+    if load_titlebars(c, true, position) then return end
     local bars = all_titlebars[c]
     local data = bars and bars[position]
     local args = data and data.args
@@ -551,6 +588,7 @@ end
 --   "right", "top", "bottom". Default is "top".
 function titlebar.toggle(c, position)
     position = position or "top"
+    if load_titlebars(c, true, position) then return end
     local _, size = get_titlebar_function(c, position)(c)
     if size == 0 then
         titlebar.show(c, position)
@@ -567,7 +605,7 @@ end
 function titlebar.widget.titlewidget(c)
     local ret = textbox()
     local function update()
-        ret:set_text(c.name or "<unknown>")
+        ret:set_text(c.name or titlebar.fallback_name)
     end
     c:connect_signal("property::name", update)
     update()

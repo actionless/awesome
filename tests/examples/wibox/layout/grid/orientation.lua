@@ -1,3 +1,4 @@
+--DOC_GEN_OUTPUT --DOC_GEN_IMAGE
 local generic_widget = ... --DOC_HIDE_ALL
 local wibox     = require("wibox") --DOC_HIDE
 local beautiful = require("beautiful") --DOC_HIDE
@@ -9,8 +10,7 @@ print([[l = wibox.layout {
     layout = wibox.layout.grid
 }
 l:set_orientation("vertical") -- change to "horizontal"
-l:add(...)
-]]) --DOC_HIDE
+l:add(...)]]) --DOC_HIDE
 
 return --DOC_HIDE
 wibox.widget {

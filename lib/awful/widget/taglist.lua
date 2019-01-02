@@ -61,7 +61,7 @@ local function get_screen(s)
 end
 
 local taglist = { mt = {} }
-taglist.filter = {}
+taglist.filter, taglist.source = {}, {}
 
 --- The tag list main foreground (text) color.
 -- @beautiful beautiful.taglist_fg_focus
@@ -386,7 +386,11 @@ end
 
 local function taglist_update(s, w, buttons, filter, data, style, update_function, args)
     local tags = {}
-    for _, t in ipairs(s.tags) do
+
+    local source = args and args.source or taglist.source.for_screen or nil
+    local list   = source and source(s, args) or s.tags
+
+    for _, t in ipairs(list) do
         if not tag.getproperty(t, "hide") and filter(t) then
             table.insert(tags, t)
         end
@@ -411,6 +415,8 @@ end
 --   update. See `awful.widget.common`.
 -- @tparam[opt] widget args.layout Optional layout widget for tag widgets. Default
 --   is wibox.layout.fixed.horizontal().
+-- @tparam[opt=awful.taglist.source.for_screen] function args.source The
+--  function used to generate the list of tag.
 -- @tparam[opt] table args.widget_template A custom widget to be used for each tag
 -- @tparam[opt={}] table args.style The style overrides default theme.
 -- @tparam[opt=nil] string|pattern args.style.fg_focus
@@ -550,6 +556,7 @@ end
 --- Filtering function to include all nonempty tags on the screen.
 -- @param t The tag.
 -- @return true if t is not empty, else false
+-- @filterfunction awful.taglist.filter.noempty
 function taglist.filter.noempty(t)
     return #t:clients() > 0 or t.selected
 end
@@ -557,14 +564,26 @@ end
 --- Filtering function to include selected tags on the screen.
 -- @param t The tag.
 -- @return true if t is not empty, else false
+-- @filterfunction awful.taglist.filter.selected
 function taglist.filter.selected(t)
     return t.selected
 end
 
 --- Filtering function to include all tags on the screen.
 -- @return true
+-- @filterfunction awful.taglist.filter.all
 function taglist.filter.all()
     return true
+end
+
+--- All tags for the defined screen ordered by indices.
+--
+-- This is the default source.
+--
+-- @sourcefunction awful.taglist.source.for_screen
+-- @see screen
+function taglist.source.for_screen(s)
+    return s.tags
 end
 
 function taglist.mt:__call(...)

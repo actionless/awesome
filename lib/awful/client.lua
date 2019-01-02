@@ -8,7 +8,7 @@
 
 -- Grab environment we need
 local gdebug = require("gears.debug")
-local spawn = require("awful.spawn")
+local spawn = nil --TODO v5 deprecate
 local set_shape = require("awful.client.shape").update.all
 local object = require("gears.object")
 local grect = require("gears.geometry").rectangle
@@ -58,6 +58,93 @@ client.dockable = {}
 client.property = {}
 client.shape = require("awful.client.shape")
 client.focus = require("awful.client.focus")
+
+--- The client default placement on the screen.
+--
+-- The default config uses:
+--
+--    awful.placement.no_overlap+awful.placement.no_offscreen
+--
+-- @clientruleproperty placement
+-- @see awful.placement
+
+--- When applying the placement, honor the screen padding.
+-- @clientruleproperty honor_padding
+-- @param[opt=true] boolean
+-- @see awful.placement
+
+--- When applying the placement, honor the screen work area.
+--
+-- The workarea is the part of the screen that excludes the bars and docks.
+--
+-- @clientruleproperty honor_workarea
+-- @param[opt=true] boolean
+-- @see awful.placement
+
+--- The client default tag.
+-- @clientruleproperty tag
+-- @param tag
+-- @see tag
+-- @see new_tag
+-- @see tags
+-- @see switch_to_tags
+
+--- The client default tags.
+--
+-- Avoid using the tag and tags properties at the same time, it will cause
+-- issues.
+--
+-- @clientruleproperty tags
+-- @param[opt={tag}] table
+-- @see tag
+-- @see new_tag
+-- @see tags
+-- @see switch_to_tags
+
+--- Create a new tag for this client.
+--
+-- If the value is `true`, the new tag will be named after the client `class`.
+-- If it is a string, it will be the tag name.
+--
+-- If a table is used, all of its properties will be passed to the tag
+-- constructor:
+--
+--    new_tag = {
+--        name     = "My new tag!", -- The tag name.
+--        layout   = awful.layout.suit.max, -- Set the tag layout.
+--        volatile = true, -- Remove the tag when the client is closed.
+--    }
+--
+-- @tparam[opt=false] table|string|boolean new_tag
+-- @clientruleproperty new_tag
+-- @see tag
+-- @see tags
+-- @see switch_to_tags
+
+--- Unselect the current tags and select this client tags.
+-- Note that this property was called `switchtotag` in previous Awesome versions.
+-- @clientruleproperty switch_to_tags
+-- @param[opt=false] boolean
+-- @see tag.selected
+
+--- Define if the client should grab focus by default.
+--
+-- The `request::activate` context for this call is `rules`.
+--
+-- @clientruleproperty focus
+-- @param[opt=false] boolean
+
+--- Should this client have a titlebar by default.
+-- @clientruleproperty titlebars_enabled
+-- @param[opt=false] boolean
+-- @see awful.titlebar
+
+--- A function to call when this client is ready.
+--
+-- It can be useful to set extra properties or perform actions.
+--
+-- @clientruleproperty callback
+-- @see awful.spawn
 
 --- Jump to the given client.
 -- Takes care of focussing the screen, the right tag, etc.
@@ -226,7 +313,7 @@ function client.swap.global_bydirection(dir, sel)
             c:swap(sel)
 
         -- swapping to an empty screen
-        elseif get_screen(sel.screen) ~= get_screen(c.screen) and sel == c then
+        elseif sel == c then
             sel:move_to_screen(screen.focused())
 
         -- swapping to a nonempty screen
@@ -1040,6 +1127,38 @@ function client.dockable.set(c, value)
     client.property.set(c, "dockable", value)
 end
 
+--- If the client requests not to be decorated with a titlebar.
+--
+-- The motif wm hints allow a client to request not to be decorated by the WM in
+-- various ways. This property uses the motif MWM_DECOR_TITLE hint and
+-- interprets it as the client (not) wanting a titlebar.
+--
+-- **Signal:**
+--
+-- * *property::requests_no_titlebar*
+--
+-- @property requests_no_titlebar
+-- @param boolean Whether the client requests not to get a titlebar
+
+function client.object.get_requests_no_titlebar(c)
+    local hints = c.motif_wm_hints
+    if not hints then return false end
+
+    local decor = hints.decorations
+    if not decor then return false end
+
+    local result = not decor.title
+    if decor.all then
+        -- The "all" bit inverts the meaning of the other bits
+        result = not result
+    end
+    return result
+end
+capi.client.connect_signal("property::motif_wm_hints", function(c)
+    -- We cannot be sure that the property actually changes, but whatever
+    c:emit_signal("property::requests_no_titlebar")
+end)
+
 --- Get a client property.
 --
 -- This method is deprecated. It is now possible to use `c.value` directly.
@@ -1138,8 +1257,11 @@ end
 -- @tparam bool|function merge If true then merge tags (select the client's
 --   first tag additionally) when the client is not visible.
 --   If it is a function, it will be called with the client as argument.
+-- @see awful.spawn.once
+-- @see awful.spawn.single_instance
+-- @see awful.spawn.raise_or_spawn
 --
--- @function awful.client.run_or_raise
+-- @deprecated awful.client.run_or_raise
 -- @usage -- run or raise urxvt (perhaps, with tabs) on modkey + semicolon
 -- awful.key({ modkey, }, 'semicolon', function ()
 --     local matcher = function (c)
@@ -1148,6 +1270,10 @@ end
 --     awful.client.run_or_raise('urxvt', matcher)
 -- end);
 function client.run_or_raise(cmd, matcher, merge)
+    gdebug.deprecate("Use awful.spawn.single_instance instead of"..
+        "awful.client.run_or_raise", {deprecated_in=5})
+
+    spawn = spawn or require("awful.spawn")
     local clients = capi.client.get()
     local findex  = gtable.hasitem(clients, capi.client.focus) or 1
     local start   = gmath.cycle(#clients, findex + 1)

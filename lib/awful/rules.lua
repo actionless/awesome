@@ -8,17 +8,98 @@
 -- to add random properties that will be later accessible as `c.property_name`
 -- (where `c` is a valid client object)
 --
--- In addition to the existing properties, the following are supported:
+-- Syntax
+-- ===
+-- You should fill this table with your rule and properties to apply.
+-- For example, if you want to set xterm maximized at startup, you can add:
 --
--- * placement
--- * honor_padding
--- * honor_workarea
--- * tag
--- * new_tag
--- * switchtotag
--- * focus
--- * titlebars_enabled
--- * callback
+--     { rule = { class = "xterm" },
+--       properties = { maximized_vertical = true, maximized_horizontal = true } }
+--
+-- If you want to set mplayer floating at startup, you can add:
+--
+--     { rule = { name = "MPlayer" },
+--       properties = { floating = true } }
+--
+-- If you want to put Firefox on a specific tag at startup, you can add:
+--
+--     { rule = { instance = "firefox" },
+--       properties = { tag = mytagobject } }
+--
+-- Alternatively, you can specify the tag by name:
+--
+--     { rule = { instance = "firefox" },
+--       properties = { tag = "3" } }
+--
+-- If you want to put Thunderbird on a specific screen at startup, use:
+--
+--     { rule = { instance = "Thunderbird" },
+--       properties = { screen = 1 } }
+--
+-- Assuming that your X11 server supports the RandR extension, you can also specify
+-- the screen by name:
+--
+--     { rule = { instance = "Thunderbird" },
+--       properties = { screen = "VGA1" } }
+--
+-- If you want to put Emacs on a specific tag at startup, and immediately switch
+-- to that tag you can add:
+--
+--     { rule = { class = "Emacs" },
+--       properties = { tag = mytagobject, switchtotag = true } }
+--
+-- If you want to apply a custom callback to execute when a rule matched,
+-- for example to pause playing music from mpd when you start dosbox, you
+-- can add:
+--
+--     { rule = { class = "dosbox" },
+--       callback = function(c)
+--          awful.spawn('mpc pause')
+--       end }
+--
+-- Note that all "rule" entries need to match. If any of the entry does not
+-- match, the rule won't be applied.
+--
+-- If a client matches multiple rules, they are applied in the order they are
+-- put in this global rules table. If the value of a rule is a string, then the
+-- match function is used to determine if the client matches the rule.
+--
+-- If the value of a property is a function, that function gets called and
+-- function's return value is used for the property.
+--
+-- To match multiple clients to a rule one need to use slightly different
+-- syntax:
+--
+--     { rule_any = { class = { "MPlayer", "Nitrogen" }, instance = { "xterm" } },
+--       properties = { floating = true } }
+--
+-- To match multiple clients with an exception one can couple `rules.except` or
+-- `rules.except_any` with the rules:
+--
+--     { rule = { class = "Firefox" },
+--       except = { instance = "Navigator" },
+--       properties = {floating = true},
+--     },
+--
+--     { rule_any = { class = { "Pidgin", "Xchat" } },
+--       except_any = { role = { "conversation" } },
+--       properties = { tag = "1" }
+--     }
+--
+--     { rule = {},
+--       except_any = { class = { "Firefox", "Vim" } },
+--       properties = { floating = true }
+--     }
+--
+-- Applicable client properties
+-- ===
+--
+-- The table below holds the list of default client properties along with
+-- some extra properties that are specific to the rules. Note that any property
+-- can be set in the rules and interpreted by user provided code. This table
+-- only represent those offered by default.
+--
+--@DOC_rules_index_COMMON@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Julien Danjou
@@ -44,90 +125,7 @@ local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility
 
 local rules = {}
 
---[[--
-This is the global rules table.
-
-You should fill this table with your rule and properties to apply.
-For example, if you want to set xterm maximized at startup, you can add:
-
-    { rule = { class = "xterm" },
-      properties = { maximized_vertical = true, maximized_horizontal = true } }
-
-If you want to set mplayer floating at startup, you can add:
-
-    { rule = { name = "MPlayer" },
-      properties = { floating = true } }
-
-If you want to put Firefox on a specific tag at startup, you can add:
-
-    { rule = { instance = "firefox" },
-      properties = { tag = mytagobject } }
-
-Alternatively, you can specify the tag by name:
-
-    { rule = { instance = "firefox" },
-      properties = { tag = "3" } }
-
-If you want to put Thunderbird on a specific screen at startup, use:
-
-    { rule = { instance = "Thunderbird" },
-      properties = { screen = 1 } }
-
-Assuming that your X11 server supports the RandR extension, you can also specify
-the screen by name:
-
-    { rule = { instance = "Thunderbird" },
-      properties = { screen = "VGA1" } }
-
-If you want to put Emacs on a specific tag at startup, and immediately switch
-to that tag you can add:
-
-    { rule = { class = "Emacs" },
-      properties = { tag = mytagobject, switchtotag = true } }
-
-If you want to apply a custom callback to execute when a rule matched,
-for example to pause playing music from mpd when you start dosbox, you
-can add:
-
-    { rule = { class = "dosbox" },
-      callback = function(c)
-         awful.spawn('mpc pause')
-      end }
-
-Note that all "rule" entries need to match. If any of the entry does not
-match, the rule won't be applied.
-
-If a client matches multiple rules, they are applied in the order they are
-put in this global rules table. If the value of a rule is a string, then the
-match function is used to determine if the client matches the rule.
-
-If the value of a property is a function, that function gets called and
-function's return value is used for the property.
-
-To match multiple clients to a rule one need to use slightly different
-syntax:
-
-    { rule_any = { class = { "MPlayer", "Nitrogen" }, instance = { "xterm" } },
-      properties = { floating = true } }
-
-To match multiple clients with an exception one can couple `rules.except` or
-`rules.except_any` with the rules:
-
-    { rule = { class = "Firefox" },
-      except = { instance = "Navigator" },
-      properties = {floating = true},
-    },
-
-    { rule_any = { class = { "Pidgin", "Xchat" } },
-      except_any = { role = { "conversation" } },
-      properties = { tag = "1" }
-    }
-
-    { rule = {},
-      except_any = { class = { "Firefox", "Vim" } },
-      properties = { floating = true }
-    }
-]]--
+--- This is the global rules table.
 rules.rules = {}
 
 --- Check if a client matches a rule.
@@ -374,6 +372,46 @@ end
 
 rules.add_rule_source("awful.spawn", apply_spawn_rules, {}, {"awful.rules"})
 
+local function apply_singleton_rules(c, props, callbacks)
+    local persis_id, info = c.single_instance_id, nil
+
+    -- This is a persistent property set by `awful.spawn`
+    if awesome.startup and persis_id then
+        info = aspawn.single_instance_manager.by_uid[persis_id]
+    elseif c.startup_id then
+        info = aspawn.single_instance_manager.by_snid[c.startup_id]
+        aspawn.single_instance_manager.by_snid[c.startup_id] = nil
+    elseif aspawn.single_instance_manager.by_pid[c.pid] then
+        info = aspawn.single_instance_manager.by_pid[c.pid].matcher(c) and
+            aspawn.single_instance_manager.by_pid[c.pid] or nil
+    end
+
+    if info then
+        c.single_instance_id = info.hash
+        gtable.crush(props, info.rules)
+        table.insert(callbacks, info.callback)
+        table.insert(info.instances, c)
+
+        -- Prevent apps with multiple clients from re-using this too often in
+        -- the first 30 seconds before the PID is cleared.
+        aspawn.single_instance_manager.by_pid[c.pid] = nil
+    end
+end
+
+--- The rule source for clients spawned by `awful.spawn.once` and `single_instance`.
+--
+-- **Has priority over:**
+--
+-- * `awful.rules`
+--
+-- **Depends on:**
+--
+-- * `awful.spawn`
+--
+-- @rulesources awful.spawn_once
+
+rules.add_rule_source("awful.spawn_once", apply_singleton_rules, {"awful.spawn"}, {"awful.rules"})
+
 --- Apply awful.rules.rules to a client.
 -- @client c The client.
 function rules.apply(c)
@@ -437,7 +475,7 @@ rules.high_priority_properties = {}
 -- @tfield table awful.rules.delayed_properties
 -- By default, the table has the following functions:
 --
--- * switchtotag
+-- * switch_to_tags
 rules.delayed_properties = {}
 
 local force_ignore = {
@@ -451,6 +489,9 @@ function rules.high_priority_properties.tag(c, value, props)
         if type(value) == "string" then
             local name = value
             value = atag.find_by_name(c.screen, value)
+            if not value and not props.screen then
+                value = atag.find_by_name(nil, name)
+            end
             if not value then
                 require("gears.debug").print_error("awful.rules-rule specified "
                     .. "tag = '" .. name .. "', but no such tag exists")
@@ -468,9 +509,15 @@ function rules.high_priority_properties.tag(c, value, props)
     end
 end
 
-function rules.delayed_properties.switchtotag(c, value)
+function rules.delayed_properties.switch_to_tags(c, value)
     if not value then return end
     atag.viewmore(c:tags(), c.screen)
+end
+
+function rules.delayed_properties.switchtotag(c, value)
+    gdebug.deprecate("Use switch_to_tags instead of switchtotag", {deprecated_in=5})
+
+    rules.delayed_properties.switch_to_tags(c, value)
 end
 
 function rules.extra_properties.geometry(c, _, props)
@@ -487,11 +534,6 @@ function rules.extra_properties.geometry(c, _, props)
     c:geometry(new_geo) --TODO use request::geometry
 end
 
---- Create a new tag based on a rule.
--- @tparam client c The client
--- @tparam boolean|function|string value The value.
--- @tparam table props The properties.
--- @treturn tag The new tag
 function rules.high_priority_properties.new_tag(c, value, props)
     local ty = type(value)
     local t = nil
@@ -579,8 +621,10 @@ end
 -- @tab[opt] callbacks Callbacks to apply.
 function rules.execute(c, props, callbacks)
     -- This has to be done first, as it will impact geometry related props.
-    if props.titlebars_enabled then
+    if props.titlebars_enabled and (type(props.titlebars_enabled) ~= "function"
+            or props.titlebars_enabled(c,props)) then
         c:emit_signal("request::titlebars", "rules", {properties=props})
+        c._request_titlebars_called = true
     end
 
     -- Border width will also cause geometry related properties to fail
@@ -684,7 +728,7 @@ function rules.execute(c, props, callbacks)
 
     -- Do this at last so we do not erase things done by the focus signal.
     if props.focus and (type(props.focus) ~= "function" or props.focus(c)) then
-        c:emit_signal('request::activate', "rules", {raise=true})
+        c:emit_signal('request::activate', "rules", {raise=not awesome.startup})
     end
 end
 
