@@ -6,24 +6,21 @@ branches=(
 	#'actionless'
 
 	# my branches
-    'shape-border'
+    #'shape-border'
     #'pr/2033'
 
 	# psychon
-    #'test-argb-patch2'
-    #'pr/2207'
-    #'check-revert-bd47'
+    'pr/2609'
+    'pr/2617'
 
 	# elv13
-    #'pr/644'
-    #'upstream_dynamic_p7'
 
     # blueyed
 
 	# other
 
     # PR
-    'gcolor'
+    #'gcolor'
 
 )
 
