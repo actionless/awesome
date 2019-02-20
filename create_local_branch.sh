@@ -10,8 +10,7 @@ branches=(
     #'pr/2033'
 
 	# psychon
-    'pr/2609'
-    'pr/2617'
+    'shape-fg'
 
 	# elv13
 
