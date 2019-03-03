@@ -3,16 +3,11 @@ set -euo pipefail
 
 branches=(
 	# local overrides
-	#'actionless'
+	'actionless'
 
 	# my branches
-    'shape-border'
-    #'pr/2033'
 
 	# psychon
-    #'test-argb-patch2'
-    #'pr/2207'
-    #'check-revert-bd47'
 
 	# elv13
     #'pr/644'
@@ -24,8 +19,6 @@ branches=(
 
     # PR
     #'pr/596'
-
-    #'snapper-gap'
 
 )
 
