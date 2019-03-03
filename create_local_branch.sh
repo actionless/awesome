@@ -10,8 +10,7 @@ branches=(
 	# psychon
 
 	# elv13
-    #'pr/644'
-    #'upstream_dynamic_p7'
+    'notif_replace_id2'
 
     # blueyed
 
