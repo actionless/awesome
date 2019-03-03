@@ -21,7 +21,7 @@ optdepends=('rlwrap: readline support for awesome-client'
 provides=('notification-daemon' 'awesome')
 conflicts=('awesome')
 backup=('etc/xdg/awesome/rc.lua')
-source=("$pkgname::git+https://github.com/awesomeWM/awesome.git"
+source=("$pkgname::git+https://github.com/actionless/awesome.git#branch=local"
         awesome.desktop
         awesomeksm.desktop)
 sha256sums=('SKIP'
