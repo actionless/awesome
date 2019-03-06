@@ -10,7 +10,6 @@ branches=(
 	# psychon
 
 	# elv13
-    'notif_replace_id2'
 
     # blueyed
 
