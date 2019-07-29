@@ -28,7 +28,7 @@ cd ~/projects
 rm -r tmp-awesome/awesome -f || true
 cp -prf awesome tmp-awesome/
 mkdir -p "$AWESOME_BUILD_DIR"
-cp awesome/PKGBUILD "$AWESOME_BUILD_DIR"
+cp awesome/{PKGBUILD,awesome*.desktop} "$AWESOME_BUILD_DIR"
 
 cd tmp-awesome/awesome
 git reset --hard
