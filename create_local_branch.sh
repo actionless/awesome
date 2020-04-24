@@ -1,32 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+AWESOME_BUILD_DIR=/tmp/awesome-build/
+
 branches=(
 	# local overrides
 	#'actionless'
-
-	# my branches
-    #'shape-border'
-    #'pr/2033'
-
-	# psychon
-    'shape-fg'
-
-	# elv13
-
-    # blueyed
-
-	# other
-
-    # PR
-    #'gcolor'
+        fix-empty-string-matcher
+        placement-skip-fullscreen
+        fix-markup-escape
 
 )
 
 cd ~/projects
 rm -r tmp-awesome/awesome -f || true
 cp -prf awesome tmp-awesome/
-cp awesome/PKGBUILD ~/build/awesome-git/
+mkdir -p "$AWESOME_BUILD_DIR"
+cp awesome/{PKGBUILD,awesome*.desktop} "$AWESOME_BUILD_DIR"
 
 cd tmp-awesome/awesome
 git reset --hard
@@ -39,20 +29,20 @@ git branch -D local
 git checkout -b local
 
 
-for branch in ${branches[@]}; do
+for branch in "${branches[@]}" ; do
 	echo "======================"
 	echo " merge $branch "
-    git checkout $branch
-    git checkout local
-	git merge upstream/$branch -m "merge $branch" || git merge $branch -m "merge $branch"
+	git checkout "$branch"
+	git checkout local
+	git merge upstream/"$branch" -m "merge $branch" || git merge "$branch" -m "merge $branch"
 done
 
 git push origin local -f
 git push origin --tags
 
 if [[ ${1-a} = '-b' ]]; then
-    cd ~/build/awesome-git
-    makepkg -fi --syncdeps
+	cd "$AWESOME_BUILD_DIR"
+	makepkg -fi --syncdeps
 fi
 
 cd ~/projects/awesome
