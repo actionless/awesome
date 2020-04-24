@@ -1,9 +1,10 @@
 local spawn = require("awful.spawn")
 
 -- This file provide a simple, yet flexible, test client.
--- It is used to test the `awful.rules`
+-- It is used to test the `ruled.client`
 
 local test_client_source = [[
+pcall(require, 'luarocks.loader')
 local lgi = require 'lgi'
 local Gdk = lgi.require('Gdk')
 local Gtk = lgi.require('Gtk')
@@ -39,6 +40,8 @@ local function open_window(class, title, options)
     window:show_all()
     if options.maximize_after then
         window:maximize()
+    elseif options.unmaximize_after then
+        window:unmaximize()
     end
     if options.resize_after_width and options.resize_after_height then
        window:resize(
@@ -140,6 +143,9 @@ return function(class, title, sn_rules, callback, resize_increment, args)
     end
     if args.maximize_after then
         options = options .. "maximize_after,"
+    end
+    if args.unmaximize_after then
+        options = options .. "unmaximize_after,"
     end
     if args.size then
         options = table.concat {

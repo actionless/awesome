@@ -32,6 +32,12 @@ local allowed_deps = {
         gears = true,
         lgi = true,
         wibox = true,
+
+        -- Necessary to lazy-load the deprecated modules.
+        ["awful.*"] = true,
+
+        -- For legacy reasons.
+        ruled = true
     },
     naughty = {
         awful = true,
@@ -47,6 +53,14 @@ local allowed_deps = {
         lgi = true,
         wibox = true,
     },
+    ruled = {
+        awful = true,
+        beautiful = true,
+        gears = true,
+        lgi = true,
+        wibox = true,
+        naughty = true,
+    },
     -- TODO: Get rid of these
     ["gears.surface"]        = { ["wibox.hierarchy"] = true },
 }
@@ -54,7 +68,7 @@ local allowed_deps = {
 -- Turn "foo.bar.baz" into "foo.bar". Returns nil if there is nothing more to
 -- remove.
 local function get_supermodule(module)
-    return string.match(module, "(.+)%.%a+")
+    return string.match(module, "(.+)%.[a-z_]+")
 end
 
 -- Check if "module" (or one of its parents) is allowed to depend on

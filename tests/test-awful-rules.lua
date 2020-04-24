@@ -1,6 +1,6 @@
 local awful = require("awful")
+local ruledc = require("ruled.client")
 local gears = require("gears")
-local beautiful = require("beautiful")
 local test_client = require("_client")
 local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 
@@ -10,12 +10,11 @@ local message_printed = false
 -- Magic table to store tests
 local tests = {}
 
-local tb_height = gears.math.round(beautiful.get_font_height() * 1.5)
 -- local border_width = beautiful.border_width
 
--- Detect "manage" race conditions
-local real_apply = awful.rules.apply
-function awful.rules.apply(c)
+-- Detect "request::manage" race conditions
+local real_apply = ruledc.apply
+function ruledc.apply(c)
     assert(#c:tags() == 0)
     return real_apply(c)
 end
@@ -35,7 +34,7 @@ local function test_rule(rule)
         rule.test = nil
     end
 
-    table.insert(awful.rules.rules, rule)
+    ruledc.append_rule(rule)
 end
 
 -- Helper function to search clients
@@ -74,7 +73,7 @@ test_rule {
 
         -- The size should not have changed
         local geo = get_client_by_class(class):geometry()
-        assert(geo.width == 100 and geo.height == 100+tb_height)
+        assert(geo.width == 100 and geo.height == 100)
 
         return true
     end
@@ -265,20 +264,20 @@ test_rule {
 }
 
 -- Test the custom sources
-assert(awful.rules.add_rule_source("high_priority", function(c, props, _)
+assert(ruledc.add_rule_source("high_priority", function(c, props, _)
     assert(type(c) == "client")
     assert(props.random2)
 
     props.random1 = true
 end, {"awful.spawn"}, {"awful.rules", "low_priority"}))
 
-assert(awful.rules.add_rule_source("before2", function()
+assert(ruledc.add_rule_source("before2", function()
     error("This function should not be called")
 end, {"awful.spawn"}, {"awful.rules"}))
 
-assert(awful.rules.remove_rule_source("before2"))
+assert(ruledc.remove_rule_source("before2"))
 
-assert(awful.rules.add_rule_source("low_priority", function(c, props, _)
+assert(ruledc.add_rule_source("low_priority", function(c, props, _)
     assert(type(c) == "client")
     assert(not props.random1)
 
@@ -287,7 +286,7 @@ end, {"awful.spawn", "high_priority"}, {"void", "awful.rules"}))
 
 local temp = gears.debug.print_warning
 gears.debug.print_warning = function() end
-assert(not awful.rules.add_rule_source("invalid_source", function()
+assert(not ruledc.add_rule_source("invalid_source", function()
     assert(false, "This cannot happen")
 end, {"awful.rules"}, {"awful.spawn"}))
 gears.debug.print_warning = temp

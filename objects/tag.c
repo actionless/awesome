@@ -19,14 +19,23 @@
  *
  */
 
-/** awesome tag API
+ /** awesome tag API.
  *
- * Furthermore to the classes described here, one can also use signals as
- * described in @{signals}.
+ * What is a tag?
+ * ==============
+ *
+ * In AwesomeWM, a `tag` is a group of clients. It can either be used as labels
+ * or as more classical workspaces depending on how they are configured.
  *
  * ![Client geometry](../images/tag_props.svg)
  *
- * **Creating tags**:
+ *  * A **tag** can be attached to **multiple clients**
+ *  * A **client** can be attached to **multiple tags**
+ *  * A **tag** can only be in 1 screen *any given time*, but can be moved
+ *  * All **clients** attached to a tag **must be in the same screen as the tag**
+ *
+ * Creating tags
+ * =============
  *
  * The default config initializes tags like this:
  *
@@ -58,7 +67,8 @@
  * Note: the example above sets "First tag" to be selected explicitly,
  * because otherwise you will find yourself without any selected tag.
  *
- * **Accessing tags**:
+ * Accessing tags
+ * ==============
  *
  * To access the "current tags", use
  *
@@ -95,7 +105,8 @@
  *
  *    local t = awful.tag.find_by_name(awful.screen.focused(), "name")
  *
- * **Common shortcuts**:
+ * Common keybindings code
+ * =======================
  *
  * Here is a few useful shortcuts not part of the default `rc.lua`. Add these
  * functions above `-- {{{ Key bindings`:
@@ -178,9 +189,11 @@
  * the documentation generation, you get the real signal name by
  * removing the starting dot.
  *
+ * @DOC_uml_nav_tables_tag_EXAMPLE@
+ *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @classmod tag
+ * @coreclassmod tag
  */
 
 #include "tag.h"
@@ -190,22 +203,57 @@
 #include "ewmh.h"
 #include "luaa.h"
 
-/**
+lua_class_t tag_class;
+
+/** When a tag requests to be selected.
  * @signal request::select
+ * @tparam string context The reason why it was called.
+ * @request tag select ewmh granted When the client request to be moved to a
+ *  specific virtual desktop. AwesomeWM interprets virtual desktop as indexed
+ *  tags.
+ */
+
+/**
+ * This signal is emitted to fill the list of default layouts.
+ *
+ * It is emitted on the global `tag` class rather than individual tag objects.
+ * The default handler is part of `rc.lua`. New modules can also use this signal
+ * to dynamically add new layouts to the list of default layouts.
+ *
+ * @signal request::default_layouts
+ * @tparam string context The context (currently always "startup").
+ * @classsignal
+ * @request tag default_layouts startup granted When AwesomeWM starts, it queries
+ *  for default layout using this request.
+ * @see awful.layout.layouts
+ * @see awful.layout.append_default_layout
+ * @see awful.layout.remove_default_layout
+ */
+
+/** This signals is emitted when a tag needs layouts for the first time.
+ *
+ * If no handler implement it, it will fallback to the content added by
+ * `request::default_layouts`
+ *
+ * @signal request::layouts
+ * @tparam string context The context (currently always "awful").
+ * @tparam table hints A, currently empty, table with hints.
  */
 
 /** When a client gets tagged with this tag.
  * @signal tagged
- * @client c The tagged client.
+ * @tparam client c The tagged client.
  */
 
 /** When a client gets untagged with this tag.
  * @signal untagged
- * @client c The untagged client.
+ * @tparam client c The untagged client.
  */
 
 /**
  * Tag name.
+ *
+ * @DOC_sequences_tag_name_EXAMPLE@
  *
  * **Signal:**
  *
@@ -217,6 +265,8 @@
 
 /**
  * True if the tag is selected to be viewed.
+ *
+ * @DOC_sequences_tag_selected_EXAMPLE@
  *
  * **Signal:**
  *
@@ -240,17 +290,17 @@
 /** Get the number of instances.
  *
  * @return The number of tag objects alive.
- * @function instances
+ * @staticfct instances
  */
 
 /* Set a __index metamethod for all tag instances.
  * @tparam function cb The meta-method
- * @function set_index_miss_handler
+ * @staticfct set_index_miss_handler
  */
 
 /* Set a __newindex metamethod for all tag instances.
  * @tparam function cb The meta-method
- * @function set_newindex_miss_handler
+ * @staticfct set_newindex_miss_handler
  */
 
 
@@ -408,10 +458,10 @@ luaA_tag_new(lua_State *L)
 
 /** Get or set the clients attached to this tag.
  *
- * @param clients_table None or a table of clients to set as being tagged with
+ * @tparam[opt=nil] table clients_table None or a table of clients to set as being tagged with
  *  this tag.
  * @return A table with the clients attached to this tags.
- * @function clients
+ * @method clients
  */
 static int
 luaA_tag_clients(lua_State *L)

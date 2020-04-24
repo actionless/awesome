@@ -13,7 +13,7 @@ local args = loadfile(file_path)() or {}
 
 -- Emulate the event loop for 5 iterations
 for _ = 1, 5 do
-    awesome.emit_signal("refresh")
+    require("gears.timer").run_delayed_calls_now()
 end
 
 -- Draw the result
@@ -35,8 +35,8 @@ local function draw_mouse(x, y)
 end
 
 -- Print an outline for the screens
-if not screen.no_outline then
-    for _, s in ipairs(screen) do
+if not rawget(screen, "no_outline") then
+    for s in screen do
         cr:save()
         -- Draw the screen outline
         cr:set_source(color("#00000044"))
@@ -141,12 +141,12 @@ local function client_widget(c, col, label)
             },
             layout = wibox.layout.stack
         },
-        shape_border_width = bw,
-        shape_border_color = beautiful.border_color,
-        shape_clip         = true,
-        fg                 = beautiful.fg_normal or "#000000",
-        bg                 = col,
-        shape              = function(cr2, w, h)
+        border_width = bw,
+        border_color = beautiful.border_color,
+        shape_clip   = true,
+        fg           = beautiful.fg_normal or "#000000",
+        bg           = col,
+        shape        = function(cr2, w, h)
             return shape.rounded_rect(cr2, w, h, args.radius or 5)
         end,
 
@@ -172,7 +172,7 @@ end
 
 -- Emulate the event loop for another 5 iterations
 for _ = 1, 5 do
-    awesome.emit_signal("refresh")
+    require("gears.timer").run_delayed_calls_now()
 end
 
 for _, d in ipairs(drawin.get()) do

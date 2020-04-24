@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
---- Taglist widget module for awful
+--- Taglist widget module for awful.
 --
 -- Here is a more advanced example of how to extent the `taglist`. It provides:
 --
@@ -34,7 +34,7 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008-2009 Julien Danjou
--- @classmod awful.widget.taglist
+-- @widgetmod awful.widget.taglist
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
@@ -153,7 +153,7 @@ taglist.filter, taglist.source = {}, {}
 -- This will be the fallback for state specific shapes.
 -- To get a shape for the whole taglist, use `wibox.container.background`.
 -- @beautiful beautiful.taglist_shape
--- @param[opt=rectangle] gears.shape
+-- @tparam[opt=gears.shape.rectangle] gears.shape shape
 -- @see gears.shape
 -- @see beautiful.taglist_shape_empty
 -- @see beautiful.taglist_shape_focus
@@ -172,7 +172,7 @@ taglist.filter, taglist.source = {}, {}
 
 --- The shape used for the empty elements.
 -- @beautiful beautiful.taglist_shape_empty
--- @param[opt=rectangle] gears.shape
+-- @tparam[opt=gears.shape.rectangle] gears.shape shape
 -- @see gears.shape
 
 --- The shape used for the empty elements border width.
@@ -187,7 +187,7 @@ taglist.filter, taglist.source = {}, {}
 
 --- The shape used for the selected elements.
 -- @beautiful beautiful.taglist_shape_focus
--- @param[opt=rectangle] gears.shape
+-- @tparam[opt=gears.shape.rectangle] gears.shape shape
 -- @see gears.shape
 
 --- The shape used for the selected elements border width.
@@ -202,7 +202,7 @@ taglist.filter, taglist.source = {}, {}
 
 --- The shape used for the urgent elements.
 -- @beautiful beautiful.taglist_shape_urgent
--- @param[opt=rectangle] gears.shape
+-- @tparam[opt=gears.shape.rectangle] gears.shape shape
 -- @see gears.shape
 
 --- The shape used for the urgent elements border width.
@@ -217,7 +217,7 @@ taglist.filter, taglist.source = {}, {}
 
 --- The shape used for the volatile elements.
 -- @beautiful beautiful.taglist_shape_volatile
--- @param[opt=rectangle] gears.shape
+-- @tparam[opt=gears.shape.rectangle] gears.shape shape
 -- @see gears.shape
 
 --- The shape used for the volatile elements border width.
@@ -261,6 +261,7 @@ function taglist.taglist_label(t, args)
     local shape              = args.shape or theme.taglist_shape
     local shape_border_width = args.shape_border_width or theme.taglist_shape_border_width
     local shape_border_color = args.shape_border_color or theme.taglist_shape_border_color
+    local icon_size = args.icon_size or theme.taglist_icon_size
     -- TODO: Re-implement bg_resize
     local bg_resize = false -- luacheck: ignore
     local is_selected = false
@@ -379,9 +380,15 @@ function taglist.taglist_label(t, args)
         shape              = shape,
         shape_border_width = shape_border_width,
         shape_border_color = shape_border_color,
+        icon_size          = icon_size,
     }
 
     return text, bg_color, bg_image, not taglist_disable_icon and icon or nil, other_args
+end
+
+-- Remove some callback boilerplate from the user provided templates.
+local function create_callback(w, t)
+    common._set_common_property(w, "tag", t)
 end
 
 local function taglist_update(s, w, buttons, filter, data, style, update_function, args)
@@ -398,7 +405,10 @@ local function taglist_update(s, w, buttons, filter, data, style, update_functio
 
     local function label(c) return taglist.taglist_label(c, style) end
 
-    update_function(w, buttons, label, data, tags, args)
+    update_function(w, buttons, label, data, tags, {
+        widget_template = args.widget_template,
+        create_callback = create_callback,
+    })
 end
 
 --- Create a new taglist widget. The last two arguments (update_function
@@ -415,7 +425,7 @@ end
 --   update. See `awful.widget.common`.
 -- @tparam[opt] widget args.layout Optional layout widget for tag widgets. Default
 --   is wibox.layout.fixed.horizontal().
--- @tparam[opt=awful.taglist.source.for_screen] function args.source The
+-- @tparam[opt=awful.widget.taglist.source.for_screen] function args.source The
 --  function used to generate the list of tag.
 -- @tparam[opt] table args.widget_template A custom widget to be used for each tag
 -- @tparam[opt={}] table args.style The style overrides default theme.
@@ -452,7 +462,7 @@ end
 -- @param style **DEPRECATED** use args.style
 -- @param update_function **DEPRECATED** use args.update_function
 -- @param base_widget **DEPRECATED** use args.base_widget
--- @function awful.taglist
+-- @constructorfct awful.widget.taglist
 function taglist.new(args, filter, buttons, style, update_function, base_widget)
 
     local screen = nil
@@ -518,12 +528,18 @@ function taglist.new(args, filter, buttons, style, update_function, base_widget)
                 for _, tlist in pairs(i) do
                     tlist._do_taglist_update()
                 end
+            else
+                -- No screen? Update all taglists
+                for _, list in pairs(instances) do
+                    for _, tlist in pairs(list) do
+                        tlist._do_taglist_update()
+                    end
+                end
             end
         end
         local uc = function (c) return u(c.screen) end
         local ut = function (t) return u(t.screen) end
-        capi.client.connect_signal("focus", uc)
-        capi.client.connect_signal("unfocus", uc)
+        capi.client.connect_signal("property::active", uc)
         tag.attached_connect_signal(nil, "property::selected", ut)
         tag.attached_connect_signal(nil, "property::icon", ut)
         tag.attached_connect_signal(nil, "property::hide", ut)
@@ -538,7 +554,7 @@ function taglist.new(args, filter, buttons, style, update_function, base_widget)
         end)
         capi.client.connect_signal("tagged", uc)
         capi.client.connect_signal("untagged", uc)
-        capi.client.connect_signal("unmanage", uc)
+        capi.client.connect_signal("request::unmanage", uc)
         capi.screen.connect_signal("removed", function(s)
             instances[get_screen(s)] = nil
         end)
@@ -556,7 +572,7 @@ end
 --- Filtering function to include all nonempty tags on the screen.
 -- @param t The tag.
 -- @return true if t is not empty, else false
--- @filterfunction awful.taglist.filter.noempty
+-- @filterfunction awful.widget.taglist.filter.noempty
 function taglist.filter.noempty(t)
     return #t:clients() > 0 or t.selected
 end
@@ -564,14 +580,14 @@ end
 --- Filtering function to include selected tags on the screen.
 -- @param t The tag.
 -- @return true if t is not empty, else false
--- @filterfunction awful.taglist.filter.selected
+-- @filterfunction awful.widget.taglist.filter.selected
 function taglist.filter.selected(t)
     return t.selected
 end
 
 --- Filtering function to include all tags on the screen.
 -- @return true
--- @filterfunction awful.taglist.filter.all
+-- @filterfunction awful.widget.taglist.filter.all
 function taglist.filter.all()
     return true
 end
@@ -580,7 +596,7 @@ end
 --
 -- This is the default source.
 --
--- @sourcefunction awful.taglist.source.for_screen
+-- @sourcefunction awful.widget.taglist.source.for_screen
 -- @see screen
 function taglist.source.for_screen(s)
     return s.tags
@@ -589,6 +605,10 @@ end
 function taglist.mt:__call(...)
     return taglist.new(...)
 end
+
+--@DOC_widget_COMMON@
+
+--@DOC_object_COMMON@
 
 return setmetatable(taglist, taglist.mt)
 

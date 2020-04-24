@@ -10,7 +10,7 @@ After extracting the dist tarball, run:
 
     make
 
-This will create a build directory, run cmake in it and build Awesome.
+This will create a build directory, run `cmake` in it and build Awesome.
 
 After building is finished, you can either install via `make install`:
 
@@ -25,10 +25,33 @@ or by auto-generating a .deb or .rpm package, for easy removal later on:
     sudo rpm -Uvh awesome-x.y.z.rpm
 
 NOTE: Awesome uses [`cmake`](https://cmake.org) to build. In case you want to
-pass arguments to cmake, please use the `CMAKE_ARGS` environment variable. For
+pass arguments to `cmake`, please use the `CMAKE_ARGS` environment variable. For
 instance:
 
     CMAKE_ARGS="-DCMAKE_INSTALL_PREFIX=/opt/awesome" make
+
+
+### Installing current git master as a package receipts
+
+#### Arch Linux AUR
+
+```
+sudo pacman -S --needed base-devel git
+git clone https://aur.archlinux.org/awesome-git.git
+cd awesome-git
+makepkg -fsri
+```
+
+#### Debian-based
+
+```
+sudo apt build-dep awesome
+git clone https://github.com/awesomewm/awesome
+cd awesome
+make package
+sudo apt install *.deb
+```
+
 
 ### Build dependencies
 
@@ -45,6 +68,7 @@ environment):
 - [libxcb-util >= 0.3.8](https://xcb.freedesktop.org/)
 - [libxcb-keysyms >= 0.3.4](https://xcb.freedesktop.org/)
 - [libxcb-icccm >= 0.3.8](https://xcb.freedesktop.org/)
+- [libxcb-xfixes](https://xcb.freedesktop.org/)
 - [xcb-util-xrm >= 1.0](https://github.com/Airblader/xcb-util-xrm)
 - [libxkbcommon](http://xkbcommon.org/) with X11 support enabled
 - [libstartup-notification >=
@@ -78,11 +102,18 @@ Additionally, the following optional dependencies exist:
   generate slightly better backtraces on crashes
 - `Xephyr` or `Xvfb` for running integration tests
 - [GTK+ >= 3.10](https://www.gtk.org/) for `./themes/gtk/`
+- [xcb-errors](https://gitlab.freedesktop.org/xorg/lib/libxcb-errors) for
+  pretty-printing of X11 errors
+- [libRSVG](https://wiki.gnome.org/action/show/Projects/LibRsvg) for displaying
+  SVG files without scaling artifacts
+- [wmctrl](http://tripie.sweb.cz/utils/wmctrl) for testing WM interactions
+  with external actions
+- [xterm](https://invisible-island.net/xterm/) for various test cases
 
 ## Running Awesome
 
 You can directly select Awesome from your display manager. If not, you can
-add the following line to your .xinitrc to start Awesome using startx
+add the following line to your `.xinitrc` to start Awesome using `startx`
 or to `.xsession` to start Awesome using your display manager:
 
     exec awesome
@@ -116,11 +147,11 @@ You can call `awesome` with `gdb` like this:
 
     DISPLAY=:2 gdb awesome
 
-Then in gdb set any args and run it:
+Then in `gdb` set any arguments and run it:
 
-    (gdb) set arg --replace
+    (gdb) set args --replace
     (gdb) run
-    
+
 ## Asking questions
 
 #### IRC
@@ -145,7 +176,7 @@ You can submit pull requests on the [github repository](https://github.com/aweso
 Please read the [contributing guide](https://github.com/awesomeWM/awesome/blob/master/docs/02-contributing.md) for any coding, documentation or patch guidelines.
 
 ## Status
-[![Build Status](https://travis-ci.org/awesomeWM/awesome.svg?branch=master)](https://travis-ci.org/awesomeWM/awesome)
+[![Build Status](https://travis-ci.com/awesomeWM/awesome.svg?branch=master)](https://travis-ci.com/awesomeWM/awesome)
 
 ## Documentation
 
@@ -153,6 +184,6 @@ Online documentation is available [here](https://awesomewm.org/apidoc/).
 
 ## License
 
-The project is licensed under GNU General Publice License v2 or later.
+The project is licensed under GNU General Public License v2 or later.
 You can read it online at ([v2](http://www.gnu.org/licenses/gpl-2.0.html)
 or [v3](http://www.gnu.org/licenses/gpl.html)).

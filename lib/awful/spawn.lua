@@ -132,17 +132,17 @@
 --
 --    awful.spawn.with_line_callback(noisy, {
 --        stdout = function(line)
---            naughty.notify { text = "LINE:"..line }
+--            naughty.notification { message = "LINE:"..line }
 --        end,
 --        stderr = function(line)
---            naughty.notify { text = "ERR:"..line}
+--            naughty.notification { message = "ERR:"..line}
 --        end,
 --    })
 --
 -- If only the full output is needed, then `easy_async` is the right choice:
 --
 --    awful.spawn.easy_async(noisy, function(stdout, stderr, reason, exit_code)
---        naughty.notify { text = stdout }
+--        naughty.notification { message = stdout }
 --    end)
 --
 -- **Default applications**:
@@ -185,7 +185,7 @@
 --
 -- This should (if the program correctly implements the protocol) result in
 -- `c.startup_id` to at least match `something`.
--- This identifier can then be used in `awful.rules` to configure the client.
+-- This identifier can then be used in `ruled.client` to configure the client.
 --
 -- Awesome can automatically set the `DESKTOP_STARTUP_ID` variable. This is used
 -- by `awful.spawn` to specify additional rules for the startup. For example:
@@ -206,7 +206,7 @@
 --      })'
 --
 -- This table contains the client properties that are valid when used the
--- `sn_rules` or `prop` function argument. They are the same as in `awful.rules`.
+-- `sn_rules` or `prop` function argument. They are the same as in `ruled.client`.
 --
 --@DOC_rules_index_COMMON@
 --
@@ -334,7 +334,7 @@ end
 -- Applying properties or running a callback requires the program/client to
 -- support startup notifications.
 --
--- See `awful.rules.execute` for more details about the format of `sn_rules`.
+-- See `ruled.client.execute` for more details about the format of `sn_rules`.
 --
 -- @tparam string|table cmd The command.
 -- @tparam[opt=true] table|boolean sn_rules A table of properties to be applied
@@ -344,6 +344,7 @@ end
 -- @treturn[1] ?string The startup notification ID, if `sn` is not false, or
 --   a `callback` is provided.
 -- @treturn[2] string Error message.
+-- @staticfct awful.spawn
 function spawn.spawn(cmd, sn_rules, callback)
     if cmd and cmd ~= "" then
         local enable_sn = (sn_rules ~= false or callback)
@@ -363,6 +364,7 @@ end
 --- Spawn a program using the shell.
 -- This calls `cmd` with `$SHELL -c` (via `awful.util.shell`).
 -- @tparam string cmd The command.
+-- @staticfct awful.spawn.with_shell
 function spawn.with_shell(cmd)
     if cmd and cmd ~= "" then
         cmd = { util.shell, "-c", cmd }
@@ -372,7 +374,7 @@ end
 
 --- Spawn a program and asynchronously capture its output line by line.
 -- @tparam string|table cmd The command.
--- @tab callbacks Table containing callbacks that should be invoked on
+-- @tparam table callbacks Table containing callbacks that should be invoked on
 --   various conditions.
 -- @tparam[opt] function callbacks.stdout Function that is called with each
 --   line of output on stdout, e.g. `stdout(line)`.
@@ -389,6 +391,7 @@ end
 --   termination.
 -- @treturn[1] Integer the PID of the forked process.
 -- @treturn[2] string Error message.
+-- @staticfct awful.spawn.with_line_callback
 function spawn.with_line_callback(cmd, callbacks)
     local stdout_callback, stderr_callback, done_callback, exit_callback =
         callbacks.stdout, callbacks.stderr, callbacks.output_done, callbacks.exit
@@ -425,7 +428,7 @@ end
 --- Asynchronously spawn a program and capture its output.
 -- (wraps `spawn.with_line_callback`).
 -- @tparam string|table cmd The command.
--- @tab callback Function with the following arguments
+-- @tparam table callback Function with the following arguments
 --   @tparam string callback.stdout Output on stdout.
 --   @tparam string callback.stderr Output on stderr.
 --   @tparam string callback.exitreason Exit reason ("exit" or "signal").
@@ -434,6 +437,7 @@ end
 -- @treturn[1] Integer the PID of the forked process.
 -- @treturn[2] string Error message.
 -- @see spawn.with_line_callback
+-- @staticfct awful.spawn.easy_async
 function spawn.easy_async(cmd, callback)
     local stdout = ''
     local stderr = ''
@@ -474,8 +478,8 @@ end
 
 --- Call `spawn.easy_async` with a shell.
 -- This calls `cmd` with `$SHELL -c` (via `awful.util.shell`).
--- @tparam string|table cmd The command.
--- @tab callback Function with the following arguments
+-- @tparam string cmd The command.
+-- @tparam table callback Function with the following arguments
 --   @tparam string callback.stdout Output on stdout.
 --   @tparam string callback.stderr Output on stderr.
 --   @tparam string callback.exitreason Exit reason ("exit" or "signal").
@@ -484,6 +488,7 @@ end
 -- @treturn[1] Integer the PID of the forked process.
 -- @treturn[2] string Error message.
 -- @see spawn.with_line_callback
+-- @staticfct awful.spawn.easy_async_with_shell
 function spawn.easy_async_with_shell(cmd, callback)
     return spawn.easy_async({ util.shell, "-c", cmd or "" }, callback)
 end
@@ -495,6 +500,7 @@ end
 -- @tparam[opt] function done_callback Function that is called when the
 --   operation finishes (e.g. due to end of file).
 -- @tparam[opt=false] boolean close Should the stream be closed after end-of-file?
+-- @staticfct awful.spawn.read_lines
 function spawn.read_lines(input_stream, line_callback, done_callback, close)
     local stream = Gio.DataInputStream.new(input_stream)
     local function done()
@@ -547,16 +553,16 @@ local function is_running(hash, matcher)
     local status = spawn.single_instance_manager.by_uid[hash]
     if not status then return false end
 
-    if #status.instances == 0 then return false end
-
-    for _, c in ipairs(status.instances) do
-        if c.valid then return true end
-    end
-
     if matcher then
         for _, c in ipairs(client.get()) do
             if matcher(c) then return true end
         end
+    end
+
+    if #status.instances == 0 then return false end
+
+    for _, c in ipairs(status.instances) do
+        if c.valid then return true end
     end
 
     return false
@@ -630,20 +636,21 @@ end
 -- command and rules, you need to specify an UID or only the first one will be
 -- executed.
 --
--- The `rules` are standard `awful.rules`.
+-- The `rules` are standard `ruled.client`.
 --
 -- This function depends on the startup notification protocol to be correctly
 -- implemented by the command. See `client.startup_id` for more information.
 -- Note that this also wont work with shell or terminal commands.
 --
 -- @tparam string|table cmd The command.
--- @tparam table rules The properties that need to be applied to the client.
+-- @tparam[opt] table rules The properties that need to be applied to the client.
 -- @tparam[opt] function matcher A matching function to find the instance
 --  among running clients.
 -- @tparam[opt] string unique_id A string to identify the client so it isn't executed
 --  multiple time.
 -- @tparam[opt] function callback A callback function when the client is created.
--- @see awful.rules
+-- @see ruled.client
+-- @staticfct awful.spawn.once
 function spawn.once(cmd, rules, matcher, unique_id, callback)
     local hash = unique_id or hash_command(cmd, rules)
     local status = register_common(hash, rules, matcher, callback)
@@ -659,7 +666,7 @@ end
 -- This is like `awful.spawn.once`, but will spawn new instances if the previous
 -- has finished.
 --
--- The `rules` are standard `awful.rules`.
+-- The `rules` are standard `ruled.client`.
 --
 -- This function depends on the startup notification protocol to be correctly
 -- implemented by the command. See `client.startup_id` for more information.
@@ -669,13 +676,14 @@ end
 -- faster than the client has time to start.
 --
 -- @tparam string|table cmd The command.
--- @tparam table rules The properties that need to be applied to the client.
+-- @tparam[opt] table rules The properties that need to be applied to the client.
 -- @tparam[opt] function matcher A matching function to find the instance
 --  among running clients.
 -- @tparam[opt] string unique_id A string to identify the client so it isn't executed
 --  multiple time.
 -- @tparam[opt] function callback A callback function when the client is created.
--- @see awful.rules
+-- @see ruled.client
+-- @staticfct awful.spawn.single_instance
 function spawn.single_instance(cmd, rules, matcher, unique_id, callback)
     local hash = unique_id or hash_command(cmd, rules)
     register_common(hash, rules, matcher, callback)
@@ -701,8 +709,11 @@ local raise_rules = {focus = true, switch_to_tags = true, raise = true}
 -- @tparam[opt] string unique_id A string to identify the client so it isn't executed
 --  multiple time.
 -- @tparam[opt] function callback A callback function when the client is created.
--- @see awful.rules
+-- @see ruled.client
 -- @treturn client The client if it already exists.
+-- @staticfct awful.spawn.raise_or_spawn
+-- @request client activate spawn.raise_or_spawn granted Activate a client when
+--  `awful.spawn.raise_or_spawn` is called and the client exists.
 function spawn.raise_or_spawn(cmd, rules, matcher, unique_id, callback)
     local hash = unique_id or hash_command(cmd, rules)
 
@@ -727,7 +738,7 @@ end
 
 capi.awesome.connect_signal("spawn::canceled" , spawn.on_snid_cancel   )
 capi.awesome.connect_signal("spawn::timeout"  , spawn.on_snid_cancel   )
-capi.client.connect_signal ("manage"          , spawn.on_snid_callback )
+capi.client.connect_signal ("request::manage" , spawn.on_snid_callback )
 
 return setmetatable(spawn, { __call = function(_, ...) return spawn.spawn(...) end })
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

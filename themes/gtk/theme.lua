@@ -5,6 +5,7 @@
 
 local theme_assets = require("beautiful.theme_assets")
 local dpi = require("beautiful.xresources").apply_dpi
+local rnotification = require("ruled.notification")
 local gfs = require("gears.filesystem")
 local themes_path = gfs.get_themes_dir()
 local gears_shape = require("gears.shape")
@@ -120,9 +121,9 @@ theme.fg_minimize   = mix(theme.wibar_fg, theme.wibar_bg, 0.9)
 
 theme.bg_systray    = theme.wibar_bg
 
-theme.border_normal = theme.gtk.wm_border_unfocused_color
-theme.border_focus  = theme.gtk.wm_border_focused_color
-theme.border_marked = theme.gtk.success_color
+theme.border_color_normal = theme.gtk.wm_border_unfocused_color
+theme.border_color_active = theme.gtk.wm_border_focused_color
+theme.border_color_marked = theme.gtk.success_color
 
 theme.border_width  = dpi(theme.gtk.button_border_width or 1)
 theme.border_radius = theme.gtk.button_border_radius
@@ -344,6 +345,14 @@ wallpaper_alt_fg = mix(wallpaper_alt_fg, wallpaper_fg, 0.4)
 theme.wallpaper = function(s)
     return theme_assets.wallpaper(wallpaper_bg, wallpaper_fg, wallpaper_alt_fg, s)
 end
+
+-- Set different colors for urgent notifications.
+rnotification.connect_signal('request::rules', function()
+    rnotification.append_rule {
+        rule       = { urgency = 'critical' },
+        properties = { bg = '#ff0000', fg = '#ffffff' }
+    }
+end)
 
 return theme
 

@@ -39,7 +39,7 @@
 --
 -- @author Sébastien Gross &lt;seb•ɱɩɲʋʃ•awesome•ɑƬ•chezwam•ɖɵʈ•org&gt;
 -- @copyright 2009 Sébastien Gross
--- @classmod awful.tooltip
+-- @popupmod awful.tooltip
 -------------------------------------------------------------------------
 
 local timer = require("gears.timer")
@@ -86,27 +86,38 @@ local offset = {
 
 --- The tooltip border color.
 -- @beautiful beautiful.tooltip_border_color
+-- @param color
 
 --- The tooltip background color.
 -- @beautiful beautiful.tooltip_bg
+-- @param color
 
 --- The tooltip foregound (text) color.
 -- @beautiful beautiful.tooltip_fg
+-- @param color
 
 --- The tooltip font.
 -- @beautiful beautiful.tooltip_font
+-- @param string
 
 --- The tooltip border width.
 -- @beautiful beautiful.tooltip_border_width
+-- @param number
 
 --- The tooltip opacity.
 -- @beautiful beautiful.tooltip_opacity
+-- @param number opacity Between 0 and 1
+
+--- The tooltip margins.
+-- @beautiful beautiful.tooltip_gaps
+-- @param table
 
 --- The default tooltip shape.
--- The default shape for all tooltips is a rectangle. However, by setting this variable
--- they can default to rounded rectangle or stretched octogons.
+-- The default shape for all tooltips is a rectangle. However, by setting
+-- this variable they can default to rounded rectangle or stretched octagons.
 -- @beautiful beautiful.tooltip_shape
--- @tparam[opt=gears.shape.rectangle] function shape A `gears.shape` compatible function
+-- @tparam[opt=gears.shape.rectangle] gears.shape shape A `gears.shape`
+--  compatible function
 -- @see shape
 -- @see gears.shape
 
@@ -129,6 +140,7 @@ local function apply_outside_mode(self)
         preferred_positions = self.preferred_positions,
         preferred_anchors   = self.preferred_alignments,
         honor_workarea      = true,
+        margins             = self._private.gaps
     })
 
     self.current_position = position
@@ -165,8 +177,8 @@ local function show(self)
     if self._private.visible then return end
     if self.timer then
         if not self.timer.started then
-            self:timer_function()
             self.timer:start()
+            self:timer_function()
         end
     end
     set_geometry(self)
@@ -193,7 +205,7 @@ end
 
 --- The wibox containing the tooltip widgets.
 -- @property wibox
--- @param `wibox`
+-- @param wibox
 
 function tooltip:get_wibox()
     if self._private.wibox then
@@ -205,7 +217,9 @@ function tooltip:get_wibox()
 
     -- Close the tooltip when clicking it.  This gets done on release, to not
     -- emit the release event on an underlying object, e.g. the titlebar icon.
-    wb:buttons(a_button({}, 1, nil, self.hide))
+    wb.buttons = {
+        a_button({}, 1, nil, self.hide)
+    }
 
     self._private.wibox = wb
 
@@ -215,6 +229,7 @@ end
 --- Is the tooltip visible?
 -- @property visible
 -- @param boolean
+-- @propemits true false
 
 function tooltip:get_visible()
     return self._private.visible
@@ -228,6 +243,8 @@ function tooltip:set_visible(value)
     else
         hide(self)
     end
+
+    self:emit_signal("property::visible", value)
 end
 
 --- The horizontal alignment.
@@ -251,9 +268,11 @@ end
 -- * top
 --
 -- @property align
--- @see beautiful.tooltip_align
+-- @param string
 -- @see mode
 -- @see preferred_positions
+-- @propemits true false
+-- @propbeautiful
 
 --- The default tooltip alignment.
 -- @beautiful beautiful.tooltip_align
@@ -272,26 +291,23 @@ function tooltip:set_align(value)
     self._private.align = value
 
     set_geometry(self)
-    self:emit_signal("property::align")
+    self:emit_signal("property::align", value)
 end
 
 --- The shape of the tooltip window.
--- If the shape require some parameters, use `set_shape`.
 --
 -- @DOC_awful_tooltip_shape_EXAMPLE@
 --
 -- @property shape
+-- @tparam gears.shape shape
 -- @see gears.shape
--- @see set_shape
--- @see beautiful.tooltip_shape
+-- @propemits true false
+-- @propbeautiful
 
---- Set the tooltip shape.
--- All other arguments will be passed to the shape function.
--- @tparam gears.shape s The shape
--- @see shape
--- @see gears.shape
 function tooltip:set_shape(s)
     self.backgroundbox:set_shape(s)
+
+    self:emit_signal("property::shape", s)
 end
 
 --- Set the tooltip positioning mode.
@@ -314,12 +330,13 @@ end
 --
 -- @property mode
 -- @param string
+-- @propemits true false
 
 function tooltip:set_mode(mode)
     self._private.mode = mode
 
     set_geometry(self)
-    self:emit_signal("property::mode")
+    self:emit_signal("property::mode", mode)
 end
 
 function tooltip:get_mode()
@@ -346,6 +363,7 @@ end
 --
 -- @property preferred_positions
 -- @tparam table preferred_positions The position, ordered by priorities
+-- @propemits true false
 -- @see align
 -- @see mode
 -- @see preferred_alignments
@@ -359,6 +377,8 @@ function tooltip:set_preferred_positions(value)
     self._private.preferred_positions = value
 
     set_geometry(self)
+
+    self:emit_signal("property::preferred_positions", value)
 end
 
 --- The preferred alignment when using the `outside` mode.
@@ -390,6 +410,7 @@ end
 --
 -- @property preferred_alignments
 -- @param string
+-- @propemits true false
 -- @see preferred_positions
 
 function tooltip:get_preferred_alignments()
@@ -401,14 +422,16 @@ function tooltip:set_preferred_alignments(value)
     self._private.preferred_alignments = value
 
     set_geometry(self)
+
+    self:emit_signal("property::preferred_alignments", value)
 end
 
 --- Change displayed text.
 --
 -- @property text
--- @tparam tooltip self The tooltip object.
 -- @tparam string  text New tooltip text, passed to
 --   `wibox.widget.textbox.set_text`.
+-- @propemits true false
 -- @see wibox.widget.textbox
 
 function tooltip:set_text(text)
@@ -416,14 +439,16 @@ function tooltip:set_text(text)
     if self._private.visible then
         set_geometry(self)
     end
+
+    self:emit_signal("property::text", text)
 end
 
 --- Change displayed markup.
 --
 -- @property markup
--- @tparam tooltip self The tooltip object.
 -- @tparam string  text New tooltip markup, passed to
 --   `wibox.widget.textbox.set_markup`.
+-- @propemits true false
 -- @see wibox.widget.textbox
 
 function tooltip:set_markup(text)
@@ -431,30 +456,34 @@ function tooltip:set_markup(text)
     if self._private.visible then
         set_geometry(self)
     end
+
+    self:emit_signal("property::markup", text)
 end
 
 --- Change the tooltip's update interval.
 --
 -- @property timeout
--- @tparam tooltip self A tooltip object.
 -- @tparam number timeout The timeout value.
+-- @propemits true false
 
 function tooltip:set_timeout(timeout)
     if self.timer then
         self.timer.timeout = timeout
     end
+    self:emit_signal("property::timeout", timeout)
 end
 
---- Set all margins around the tooltip textbox
+--- Set all margins around the tooltip textbox.
 --
 -- @DOC_awful_tooltip_margins_EXAMPLE@
 --
 -- @property margins
--- @tparam tooltip self A tooltip object
--- @tparam number New margins value
+-- @tparam number|table New margins value.
+-- @propemits true false
 
 function tooltip:set_margins(val)
     self.marginbox:set_margins(val)
+    self:emit_signal("property::margins", val)
 end
 
 --- The border width.
@@ -463,9 +492,12 @@ end
 --
 -- @property border_width
 -- @param number
+-- @propemits true false
+-- @propbeautiful
 
 function tooltip:set_border_width(val)
-    self.widget.shape_border_width = val
+    self.widget.border_width = val
+    self:emit_signal("property::border_width", val)
 end
 
 --- The border color.
@@ -473,23 +505,26 @@ end
 -- @DOC_awful_tooltip_border_color_EXAMPLE@
 --
 -- @property border_color
--- @param gears.color
+-- @param color
+-- @propemits true false
 
 function tooltip:set_border_color(val)
-    self.widget.shape_border_color = val
+    self.widget.border_color = val
+    self:emit_signal("property::border_color", val)
 end
 
---- Set the margins around the left and right of the tooltip textbox
+--- Set the margins around the left and right of the tooltip textbox.
 --
 -- @DOC_awful_tooltip_margins_leftright_EXAMPLE@
 --
 -- @property margins_leftright
--- @tparam tooltip self A tooltip object
--- @tparam number New margins value
+-- @tparam number New margins value.
+-- @propemits true false
 
 function tooltip:set_margin_leftright(val)
     self.marginbox:set_left(val)
     self.marginbox:set_right(val)
+    self:emit_signal("property::margin_leftright", val)
 end
 
 --TODO v5 deprecate this
@@ -497,17 +532,18 @@ function tooltip:set_margins_leftright(val)
     self:set_margin_leftright(val)
 end
 
---- Set the margins around the top and bottom of the tooltip textbox
+--- Set the margins around the top and bottom of the tooltip textbox.
 --
 -- @DOC_awful_tooltip_margins_topbottom_EXAMPLE@
 --
 -- @property margins_topbottom
--- @tparam tooltip self A tooltip object
--- @tparam number New margins value
+-- @tparam number New margins value.
+-- @propemits true false
 
 function tooltip:set_margin_topbottom(val)
     self.marginbox:set_top(val)
     self.marginbox:set_bottom(val)
+    self:emit_signal("property::margin_topbottom", val)
 end
 
 --TODO v5 deprecate this
@@ -515,12 +551,28 @@ function tooltip:set_margins_topbottom(val)
     self:set_margin_topbottom(val)
 end
 
+--- Set the margins between the tooltip and its parent.
+--
+-- @DOC_awful_tooltip_gaps_EXAMPLE@
+--
+-- @property gaps
+-- @tparam number|table New margins value.
+-- @propemits true false
+
+function tooltip:set_gaps(val)
+    self._private.gaps = val
+end
+
+function tooltip:get_gaps()
+    return self._private.gaps
+end
+
 --- Add tooltip to an object.
 --
 -- @tparam tooltip self The tooltip.
 -- @tparam gears.object obj An object with `mouse::enter` and
 --   `mouse::leave` signals.
--- @function add_to_object
+-- @method add_to_object
 function tooltip:add_to_object(obj)
     if not obj then return end
 
@@ -533,7 +585,7 @@ end
 -- @tparam tooltip self The tooltip.
 -- @tparam gears.object obj An object with `mouse::enter` and
 --   `mouse::leave` signals.
--- @function remove_from_object
+-- @method remove_from_object
 function tooltip:remove_from_object(obj)
     obj:disconnect_signal("mouse::enter", self.show)
     obj:disconnect_signal("mouse::leave", self.hide)
@@ -563,21 +615,22 @@ end
 --   seconds.
 -- @tparam[opt=apply_dpi(5)] integer args.margin_leftright The left/right margin for the text.
 -- @tparam[opt=apply_dpi(3)] integer args.margin_topbottom The top/bottom margin for the text.
--- @tparam[opt=nil] gears.shape args.shape The shape
--- @tparam[opt] string args.bg The background color
--- @tparam[opt] string args.fg The foreground color
--- @tparam[opt] string args.border_color The tooltip border color
--- @tparam[opt] number args.border_width The tooltip border width
--- @tparam[opt] string args.align The horizontal alignment
--- @tparam[opt] string args.font The tooltip font
--- @tparam[opt] number args.opacity The tooltip opacity
+-- @tparam[opt=nil] gears.shape args.shape The shape.
+-- @tparam[opt] string args.bg The background color.
+-- @tparam[opt] string args.fg The foreground color.
+-- @tparam[opt] string args.border_color The tooltip border color.
+-- @tparam[opt] number args.border_width The tooltip border width.
+-- @tparam[opt] string args.align The horizontal alignment.
+-- @tparam[opt] string args.font The tooltip font.
+-- @tparam[opt] number args.opacity The tooltip opacity.
+-- @tparam[opt] table|number args.gaps The tooltip margins.
 -- @treturn awful.tooltip The created tooltip.
 -- @see add_to_object
 -- @see timeout
 -- @see text
 -- @see markup
 -- @see align
--- @function awful.tooltip
+-- @constructorfct awful.tooltip
 function tooltip.new(args)
     -- gears.object, properties are linked to set_/get_ functions
     local self = object {
@@ -590,6 +643,10 @@ function tooltip.new(args)
     self._private.align   = args.align or beautiful.tooltip_align  or "right"
     self._private.shape   = args.shape or beautiful.tooltip_shape
                                 or shape.rectangle
+    self._private.gaps  = args.gaps or beautiful.tooltip_gaps or {
+        left = args.gaps or 0, right  = args.gaps or 0,
+        top  = args.gaps or 0, bottom = args.gaps or 0
+    }
 
     -- private data
     if args.delay_show then
@@ -663,7 +720,7 @@ function tooltip.new(args)
         or beautiful.bg_focus or "#ffcb60"
     local border_width = args.border_width or beautiful.tooltip_border_width or 0
     local border_color = args.border_color or beautiful.tooltip_border_color
-        or beautiful.border_normal or "#ffcb60"
+        or beautiful.border_color_normal or "#ffcb60"
 
     -- Set wibox default properties
     self.wibox_properties = {
@@ -679,23 +736,23 @@ function tooltip.new(args)
     self.widget = wibox.widget {
         {
             {
-                id = 'text_role',
-                font = font,
+                id     = 'text_role',
+                font   = font,
                 widget = wibox.widget.textbox,
             },
-            id = 'margin_role',
-            left = m_lr,
-            right = m_lr,
-            top = m_tb,
+            id     = 'margin_role',
+            left   = m_lr,
+            right  = m_lr,
+            top    = m_tb,
             bottom = m_tb,
             widget = wibox.container.margin,
         },
-        id = 'background_role',
-        bg = bg,
-        shape = self._private.shape,
-        shape_border_width = border_width,
-        shape_border_color = border_color,
-        widget = wibox.container.background,
+        id           = 'background_role',
+        bg           = bg,
+        shape        = self._private.shape,
+        border_width = border_width,
+        border_color = border_color,
+        widget       = wibox.container.background,
     }
     self.textbox = self.widget:get_children_by_id('text_role')[1]
     self.marginbox = self.widget:get_children_by_id('margin_role')[1]
@@ -721,6 +778,8 @@ end
 function tooltip.mt:__call(...)
     return tooltip.new(...)
 end
+
+--@DOC_object_COMMON@
 
 return setmetatable(tooltip, tooltip.mt)
 

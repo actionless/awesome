@@ -1,9 +1,10 @@
 ---------------------------------------------------------------------------
+-- Restrict a widget size using one of multiple available strategies.
 --
 --@DOC_wibox_container_defaults_constraint_EXAMPLE@
 -- @author Lukáš Hrázký
 -- @copyright 2012 Lukáš Hrázký
--- @classmod wibox.container.constraint
+-- @containermod wibox.container.constraint
 ---------------------------------------------------------------------------
 
 local setmetatable = setmetatable
@@ -39,34 +40,35 @@ function constraint:fit(context, width, height)
 end
 
 --- The widget to be constrained.
+--
 -- @property widget
 -- @tparam widget widget The widget
+-- @interface container
 
-function constraint:set_widget(widget)
-    self._private.widget = widget
-    self:emit_signal("widget::layout_changed")
-end
+constraint.set_widget = base.set_widget_common
 
 function constraint:get_widget()
     return self._private.widget
 end
 
---- Get the number of children element
--- @treturn table The children
 function constraint:get_children()
     return {self._private.widget}
 end
 
---- Replace the layout children
--- This layout only accept one children, all others will be ignored
--- @tparam table children A table composed of valid widgets
 function constraint:set_children(children)
     self:set_widget(children[1])
 end
 
---- Set the strategy to use for the constraining. Valid values are 'max',
--- 'min' or 'exact'. Throws an error on invalid values.
+--- Set the strategy to use for the constraining.
+-- Valid values are:
+--
+-- * **max**: Never allow the size to be larger than the limit.
+-- * **min**: Never allow the size to tbe below the limit.
+-- * **exact**: Force the widget size.
+--
 -- @property strategy
+-- @tparam string strategy Either 'max', 'min' or 'exact'.
+-- @propemits true false
 
 function constraint:set_strategy(val)
     local func = {
@@ -87,6 +89,7 @@ function constraint:set_strategy(val)
 
     self._private.strategy = func[val]
     self:emit_signal("widget::layout_changed")
+    self:emit_signal("property::strategy", val)
 end
 
 function constraint:get_strategy()
@@ -94,12 +97,15 @@ function constraint:get_strategy()
 end
 
 --- Set the maximum width to val. nil for no width limit.
+--
 -- @property height
--- @param number
+-- @tparam number height
+-- @propemits true false
 
 function constraint:set_width(val)
     self._private.width = val
     self:emit_signal("widget::layout_changed")
+    self:emit_signal("property::width", val)
 end
 
 function constraint:get_width()
@@ -107,20 +113,28 @@ function constraint:get_width()
 end
 
 --- Set the maximum height to val. nil for no height limit.
+--
 -- @property width
--- @param number
+-- @tparam number width
+-- @propemits true false
 
 function constraint:set_height(val)
     self._private.height = val
     self:emit_signal("widget::layout_changed")
+    self:emit_signal("property::height", val)
 end
 
 function constraint:get_height()
     return self._private.height
 end
 
---- Reset this layout. The widget will be unreferenced, strategy set to "max"
+--- Reset this layout.
+--
+--The widget will be unreferenced, strategy set to "max"
 -- and the constraints set to nil.
+--
+-- @method reset
+-- @interface container
 function constraint:reset()
     self._private.width = nil
     self._private.height = nil
@@ -129,6 +143,7 @@ function constraint:reset()
 end
 
 --- Returns a new constraint container.
+--
 -- This container will constraint the size of a
 -- widget according to the strategy. Note that this will only work for layouts
 -- that respect the widget's size, eg. fixed layout. In layouts that don't
@@ -140,7 +155,7 @@ end
 -- @param[opt] width The maximum width of the widget. nil for no limit.
 -- @param[opt] height The maximum height of the widget. nil for no limit.
 -- @treturn table A new constraint container
--- @function wibox.container.constraint
+-- @constructorfct wibox.container.constraint
 local function new(widget, strategy, width, height)
     local ret = base.make_widget(nil, nil, {enable_properties = true})
 

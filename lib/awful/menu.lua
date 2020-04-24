@@ -1,11 +1,11 @@
 --------------------------------------------------------------------------------
---- A menu for awful
+--- A menu for awful.
 --
 -- @author Damien Leone &lt;damien.leone@gmail.com&gt;
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @author dodo
 -- @copyright 2008, 2011 Damien Leone, Julien Danjou, dodo
--- @module awful.menu
+-- @popupmod awful.menu
 --------------------------------------------------------------------------------
 
 local wibox = require("wibox")
@@ -50,6 +50,7 @@ end
 
 --- The icon used for sub-menus.
 -- @beautiful beautiful.menu_submenu_icon
+-- @tparam string|gears.surface menu_submenu_icon
 
 --- The menu text font.
 -- @beautiful beautiful.menu_font
@@ -118,8 +119,8 @@ local function load_theme(a, b)
     local fallback = beautiful.get()
     if a.reset      then b = fallback end
     if a == "reset" then a = fallback end
-    ret.border = a.border_color or b.menu_border_color or b.border_normal or
-                 fallback.menu_border_color or fallback.border_normal
+    ret.border = a.border_color or b.menu_border_color or b.border_color_normal or
+                 fallback.menu_border_color or fallback.border_color_normal
     ret.border_width= a.border_width or b.menu_border_width or b.border_width or
                       fallback.menu_border_width or fallback.border_width or dpi(0)
     ret.fg_focus = a.fg_focus or b.menu_fg_focus or b.fg_focus or
@@ -358,6 +359,7 @@ end
 --- Show a menu.
 -- @param args The arguments
 -- @param args.coords Menu position defaulting to mouse.coords()
+-- @method show
 function menu:show(args)
     args = args or {}
     local coords = args.coords or nil
@@ -371,6 +373,7 @@ function menu:show(args)
 end
 
 --- Hide a menu popup.
+-- @method hide
 function menu:hide()
     -- Remove items from screen
     for i = 1, #self.items do
@@ -389,6 +392,7 @@ end
 --- Toggle menu visibility.
 -- @param args The arguments
 -- @param args.coords Menu position {x,y}
+-- @method toggle
 function menu:toggle(args)
     if self.wibox.visible then
         self:hide()
@@ -397,7 +401,8 @@ function menu:toggle(args)
     end
 end
 
---- Update menu content
+--- Update menu content.
+-- @method update
 function menu:update()
     if self.wibox.visible then
         self:show({ coords = { x = self.x, y = self.y } })
@@ -407,6 +412,7 @@ end
 
 --- Get the elder parent so for example when you kill
 -- it, it will destroy the whole family.
+-- @method get_root
 function menu:get_root()
     return self.parent and menu.get_root(self.parent) or self
 end
@@ -417,6 +423,7 @@ end
 -- @param args.new (Default: awful.menu.entry) The menu entry constructor.
 -- @param[opt] args.theme The menu entry theme.
 -- @param[opt] index The index where the new entry will inserted.
+-- @method add
 function menu:add(args, index)
     if not args then return end
     local theme = load_theme(args.theme or {}, self.theme)
@@ -439,13 +446,14 @@ function menu:add(args, index)
 
 
     -- Create bindings
-    item._background:buttons(gtable.join(
+    item._background.buttons = {
         button({}, 3, function () self:hide() end),
         button({}, 1, function ()
             local num = gtable.hasitem(self.items, item)
             self:item_enter(num, { mouse = true })
             self:exec(num, { exec = true, mouse = true })
-        end )))
+        end)
+    }
 
 
     item._mouse = function ()
@@ -470,8 +478,9 @@ function menu:add(args, index)
     return item
 end
 
---- Delete menu entry at given position
--- @param num The position in the table of the menu entry to be deleted; can be also the menu entry itself
+--- Delete menu entry at given position.
+-- @param num The position in the table of the menu entry to be deleted; can be also the menu entry itself.
+-- @method delete
 function menu:delete(num)
     if type(num) == "table" then
         num = gtable.hasitem(self.items, num)
@@ -511,6 +520,9 @@ end
 --   returning `true` or `false` to indicate whether the client should be
 --   included in the menu.
 -- @return The menu.
+-- @constructorfct awful.menu.clients
+-- @request client activate menu.clients granted When clicking on a clients menu
+--  element.
 function menu.clients(args, item_args, filter)
     local cls_t = {}
     for c in client_iterate(filter or function() return true end) do
@@ -541,12 +553,36 @@ function menu.clients(args, item_args, filter)
     return m
 end
 
+local clients_menu = nil
+
+--- Use menu.clients to build and open the client menu if it isn't already open.
+-- Close the client menu if it is already open.
+-- See `awful.menu.clients` for more information.
+-- @tparam[opt] table args Menu table, see `new()` for more information.
+-- @tparam[opt] table item_args Table that will be merged into each item, see
+--   `new()` for more information.
+-- @tparam[opt] func filter A function taking a client as an argument and
+--   returning `true` or `false` to indicate whether the client should be
+--   included in the menu.
+-- @return The menu.
+-- @constructorfct awful.menu.client_list
+function menu.client_list(args, item_args, filter)
+    if clients_menu and clients_menu.wibox.visible then
+        clients_menu:hide()
+        clients_menu = nil
+    else
+        clients_menu = menu.clients(args, item_args, filter)
+    end
+    return clients_menu
+end
+
 --------------------------------------------------------------------------------
 
---- Default awful.menu.entry constructor
+--- Default awful.menu.entry constructor.
 -- @param parent The parent menu (TODO: This is apparently unused)
 -- @param args the item params
 -- @return table with 'widget', 'cmd', 'akey' and all the properties the user wants to change
+-- @constructorfct awful.menu.entry
 function menu.entry(parent, args) -- luacheck: no unused args
     args = args or {}
     args.text = args[1] or args.text or ""
@@ -646,17 +682,18 @@ end
 -- * Key auto_expand controls the submenu auto expand behaviour by setting it to true (default) or false.
 --
 -- @param parent Specify the parent menu if we want to open a submenu, this value should never be set by the user.
+-- @constructorfct awful.menu
 -- @usage -- The following function builds and shows a menu of clients that match
 -- -- a particular rule.
 -- -- Bound to a key, it can be used to select from dozens of terminals open on
 -- -- several tags.
--- -- When using @{rules.match_any} instead of @{rules.match},
+-- -- When using @{ruled.client.match_any} instead of @{ruled.client.match},
 -- -- a menu of clients with different classes could be build.
 --
 -- function terminal_menu ()
 --   terms = {}
 --   for i, c in pairs(client.get()) do
---     if awful.rules.match(c, {class = "URxvt"}) then
+--     if ruled.client.match(c, {class = "URxvt"}) then
 --       terms[i] =
 --         {c.name,
 --          function()

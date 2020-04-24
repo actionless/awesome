@@ -31,7 +31,7 @@
  *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @classmod key
+ * @coreclassmod key
  */
 
 #include "objects/key.h"
@@ -42,6 +42,8 @@
 #include <X11/Xlib.h>
 #include <xkbcommon/xkbcommon.h>
 #include <glib.h>
+
+lua_class_t key_class;
 
 /** Key object.
  *
@@ -74,17 +76,17 @@
 /** Get the number of instances.
  *
  * @return The number of key objects alive.
- * @function instances
+ * @staticfct instances
  */
 
 /** Set a __index metamethod for all key instances.
  * @tparam function cb The meta-method
- * @function set_index_miss_handler
+ * @staticfct set_index_miss_handler
  */
 
 /** Set a __newindex metamethod for all key instances.
  * @tparam function cb The meta-method
- * @function set_newindex_miss_handler
+ * @staticfct set_newindex_miss_handler
  */
 
 static void
@@ -275,8 +277,8 @@ luaA_key_set_modifiers(lua_State *L, keyb_t *k)
 LUA_OBJECT_EXPORT_PROPERTY(key, keyb_t, modifiers, luaA_pushmodifiers)
 
 /* It's caller's responsibility to release the returned string. */
-static char *
-get_keysym_name(xkb_keysym_t keysym)
+char *
+key_get_keysym_name(xkb_keysym_t keysym)
 {
     const ssize_t bufsize = 64;
     char *buf = p_new(char, bufsize);
@@ -310,7 +312,7 @@ luaA_key_get_key(lua_State *L, keyb_t *k)
     }
     else
     {
-        char *name = get_keysym_name(k->keysym);
+        char *name = key_get_keysym_name(k->keysym);
         if(!name)
             return 0;
         lua_pushstring(L, name);
@@ -322,7 +324,7 @@ luaA_key_get_key(lua_State *L, keyb_t *k)
 static int
 luaA_key_get_keysym(lua_State *L, keyb_t *k)
 {
-    char *name = get_keysym_name(k->keysym);
+    char *name = key_get_keysym_name(k->keysym);
     if(!name)
         return 0;
     lua_pushstring(L, name);

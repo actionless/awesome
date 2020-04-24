@@ -47,6 +47,14 @@ typedef enum {
     CLIENT_TITLEBAR_COUNT = 4
 } client_titlebar_t;
 
+typedef enum {
+    CLIENT_UNMANAGE_DESTROYED = 0,
+    CLIENT_UNMANAGE_USER = 1,
+    CLIENT_UNMANAGE_REPARENT = 2,
+    CLIENT_UNMANAGE_UNMAP = 3,
+    CLIENT_UNMANAGE_FAILED = 4
+} client_unmanage_t;
+
 /* Special bit we invented to "fake" unset hints */
 #define MWM_HINTS_AWESOME_SET   (1L << 15)
 
@@ -192,7 +200,7 @@ struct client_t
 ARRAY_FUNCS(client_t *, client, DO_NOTHING)
 
 /** Client class */
-lua_class_t client_class;
+extern lua_class_t client_class;
 
 LUA_OBJECT_FUNCS(client_class, client_t, client)
 
@@ -206,7 +214,7 @@ void client_ban_unfocus(client_t *);
 void client_unban(client_t *);
 void client_manage(xcb_window_t, xcb_get_geometry_reply_t *, xcb_get_window_attributes_reply_t *);
 bool client_resize(client_t *, area_t, bool);
-void client_unmanage(client_t *, bool);
+void client_unmanage(client_t *, client_unmanage_t);
 void client_kill(client_t *);
 void client_set_sticky(lua_State *, int, bool);
 void client_set_above(lua_State *, int, bool);
@@ -244,6 +252,8 @@ void client_refresh_partial(client_t *, int16_t, int16_t, uint16_t, uint16_t);
 void client_class_setup(lua_State *);
 void client_send_configure(client_t *);
 void client_find_transient_for(client_t *);
+void client_emit_scanned(void);
+void client_emit_scanning(void);
 drawable_t *client_get_drawable(client_t *, int, int);
 drawable_t *client_get_drawable_offset(client_t *, int *, int *);
 

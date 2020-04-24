@@ -38,8 +38,6 @@ include_directories(
     ${AWESOME_REQUIRED_INCLUDE_DIRS}
     ${AWESOME_OPTIONAL_INCLUDE_DIRS})
 
-set(CHECK_TARGETS check-integration)
-
 set(AWE_ICON_DIR ${SOURCE_DIR}/icons)
 set(AWE_THEMES_DIR ${SOURCE_DIR}/themes)
 
@@ -71,6 +69,7 @@ set(AWE_SRCS
     ${BUILD_DIR}/strut.c
     ${BUILD_DIR}/systray.c
     ${BUILD_DIR}/xwindow.c
+    ${BUILD_DIR}/options.c
     ${BUILD_DIR}/xkb.c
     ${BUILD_DIR}/xrdb.c
     ${BUILD_DIR}/common/atoms.c
@@ -90,7 +89,11 @@ set(AWE_SRCS
     ${BUILD_DIR}/objects/drawin.c
     ${BUILD_DIR}/objects/key.c
     ${BUILD_DIR}/objects/screen.c
+    ${BUILD_DIR}/objects/selection_acquire.c
+    ${BUILD_DIR}/objects/selection_transfer.c
+    ${BUILD_DIR}/objects/selection_watcher.c
     ${BUILD_DIR}/objects/tag.c
+    ${BUILD_DIR}/objects/selection_getter.c
     ${BUILD_DIR}/objects/window.c)
 
 set(AWE_MAN_SRCS
@@ -237,7 +240,7 @@ if(GENERATE_MANPAGES)
                 set(asciilang ${lang})
             endif()
             add_custom_command(
-                COMMAND ${ASCIIDOCTOR_EXECUTABLE} -a lang=${asciilang} -d manpage -b manpage -o ${manfile} - < ${txtfile}
+                COMMAND ${ASCIIDOCTOR_EXECUTABLE} -a lang=${asciilang} -d manpage -b manpage -o ${manfile} ${txtfile}
                 WORKING_DIRECTORY ${BUILD_DIR}/${relpath2}
                 OUTPUT  ${manfile}
                 DEPENDS ${txtfile}
@@ -282,15 +285,12 @@ if(GENERATE_DOC)
     # Copy the images to the build directory
     file(COPY ${SOURCE_DIR}/docs/images DESTINATION ${BUILD_DIR}/doc)
 
-    # Copy the aliases to the build directory
-    file(COPY ${SOURCE_DIR}/docs/aliases DESTINATION ${BUILD_DIR}/docs)
-    file(COPY ${SOURCE_DIR}/docs/ldoc.css DESTINATION ${BUILD_DIR}/docs)
+    # Copy ldoc files.
+    configure_file(${SOURCE_DIR}/docs/ldoc.css ${BUILD_DIR}/docs COPYONLY)
+    configure_file(${SOURCE_DIR}/docs/ldoc.ltp ${BUILD_DIR}/docs COPYONLY)
 
     add_custom_target(ldoc ALL
-        DEPENDS
-            ${BUILD_DIR}/doc/index.html
-            ${BUILD_DIR}/docs/ldoc.css
-            generate_awesomerc
+        DEPENDS ${BUILD_DIR}/doc/index.html
     )
 
     if (STRICT_TESTS)
@@ -303,7 +303,15 @@ if(GENERATE_DOC)
         OUTPUT  ${BUILD_DIR}/doc/index.html
         COMMAND ${LDOC_EXECUTABLE} ${ldoc_args}
         WORKING_DIRECTORY ${AWE_DOC_DIR}
-        DEPENDS ${AWE_SRCS} ${AWE_LUA_FILES} ${AWE_MD_FILES} ${BUILD_DIR}/docs/config.ld generate-examples ${BUILD_DIR}/docs/ldoc.css
+        DEPENDS
+            ${AWE_SRCS}
+            ${AWE_LUA_FILES}
+            ${AWE_MD_FILES}
+            ${BUILD_DIR}/docs/config.ld
+            ${BUILD_DIR}/docs/ldoc.css
+            ${BUILD_DIR}/docs/ldoc.ltp
+            generate_awesomerc
+            generate-examples
         COMMENT "Generating API documentation${ldoc_desc_suffix}")
 endif()
 # }}}
@@ -387,23 +395,34 @@ endif()
 # }}}
 
 # {{{ Tests
+add_custom_target(check DEPENDS check-integration)
+
 add_executable(test-gravity tests/test-gravity.c)
 target_link_libraries(test-gravity
     ${AWESOME_COMMON_REQUIRED_LDFLAGS} ${AWESOME_REQUIRED_LDFLAGS})
+if(DO_COVERAGE)
+    set(TESTS_RUN_ENV DO_COVERAGE=1)
+endif()
+
+# Start AwesomeWM tests with `--screen off`
+if ("${TEST_MANUAL_SCREENS}" MATCHES "1")
+    set(TEST_RUN_ARGS "--W --m")
+endif()
+
 add_custom_target(check-integration
-    ${CMAKE_COMMAND} -E env CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ./tests/run.sh \$\${TEST_RUN_ARGS:--W}
+    ${CMAKE_COMMAND} -E env CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ${TESTS_RUN_ENV} ./tests/run.sh \$\${TEST_RUN_ARGS:--W}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running integration tests"
     DEPENDS ${PROJECT_AWE_NAME}
     USES_TERMINAL)
 add_dependencies(check-integration test-gravity)
 add_custom_target(check-themes
-    ${CMAKE_COMMAND} -E env CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ./tests/themes/run.sh
+    ${CMAKE_COMMAND} -E env CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}' ${TESTS_RUN_ENV} ./tests/themes/run.sh
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Testing themes"
     USES_TERMINAL
     DEPENDS generated_icons generate_awesomerc ${PROJECT_AWE_NAME})
-list(APPEND CHECK_TARGETS check-themes)
+add_dependencies(check check-themes)
 
 add_custom_target(check-requires
     lua "${CMAKE_SOURCE_DIR}/build-utils/check_for_invalid_requires.lua"
@@ -414,25 +433,23 @@ add_custom_target(check-requires
 list(APPEND CHECK_QA_TARGETS check-requires)
 a_find_program(BUSTED_EXECUTABLE busted FALSE)
 if(BUSTED_EXECUTABLE)
-    # Keep the arguments in sync with the version below!
+    if(DO_COVERAGE)
+        set(BUSTED_ARGS "--coverage")
+    else()
+        set(BUSTED_ARGS)
+    endif()
     add_custom_target(check-unit
-        ${BUSTED_EXECUTABLE}
+        COMMAND ${BUSTED_EXECUTABLE} ${BUSTED_ARGS}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running unit tests"
         VERBATIM)
-    list(APPEND CHECK_TARGETS check-unit)
-
-    # Same as above, but with --coverage argument
-    add_custom_target(check-unit-coverage
-        ${BUSTED_EXECUTABLE} "--coverage"
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Running unit tests under LuaCov"
-        VERBATIM)
 else()
     add_custom_target(check-unit true
-        COMMENT "Skipping check-unit, since busted was not found"
+        COMMENT "Skipping check-unit, since busted was not found (during configuration)"
         VERBATIM)
 endif()
+add_dependencies(check check-unit)
+
 a_find_program(LUACHECK_EXECUTABLE luacheck FALSE)
 if(LUACHECK_EXECUTABLE)
     add_custom_target(luacheck
@@ -443,7 +460,7 @@ if(LUACHECK_EXECUTABLE)
     list(APPEND CHECK_QA_TARGETS luacheck)
 endif()
 add_custom_target(check-qa DEPENDS ${CHECK_QA_TARGETS})
-add_custom_target(check DEPENDS ${CHECK_TARGETS} check-qa)
+add_dependencies(check check-qa check-examples)
 # }}}
 
 INCLUDE(${CMAKE_SOURCE_DIR}/Packaging.cmake)

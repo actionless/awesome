@@ -1,3 +1,10 @@
+_G.key = setmetatable({
+    set_index_miss_handler = function() end,
+    set_newindex_miss_handler = function() end
+}, {
+    __call = function() return {} end
+})
+
 local function assert_markup_format(markup)
     if #markup == 0 then
         return
@@ -49,6 +56,9 @@ insulate('main', function ()
     _G.keygrabber = {
         run                       = function() end,
         stop                      = function() end,
+    }
+    _G.client = {
+        connect_signal = function() end
     }
     -- luacheck: globals string
     function string.wlen(self)

@@ -32,6 +32,7 @@ local utils = {}
 -- Options section
 
 --- Terminal which applications that need terminal would open in.
+-- @param[opt="xterm"] string
 utils.terminal = 'xterm'
 
 --- The default icon for applications that don't provide any icon in
@@ -39,6 +40,7 @@ utils.terminal = 'xterm'
 local default_icon = nil
 
 --- Name of the WM for the OnlyShowIn entry in the .desktop file.
+-- @param[opt="awesome"] string
 utils.wm_name = "awesome"
 
 -- Maps keys in desktop entries to suitable getter function.
@@ -127,22 +129,11 @@ local all_icon_sizes = {
     '16x16'
 }
 
---- List of supported icon formats.
-local icon_formats = { "png", "xpm", "svg" }
-
---- Check whether the icon format is supported.
--- @param icon_file Filename of the icon.
--- @return true if format is supported, false otherwise.
-local function is_format_supported(icon_file)
-    for _, f in ipairs(icon_formats) do
-        if icon_file:match('%.' .. f) then
-            return true
-        end
-    end
-    return false
-end
+--- List of supported icon exts.
+local supported_icon_file_exts = { png = 1, xpm = 2, svg = 3 }
 
 local icon_lookup_path = nil
+
 --- Get a list of icon lookup paths.
 -- @treturn table A list of directories, without trailing slash.
 local function get_icon_lookup_path()
@@ -210,6 +201,7 @@ end
 
 --- Remove CR newline from the end of the string.
 -- @param s string to trim
+-- @staticfct menubar.utils.rtrim
 function utils.rtrim(s)
     if not s then return end
     if string.byte(s, #s) == 13 then
@@ -221,32 +213,34 @@ end
 --- Lookup an icon in different folders of the filesystem.
 -- @tparam string icon_file Short or full name of the icon.
 -- @treturn string|boolean Full name of the icon, or false on failure.
+-- @staticfct menubar.utils.lookup_icon_uncached
 function utils.lookup_icon_uncached(icon_file)
     if not icon_file or icon_file == "" then
         return false
     end
 
-    if icon_file:sub(1, 1) == '/' and is_format_supported(icon_file) then
-        -- If the path to the icon is absolute and its format is
-        -- supported, do not perform a lookup.
+    local icon_file_ext = icon_file:match(".+%.(.*)$")
+    if icon_file:sub(1, 1) == '/' and supported_icon_file_exts[icon_file_ext] then
+        -- If the path to the icon is absolute do not perform a lookup [nil if unsupported ext or missing]
         return gfs.file_readable(icon_file) and icon_file or nil
     else
+        -- Look for the requested file in the lookup path
         for _, directory in ipairs(get_icon_lookup_path()) do
-            if is_format_supported(icon_file) and
-                    gfs.file_readable(directory .. "/" .. icon_file) then
-                return directory .. "/" .. icon_file
+            local possible_file = directory .. "/" .. icon_file
+            -- Check to see if file exists if requested with a valid extension
+            if supported_icon_file_exts[icon_file_ext] and gfs.file_readable(possible_file) then
+                return possible_file
             else
-                -- Icon is probably specified without path and format,
-                -- like 'firefox'. Try to add supported extensions to
-                -- it and see if such file exists.
-                for _, format in ipairs(icon_formats) do
-                    local possible_file = directory .. "/" .. icon_file .. "." .. format
-                    if gfs.file_readable(possible_file) then
-                        return possible_file
+                -- Find files with any supported extension if icon specified without, eg: 'firefox'
+                for ext, _ in pairs(supported_icon_file_exts) do
+                    local possible_file_new_ext = possible_file .. "." .. ext
+                    if gfs.file_readable(possible_file_new_ext) then
+                        return possible_file_new_ext
                     end
                 end
             end
         end
+        -- No icon found
         return false
     end
 end
@@ -255,6 +249,7 @@ local lookup_icon_cache = {}
 --- Lookup an icon in different folders of the filesystem (cached).
 -- @param icon Short or full name of the icon.
 -- @return full name of the icon.
+-- @staticfct menubar.utils.lookup_icon
 function utils.lookup_icon(icon)
     if not lookup_icon_cache[icon] and lookup_icon_cache[icon] ~= false then
         lookup_icon_cache[icon] = utils.lookup_icon_uncached(icon)
@@ -265,6 +260,7 @@ end
 --- Parse a .desktop file.
 -- @param file The .desktop file.
 -- @return A table with file entries.
+-- @staticfct menubar.utils.parse_desktop_file
 function utils.parse_desktop_file(file)
     local program = { show = true, file = file }
 
@@ -297,17 +293,19 @@ function utils.parse_desktop_file(file)
         -- Only check these values is NoDisplay is true (or non-existent)
 
         -- Only show the program if there is no OnlyShowIn attribute
-        -- or if it contains wm_name
-        if program.OnlyShowIn then
-            program.show = false -- Assume false until found
-            for _, wm in ipairs(program.OnlyShowIn) do
-                if wm == utils.wm_name then
-                    program.show = true
-                    break
+        -- or if it contains wm_name or wm_name is empty
+        if utils.wm_name ~= "" then
+            if program.OnlyShowIn then
+                program.show = false -- Assume false until found
+                for _, wm in ipairs(program.OnlyShowIn) do
+                    if wm == utils.wm_name then
+                        program.show = true
+                        break
+                    end
                 end
+            else
+                program.show = true
             end
-        else
-            program.show = true
         end
 
         -- Only need to check NotShowIn if the program is being shown
@@ -359,6 +357,7 @@ end
 -- @tparam function callback Will be fired when all the files were parsed
 -- with the resulting list of menu entries as argument.
 -- @tparam table callback.programs Paths of found .desktop files.
+-- @staticfct menubar.utils.parse_dir
 function utils.parse_dir(dir_path, callback)
 
     local function get_readable_path(file)
@@ -422,6 +421,7 @@ end
 -- @tparam str text Text.
 -- @tparam number|screen s Screen
 -- @treturn int Text width.
+-- @staticfct menubar.utils.compute_text_width
 function utils.compute_text_width(text, s)
     local w, _ = w_textbox(gstring.xml_escape(text)):get_preferred_size(s)
     return w

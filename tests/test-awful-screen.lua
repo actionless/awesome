@@ -64,6 +64,40 @@ local steps = {
 
             return true
         end
+    end,
+    -- Make sure the error code still works when all screens are gone.
+    function()
+        while screen.count() > 0 do
+            -- Before removing them, check if `name` works.
+            assert(screen[1].name == "screen1")
+            screen[1].name = "foo"
+            assert(screen[1].name == "foo")
+            assert(screen.foo == screen[1])
+
+            screen[1]:fake_remove()
+        end
+
+        -- Don't make the test fail.
+        local called = false
+        require("gears.debug").print_warning = function() called = true end
+
+        -- Cause an error in a protected call!
+        awesome.emit_signal("debug::error", "err")
+
+        assert(called)
+
+        return true
+    end,
+    -- Test the `automatic_factory` getter and setter.
+    function()
+        assert(type(screen.automatic_factory) == "boolean")
+        local orig = screen.automatic_factory
+        screen.automatic_factory = not orig
+        assert(screen.automatic_factory ~= orig)
+        assert(type(screen.automatic_factory) == "boolean")
+        screen.automatic_factory = not screen.automatic_factory
+        assert(screen.automatic_factory == orig)
+        return true
     end
 }
 

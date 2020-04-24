@@ -6,13 +6,16 @@ local cairo = require("lgi").cairo
 
 local function new_drawin(_, args)
     local ret = gears_obj()
-    ret.data = {drawable = gears_obj()}
+    ret._private = {drawable = gears_obj()}
+
+    -- Deprecated.
+    ret.data = ret._private
 
     ret.x=0
     ret.y=0
     ret.width=1
     ret.height=1
-    ret.border_width=0
+    ret._border_width=0
     ret.ontop = false
     ret.below = false
     ret.above = false
@@ -31,13 +34,22 @@ local function new_drawin(_, args)
         }
     end
 
-    ret.data.drawable.valid    = true
-    ret.data.drawable.surface  = cairo.ImageSurface(cairo.Format.ARGB32, 0, 0)
-    ret.data.drawable.geometry = ret.geometry
-    ret.data.drawable.refresh  = function() end
+    ret._private.drawable.valid    = true
+    ret._private.drawable.surface  = cairo.ImageSurface(cairo.Format.ARGB32, 0, 0)
+    ret._private.drawable.geometry = ret.geometry
+    ret._private.drawable.refresh  = function() end
+    ret._private._struts           = { top = 0, right = 0, left = 0, bottom = 0 }
 
-    for _, k in pairs{ "buttons", "struts", "get_xproperty", "set_xproperty" } do
+    for _, k in pairs{ "_buttons", "get_xproperty", "set_xproperty" } do
         ret[k] = function() end
+    end
+
+    function ret:struts(new)
+        for k, v in pairs(new or {}) do
+            ret._private._struts[k] = v
+        end
+
+        return ret._private._struts
     end
 
     local md = setmetatable(ret, {

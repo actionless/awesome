@@ -59,6 +59,7 @@
 #include "property.h"
 #include "xwindow.h"
 
+lua_class_t window_class;
 LUA_CLASS_FUNCS(window, window_class)
 
 static xcb_window_t
@@ -515,7 +516,7 @@ window_class_setup(lua_State *L)
     static const struct luaL_Reg window_meta[] =
     {
         { "struts", luaA_window_struts },
-        { "buttons", luaA_window_buttons },
+        { "_buttons", luaA_window_buttons },
         { "set_xproperty", luaA_window_set_xproperty },
         { "get_xproperty", luaA_window_get_xproperty },
         { NULL, NULL }
@@ -530,15 +531,15 @@ window_class_setup(lua_State *L)
                             NULL,
                             (lua_class_propfunc_t) luaA_window_get_window,
                             NULL);
-    luaA_class_add_property(&window_class, "opacity",
+    luaA_class_add_property(&window_class, "_opacity",
                             (lua_class_propfunc_t) luaA_window_set_opacity,
                             (lua_class_propfunc_t) luaA_window_get_opacity,
                             (lua_class_propfunc_t) luaA_window_set_opacity);
-    luaA_class_add_property(&window_class, "border_color",
+    luaA_class_add_property(&window_class, "_border_color",
                             (lua_class_propfunc_t) luaA_window_set_border_color,
                             (lua_class_propfunc_t) luaA_window_get_border_color,
                             (lua_class_propfunc_t) luaA_window_set_border_color);
-    luaA_class_add_property(&window_class, "border_width",
+    luaA_class_add_property(&window_class, "_border_width",
                             (lua_class_propfunc_t) luaA_window_set_border_width,
                             (lua_class_propfunc_t) luaA_window_get_border_width,
                             (lua_class_propfunc_t) luaA_window_set_border_width);

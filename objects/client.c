@@ -63,7 +63,7 @@
  *
  * To execute a callback when a new client is added, use the `manage` signal:
  *
- *    client.connect_signal("manage", function(c)
+ *    client.connect_signal("request::manage", function(c)
  *        -- do something
  *    end)
  *
@@ -82,9 +82,11 @@
  * To get all the clients for a screen use either `screen.clients` or
  * `screen.tiled_clients`.
  *
+ * @DOC_uml_nav_tables_client_EXAMPLE@
+ *
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @classmod client
+ * @coreclassmod client
  */
 
 #include "objects/client.h"
@@ -105,6 +107,8 @@
 #include <xcb/xcb_atom.h>
 #include <xcb/shape.h>
 #include <cairo-xcb.h>
+
+lua_class_t client_class;
 
 /** Client class.
  *
@@ -129,15 +133,34 @@
  * it is only useful when setting or getting these properties require code to
  * executed.
  *
- * @table awful.object
+ * @table awful.client.object
+ */
+
+/** AwesomeWM is about to scan for existing clients.
+ *
+ * Connect to this signal when code needs to be executed after screens are
+ * initialized, but before clients are added.
+ *
+ * @signal scanning
+ * @classsignal
+ */
+
+/** AwesomeWM is done scanning for clients.
+ *
+ * This is emitted before the `startup` signal and after the `scanning` signal.
+ *
+ * @signal scanned
+ * @classsignal
  */
 
 /** When a client gains focus.
  * @signal focus
+ * @classsignal
  */
 
 /** Before manage, after unmanage, and when clients swap.
  * @signal list
+ * @classsignal
  */
 
 /** When 2 clients are swapped
@@ -147,31 +170,75 @@
  */
 
 /** When a new client appears and gets managed by Awesome.
- * @signal manage
+ *
+ * This request should be implemented by code which track the client. It isn't
+ * recommended to use this to initialize the client content. This use case is
+ * a better fit for `ruled.client`, which has built-in dependency management.
+ * Using this request to mutate the client state will likely conflict with
+ * `ruled.client`.
+ *
+ * @signal request::manage
+ * @tparam client c The client.
+ * @tparam string context What created the client. It is currently either "new"
+ *  or "startup".
+ * @tparam table hints More metadata (currently empty, it exists for compliance
+ *  with the other `request::` signals).
+ * @request client border added granted When a new client needs a its initial
+ *  border settings.
+ * @classsignal
  */
 
-/**
+/** When a client is going away.
+ *
+ * Each places which store `client` objects in non-weak table or whose state
+ * depend on the current client should answer this request.
+ *
+ * The contexts are:
+ *
+ * * **user**: `c:unmanage()` was called.
+ * * **reparented**: The window was reparented to another window. It is no
+ *   longer a stand alone client.
+ * * **destroyed**: The window was closed.
+ *
+ * @signal request::unmanage
+ * @tparam client c The client.
+ * @tparam string context Why was the client unmanaged.
+ * @tparam table hints More metadata (currently empty, it exists for compliance
+ *  with the other `request::` signals).
+ * @classsignal
+ */
+
+/** Use `request::manage`.
+ * @deprecatedsignal manage
+ */
+
+/** Use `request::unmanage`.
+ * @deprecatedsignal unmanage
+ */
+
+/** When a mouse button is pressed in a client.
  * @signal button::press
  */
 
-/**
+/** When a mouse button is released in a client.
+ *
  * @signal button::release
  */
 
-/**
+/** When the mouse enters a client.
+ *
  * @signal mouse::enter
  */
 
-/**
+/** When the mouse leaves a client.
+ *
  * @signal mouse::leave
  */
 
 /**
+ * When the mouse moves within a client.
+ *
  * @signal mouse::move
- */
-
-/**
- * @signal property::window
  */
 
 /** When a client should get activated (focused and/or raised).
@@ -197,7 +264,7 @@
  *   (from `awful.client.focus.history.previous`).
  * * *menu.clients*: When using the builtin client menu
  *   (from `awful.menu.clients`).
- * * *rules*: When a new client is focused from a rule (from `awful.rules`).
+ * * *rules*: When a new client is focused from a rule (from `ruled.client`).
  * * *screen.focus*: When a screen is focused (from `awful.screen.focus`).
  *
  * Default implementation: `awful.ewmh.activate`.
@@ -208,189 +275,345 @@
  * @tparam string context The context where this signal was used.
  * @tparam[opt] table hints A table with additional hints:
  * @tparam[opt=false] boolean hints.raise should the client be raised?
+ * @request client activate ewmh granted When the client asks to be activated.
+ * @classsignal
  */
 
-/**
+/** When an event could lead to the client being activated.
+ *
+ * This is an layer "on top" of `request::activate` for event which are not
+ * actual request for activation/focus, but where "it would be nice" if the
+ * client got the focus. This includes the focus-follow-mouse model and focusing
+ * previous clients when the selected tag changes.
+ *
+ * This idea is that `request::autoactivate` will emit `request::activate`.
+ * However it is much easier to replace the handler for `request::autoactivate`
+ * than it is to replace the handler for `request::activate`. Thus it provides
+ * a nice abstraction to simplify handling the focus when switching tags or
+ * moving the mouse.
+ *
+ * @signal request::autoactivate
+ * @tparam string context The context where this signal was used.
+ * @tparam[opt] table hints A table with additional hints:
+ * @tparam[opt=false] boolean hints.raise should the client be raised?
+ * @classsignal
+ *
+ */
+
+/** When something request a client geometry to be modified.
+ *
  * @signal request::geometry
  * @tparam client c The client
  * @tparam string context Why and what to resize. This is used for the
  *   handlers to know if they are capable of applying the new geometry.
  * @tparam[opt={}] table Additional arguments. Each context handler may
  *   interpret this differently.
+ * @request client geometry client_maximize_horizontal granted When a client
+ *  (programmatically) asks for the maximization to be changed.
+ * @request client geometry client_maximize_vertical granted When a client
+ *  (programmatically) asks for the maximization to be changed.
+ * @classsignal
  */
 
-/**
+/** When the tag requests to be moved to a tag or needs a new tag.
+ *
  * @signal request::tag
+ * @classsignal
  */
 
-/**
+/** When the client requests to become urgent.
+ *
  * @signal request::urgent
+ * @classsignal
+ */
+
+/** Emitted during startup to gather the default client mousebindings.
+ *
+ * This signals gives a chance to all module to register new client keybindings.
+ * Assuming the client rules does not overwrite them with the `keys` property,
+ * they will be added to all clients.
+ *
+ * @signal request::default_mousebindings
+ * @tparam string context The reason why the signal was sent (currently always
+ *  `startup`).
+ * @classsignal
+*/
+
+/** Emitted during startup to gather the default client keybindings.
+ *
+ * This signals gives a chance to all module to register new client keybindings.
+ * Assuming the client rules does not overwrite them with the `keys` property,
+ * they will be added to all clients.
+ *
+ * @signal request::default_keybindings
+ * @tparam string context The reason why the signal was sent (currently always
+ *  `startup`).
+ * @classsignal
+ */
+
+/** Sent once when AwesomeWM starts to add default keybindings.
+ *
+ * Keybindings can be set directly on clients. Actually, older version of
+ * AwesomeWM did that through the rules. However this makes it impossible for
+ * auto-configured modules to add their own keybindings. Using the signals,
+ * `rc.lua` or any module can cleanly manage keybindings.
+ *
+ * @signal request::default_keybindings
+ * @tparam string context The context (currently always "startup").
+ * @classsignal
+ * @request client default_keybindings startup granted Sent when AwesomeWM starts.
  */
 
 /** When a client gets tagged.
  * @signal tagged
- * @tag t The tag object.
+ * @tparam tag t The tag object.
  */
 
 /** When a client gets unfocused.
  * @signal unfocus
  */
 
-/**
- * @signal unmanage
- */
-
 /** When a client gets untagged.
  * @signal untagged
- * @tag t The tag object.
+ * @tparam tag t The tag object.
  */
 
 /**
+ * Emitted when the client is raised within its layer.
+ *
  * @signal raised
+ * @see below
+ * @see above
+ * @see ontop
+ * @see raise
+ * @see lower
+ * @see lowered
  */
 
-/**
+/** Emitted when the client is lowered within its layer.
+ *
  * @signal lowered
+ * @see below
+ * @see above
+ * @see ontop
+ * @see raise
+ * @see lower
+ * @see raised
  */
 
 /**
  * The focused `client` or nil (in case there is none).
  *
+ * It is not recommanded to set the focused client using
+ * this property. Please use `c:activate{}` instead of
+ * `client.focus = c`. Setting the focus directly bypasses
+ * all the filters and emits fewer signals, which tend to
+ * cause unwanted side effects and make it harder to alter
+ * the code behavior in the future. It usually takes *more*
+ * code to use this rather than `:activate{}` because all
+ * the boilerplate code (such as `c:raise()`) needs to be
+ * added everywhere.
+ *
+ * The main use case for this field is to check *when* there
+ * is an active client.
+ *
+ *     if client.focus ~= nil then
+ *         -- do something
+ *     end
+ *
+ * If you want to check if a client is active, use:
+ *
+ *     if c.active then
+ *         -- do something
+ *     end
+ *
  * @tfield client focus
+ * @see active
+ * @see activate
+ * @see request::activate
  */
 
 /**
  * The X window id.
  *
- * **Signal:**
- *
- *  * *property::window*
+ * This is rarely useful, but some DBus protocols will
+ * have this ID in their API, so it can be useful when
+ * writing AwesomeWM bindings for them.
  *
  * @property window
- * @param string
+ * @tparam integer window
+ * @propemits false false
  */
 
 /**
  * The client title.
  *
- * **Signal:**
- *
- *  * *property::name*
+ * This is the text which will be shown in `awful.widget.tasklist`
+ * and `awful.titlebar.widget.titlewidget`.
  *
  * @property name
- * @param string
+ * @tparam string name
+ * @propemits false false
+ * @see awful.titlebar
+ * @see awful.widget.tasklist
  */
 
 /**
  * True if the client does not want to be in taskbar.
  *
- * **Signal:**
+ * Some clients, like docked bars or some `sticky` clients
+ * such as wallpaper sensors like Conky have no value in
+ * the `awful.widget.tasklist` and should not be shown there.
  *
- *  * *property::skip\_taskbar*
+ * The default value of this property reflects the value of the
+ * `_NET_WM_STATE_SKIP_TASKBAR` X11 protocol xproperty. Clients can modify this
+ * state through this property.
  *
  * @property skip_taskbar
- * @param boolean
+ * @tparam[opt=false] boolean skip_taskbar
+ * @propemits false false
+ * @see sticky
  */
 
 /**
  * The window type.
  *
+ * This is useful in, among other places, the `ruled.client` rules to apply
+ * different properties depending on the client types. It is also used
+ * throughout the API to alter the client (and `wibox`) behavior depending on
+ * the `type`. For example, clients with the `dock` type are placed on the side
+ * of the screen while other like `combo` are totally ignored and never
+ * considered `client`s in the first place.
+ *
  * Valid types are:
  *
- * * **desktop**: The root client, it cannot be moved or resized.
- * * **dock**: A client attached to the side of the screen.
- * * **splash**: A client, usually without titlebar shown when an application starts.
- * * **dialog**: A dialog, see `transient_for`.
- * * **menu**: A context menu.
- * * **toolbar**: A floating toolbar.
- * * **utility**:
- * * **dropdown_menu**: A context menu attached to a parent position.
- * * **popup_menu**: A context menu.
- * * **notification**: A notification popup.
- * * **combo**: A combobox list menu.
- * * **dnd**: A drag and drop indicator.
- * * **normal**: A normal application main window.
+ * <table class='widget_list' border=1>
+ * <tr style='font-weight: bold;'>
+ *  <th align='center'>Name</th>
+ *  <th align='center'>Description</th>
+ * </tr>
+ * <tr><td><b>desktop</b></td><td>The root client, it cannot be moved or resized.</td></tr>
+ * <tr><td><b>dock</b></td><td>A client attached to the side of the screen.</td></tr>
+ * <tr><td><b>splash</b></td><td>A client, usually without titlebar shown when an application starts.</td></tr>
+ * <tr><td><b>dialog</b></td><td>A dialog, see `transient_for`.</td></tr>
+ * <tr><td><b>menu</b></td><td>A context menu.</td></tr>
+ * <tr><td><b>toolbar</b></td><td>A floating toolbar.</td></tr>
+ * <tr><td><b>utility</b></td><td></td></tr>
+ * <tr><td><b>dropdown_menu</b></td><td>A context menu attached to a parent position.</td></tr>
+ * <tr><td><b>popup_menu</b></td><td>A context menu.</td></tr>
+ * <tr><td><b>notification</b></td><td>A notification popup.</td></tr>
+ * <tr><td><b>combo</b></td><td>A combobox list menu.</td></tr>
+ * <tr><td><b>dnd</b></td><td>A drag and drop indicator.</td></tr>
+ * <tr><td><b>normal</b></td><td>A normal application main window.</td></tr>
+ * </table>
  *
  * More information can be found [here](https://specifications.freedesktop.org/wm-spec/wm-spec-latest.html#idm140200472629520)
  *
- * **Signal:**
- *
- *  * *property::type*
- *
  * @property type
- * @param string
+ * @tparam string type
+ * @propemits false false
+ * @see ruled.client
  */
 
 /**
  * The client class.
  *
- * To get a client class from the command line, use the command `xprop
- * WM_CLASS`. The class will be the second string.
+ * A class usually maps to the application name. It is useful in, among other
+ * places, the rules to apply different properties to different clients. It
+ * is also useful, along with `instance`, to implement "windows counter"
+ * used in many popular docks and Alt-Tab like popups.
  *
- * **Signal:**
+ * To get a client class from the command line, use the command:
  *
- *  * *property::class*
+ *    xprop WM_CLASS
+ *
+ * The class will be the second string.
+ *
+ * This *should* never change after the client is created, but some
+ * buggy application like the Spotify desktop client are known to
+ * violate the specification and do it anyway. There *is* a signal for
+ * this property, but it should hopefully never be useful. If your
+ * applications change their classes, please report a bug to them
+ * and point to ICCCM §4.1.2.5.
+ * It tends to break `ruled.client` and other AwesomeWM APIs.
  *
  * @property class
- * @param string
+ * @tparam string class
+ * @propemits false false
+ * @see instance
+ * @see ruled.client
  */
 
 /**
  * The client instance.
  *
- * To get a client instance from the command line, use the command `xprop
- * WM_CLASS`. The instance will be the first string.
+ * The `instance` is a subtype of the `class`. Each `class` can have
+ * multiple instances. This is useful in the `ruled.client` rules to
+ * filter clients and apply different properties to them.
  *
- * **Signal:**
+ * To get a client instance from the command line, use the command:
  *
- *  * *property::instance*
+ *     xprop WM_CLASS
+ *
+ * The instance will be the first string.
+ *
+ * This *should* never change after the client is created. There
+ * *is* a signal for * this property, but it should hopefully never
+ * be useful. If your applications change their classes, please
+ * report a bug to them and point to ICCCM §4.1.2.5.
+ * It tends to break `ruled.client` and other AwesomeWM APIs.
  *
  * @property instance
- * @param string
+ * @tparam string instance
+ * @propemits false false
+ * @see class
+ * @see ruled.client
  */
 
 /**
  * The client PID, if available.
  *
- * **Signal:**
- *
- *  * *property::pid*
+ * This will never change.
  *
  * @property pid
- * @param number
+ * @tparam integer pid
+ * @propemits false false
  */
 
 /**
  * The window role, if available.
  *
- * **Signal:**
- *
- *  * *property::role*
- *
  * @property role
- * @param string
+ * @tparam string role
+ * @propemits false false
+ * @see instance
+ * @see class
  */
 
 /**
  * The machine client is running on.
  *
- * **Signal:**
+ * X11 windows can "live" in another computer but shown
+ * in another one. This is called "network transparency"
+ * and is either used directly by allowing remote windows
+ * using the `xhosts` command for using proxies such as
+ * `ssh -X` or `ssh -Y`.
  *
- *  * *property::machine*
+ * According to EWMH, this property contains the value
+ * returned by `gethostname()` on the computer that the
+ * client is running on.
  *
  * @property machine
- * @param string
+ * @tparam string machine
+ * @propemits false false
  */
 
 /**
  * The client name when iconified.
  *
- * **Signal:**
- *
- *  * *property::icon\_name*
- *
  * @property icon_name
- * @param string
+ * @tparam string icon_name
+ * @propemits false false
  */
 
 /**
@@ -409,67 +632,65 @@
  * the same icon, it will cause a double-free error and Awesome will crash. To
  * get a copy of the icon, you can use:
  *
- *     local s = gears.surface(c.icon)
- *     local img = cairo.ImageSurface.create(cairo.Format.ARGB32, s:get_width(), s:get_height())
- *     local cr  = cairo.Context(img)
- *     cr:set_source_surface(s, 0, 0)
- *     cr:paint()
- *
- * **Signal:**
- *
- *  * *property::icon*
+ *    local s = gears.surface(c.icon)
+ *    local img = cairo.ImageSurface.create(cairo.Format.ARGB32, s:get_width(), s:get_height())
+ *    local cr  = cairo.Context(img)
+ *    cr:set_source_surface(s, 0, 0)
+ *    cr:paint()
  *
  * @property icon
- * @param surface
+ * @tparam surface icon
+ * @propemits false false
  * @usage local ib = wibox.widget.imagebox(c.icon)
+ * @see awful.widget.clienticon
  */
 
 /**
  * The available sizes of client icons. This is a table where each entry
  * contains the width and height of an icon.
  *
- * **Signal:**
- *
- *  * *property::icon\_sizes*
- *
  * @property icon_sizes
  * @tparam table sizes
+ * @propemits false false
+ * @see awful.widget.clienticon
  * @see get_icon
  */
 
 /**
  * Client screen.
  *
- * **Signal:**
+ * The `screen` corresponds to the top-left corner of the window.
  *
- *  * *property::screen*
+ * Please note that clients can only be on one screen at once. X11
+ * does not natively allow clients to be in multiple locations at
+ * once. Changing the screen directly will affect the tags and may
+ * cause several other changes to the state in order to ensure that
+ * a client's position and its screen are consistent.
  *
  * @property screen
- * @param screen
+ * @tparam screen screen
+ * @propemits false false
+ * @see move_to_screen
  */
 
 /**
  * Define if the client must be hidden, i.e. never mapped,
  *   invisible in taskbar.
  *
- * **Signal:**
- *
- *  * *property::hidden*
- *
  * @property hidden
- * @param boolean
+ * @tparam boolean hidden
+ * @propemits false false
+ * @see minimized
  */
 
 /**
  * Define it the client must be iconify, i.e. only visible in
  *   taskbar.
  *
- * **Signal:**
- *
- *  * *property::minimized*
- *
  * @property minimized
- * @param boolean
+ * @tparam boolean minimized
+ * @propemits false false
+ * @see hidden
  */
 
 /**
@@ -479,46 +700,41 @@
  * multiple of the character size. Honoring size hints will cause the terminal
  * window to have a small gap at the bottom.
  *
- * This is enabled by default. To disable it by default, see `awful.rules`.
- *
- * **Signal:**
- *
- *  * *property::size\_hints\_honor*
+ * This is enabled by default. To disable it by default, see `ruled.client`.
  *
  * @property size_hints_honor
- * @param boolean
+ * @tparam boolean size_hints_honor
+ * @propemits false false
  * @see size_hints
  */
 
 /**
  * The client border width.
+ *
  * @property border_width
- * @param integer
+ * @tparam integer border_width
+ * @propemits false false
+ * @see request::border
  */
 
 /**
  * The client border color.
  *
- * **Signal:**
- *
- *  * *property::border\_color*
- *
- * @see gears.color
- *
  * @property border_color
- * @param pattern Any string, gradients and patterns will be converted to a
+ * @tparam color border_color Any string, gradients and patterns will be converted to a
  *  cairo pattern.
+ * @propemits false false
+ * @see request::border
+ * @see gears.color
  */
 
 /**
  * The client urgent state.
  *
- * **Signal:**
- *
- *  * *property::urgent*
- *
  * @property urgent
- * @param boolean
+ * @tparam boolean urgent
+ * @propemits false false
+ * @see request::border
  */
 
 /**
@@ -532,141 +748,210 @@
  *
  *    gears.surface(c.content):write_to_png(path)
  *
+ * Please note that this only creates a new cairo surface
+ * referring to the client's content. This means that
+ * changes to the client's content may or may not become
+ * visible in the returned surface. If you want to take a
+ * screenshot, a copy of the surface's content needs to
+ * be taken. Note that the content of parts of a window
+ * that are currently not visible are undefined.
+ *
+ * The only way to get an animated client screenshot widget is to poll this
+ * property multiple time per seconds. This is obviously a bad idea.
+ *
+ * This property has no signals when the content changes.
+ *
  * @property content
- * @param surface
+ * @tparam surface content
+ * @see gears.surface
  */
 
 /**
  * The client opacity.
  *
- * **Signal:**
- *
- *  * *property::opacity*
- *
  * @property opacity
- * @param number Between 0 (transparent) to 1 (opaque)
+ * @tparam number opacity Between 0 (transparent) to 1 (opaque).
+ * @propemits false false
+ * @see request::border
  */
 
 /**
  * The client is on top of every other windows.
+ *
  * @property ontop
- * @param boolean
+ * @tparam boolean ontop
+ * @propemits false false
+ * @see below
+ * @see above
  */
 
 /**
  * The client is above normal windows.
  *
- * **Signal:**
- *
- *  * *property::above*
- *
  * @property above
- * @param boolean
+ * @tparam boolean above
+ * @propemits false false
+ * @see below
+ * @see ontop
  */
 
 /**
  * The client is below normal windows.
  *
- * **Signal:**
- *
- *  * *property::below*
- *
  * @property below
- * @param boolean
+ * @tparam boolean below
+ * @propemits false false
+ * @see above
+ * @see ontop
  */
 
 /**
  * The client is fullscreen or not.
  *
- * **Signal:**
- *
- *  * *property::fullscreen*
+ * @DOC_sequences_client_fullscreen_EXAMPLE@
  *
  * @property fullscreen
- * @param boolean
+ * @tparam boolean fullscreen
+ * @propemits false false
+ * @request client geometry fullscreen granted When the client must be resized
+ *  because it became (or stop being) fullscreen.
  */
 
 /**
  * The client is maximized (horizontally and vertically) or not.
  *
- * **Signal:**
- *
- *  * *property::maximized*
+ * @DOC_sequences_client_maximized_EXAMPLE@
  *
  * @property maximized
- * @param boolean
+ * @tparam boolean maximized
+ * @propemits false false
+ * @request client geometry maximized granted When the client must be resized
+ *  because it became (or stop being) maximized.
+ * @see request::border
  */
 
 /**
  * The client is maximized horizontally or not.
  *
- * **Signal:**
- *
- *  * *property::maximized\_horizontal*
+ * @DOC_sequences_client_maximized_horizontal_EXAMPLE@
  *
  * @property maximized_horizontal
- * @param boolean
+ * @tparam boolean maximized_horizontal
+ * @propemits false false
+ * @request client geometry maximized_horizontal granted When the client must be resized
+ *  because it became (or stop being) maximized horizontally.
  */
 
 /**
  * The client is maximized vertically or not.
  *
- * **Signal:**
- *
- *  * *property::maximized\_vertical*
+ * @DOC_sequences_client_maximized_vertical_EXAMPLE@
  *
  * @property maximized_vertical
- * @param boolean
+ * @tparam boolean maximized_vertical
+ * @propemits false false
+ * @request client geometry maximized_vertical granted When the client must be resized
+ *  because it became (or stop being) maximized vertically.
  */
 
 /**
  * The client the window is transient for.
  *
- * **Signal:**
+ * A transient window is a client that "belongs" to another
+ * client. If the client is also `modal`, then  the parent client
+ * cannot be focused while the child client exists.
+ * This is common for "Save as" dialogs or other dialogs where it
+ * is not possible to modify the content of the "parent" client
+ * while the dialog is open.
  *
- *  * *property::transient\_for*
+ * However, `modal` is not a requirement for using the `transient_for`
+ * concept. "Tools" such as popup palette in canvas-and-palettes
+ * applications can belong to each other without being modal.
  *
  * @property transient_for
- * @param client
+ * @tparam client transient_for
+ * @propemits false false
+ * @see modal
+ * @see type
+ * @see is_transient_for
+ * @see get_transient_for_matching
  */
 
 /**
  * Window identification unique to a group of windows.
  *
- * **Signal:**
- *
- *  * *property::group\_window*
+ * This is the ID of the group window, not a client object.
+ * The group window is most likely not a visible client, but
+ * only an invisible and internal window.
  *
  * @property group_window
- * @param client
+ * @tparam integer group_window
+ * @propemits false false
+ * @see leader_window
  */
 
 /**
  * Identification unique to windows spawned by the same command.
+ *
+ * This is the ID of the group window, not a client object.
+ *
  * @property leader_window
- * @param client
+ * @tparam number leader_window
+ * @propemits false false
+ * @see transient_for
+ * @see modal
+ * @see group_window
  */
 
 /**
  * A table with size hints of the client.
  *
- * **Signal:**
+ * For details on the meaning of the fields, refer to ICCCM § 4.1.2.3
+ * `WM_NORMAL_HINTS`.
  *
- *  * *property::size\_hints*
+ * Please note that most fields are optional and may or may not be set.
+ *
+ * When the client is tiled, the `size_hints` usually get in the way and
+ * cause the layouts to behave incorrectly. To mitigate this, it is often
+ * advised to set `size_hints_honor` to `false` in the `ruled.client` rules.
  *
  * @property size_hints
- * @param table
- * @tfield integer table.user_position
- * @tfield integer table.user_size
- * @tfield integer table.program_position
- * @tfield integer table.program_size
- * @tfield integer table.max_width
- * @tfield integer table.max_height
- * @tfield integer table.min_width
- * @tfield integer table.min_height
- * @tfield integer table.width_inc
- * @tfield integer table.height_inc
+ * @tparam[opt] table|nil hints The hints.
+ * @tparam[opt] table|nil hints.user_position A table with `x` and `y` keys. It
+ *  contains the preferred position of the client. This is set when the
+ *  position has been modified by the user. See `program_position`.
+ * @tparam[opt] table|nil hints.program_position A table with `x` and `y` keys. It
+ *  contains the preferred position of the client. This is set when the
+ *  application itself requests a specific position. See `user_position`.
+ * @tparam[opt] table|nil hints.user_size A table with `width` and `height`. This
+ *  contains the client preferred size when it has previously been set by
+ *  the user. See `program_size` for the equivalent when the applications
+ *  itself wants to specify its preferred size.
+ * @tparam[opt] table|nil hints.program_size A table with `width` and `height`. This
+ *  contains the client preferred size as specified by the application.
+ * @tparam[opt] integer|nil hints.max_width The maximum width (in pixels).
+ * @tparam[opt] integer|nil hints.max_height The maximum height (in pixels).
+ * @tparam[opt] integer|nil hints.min_width The minimum width (in pixels).
+ * @tparam[opt] integer|nil hints.min_height The minimum height (in pixels).
+ * @tparam[opt] integer|nil hints.width_inc The number of pixels by which the
+ *  client width may be increased or decreased. For example, for terminals,
+ *  the size has to be proportional with the monospace font size.
+ * @tparam[opt] integer|nil hints.height_inc The number of pixels by which the
+ *  client height may be increased or decreased. For example, for terminals,
+ *  the size has to be proportional with the monospace font size.
+ * @tparam[opt] string|nil hints.win_gravity The client `gravity` defines the corder
+ *   from which the size is computed. For most clients, it is `north_west`, which
+ *   corresponds to the top-left of the window. This will affect how the client
+ *   is resized and other size related operations.
+ * @tparam[opt] integer|nil hints.min_aspect_num
+ * @tparam[opt] integer|nil hints.min_aspect_den
+ * @tparam[opt] integer|nil hints.max_aspect_num
+ * @tparam[opt] integer|nil hints.max_aspect_den
+ * @tparam[opt] integer|nil hints.base_width
+ * @tparam[opt] integer|nil hints.base_height
+ * @propemits false false
  * @see size_hints_honor
+ * @see geometry
  */
 
 /**
@@ -680,119 +965,169 @@
  * "resize" and "all" are set, this means that all but the resize function
  * should be enabled.
  *
- * **Signal:**
- *
- *  * *property::motif\_wm\_hints*
- *
  * @property motif_wm_hints
- * @param table
- * @tfield[opt] table table.functions
- * @tfield[opt] boolean table.functions.all
- * @tfield[opt] boolean table.functions.resize
- * @tfield[opt] boolean table.functions.move
- * @tfield[opt] boolean table.functions.minimize
- * @tfield[opt] boolean table.functions.maximize
- * @tfield[opt] boolean table.functions.close
- * @tfield[opt] table table.decorations
- * @tfield[opt] boolean table.decorations.all
- * @tfield[opt] boolean table.decorations.border
- * @tfield[opt] boolean table.decorations.resizeh
- * @tfield[opt] boolean table.decorations.title
- * @tfield[opt] boolean table.decorations.menu
- * @tfield[opt] boolean table.decorations.minimize
- * @tfield[opt] boolean table.decorations.maximize
- * @tfield[opt] string table.input_mode
- * @tfield[opt] table table.status
- * @tfield[opt] boolean table.status.tearoff_window
+ * @tparam table hints The hints.
+ * @tparam[opt] boolean hints.functions.all
+ * @tparam[opt] boolean hints.functions.resize
+ * @tparam[opt] boolean hints.functions.move
+ * @tparam[opt] boolean hints.functions.minimize
+ * @tparam[opt] boolean hints.functions.maximize
+ * @tparam[opt] boolean hints.functions.close
+ * @tparam[opt] boolean hints.decorations.all
+ * @tparam[opt] boolean hints.decorations.border
+ * @tparam[opt] boolean hints.decorations.resizeh
+ * @tparam[opt] boolean hints.decorations.title
+ * @tparam[opt] boolean hints.decorations.menu
+ * @tparam[opt] boolean hints.decorations.minimize
+ * @tparam[opt] boolean hints.decorations.maximize
+ * @tparam[opt] string hints.input_mode This is either `modeless`,
+ *  `primary_application_modal`, `system_modal`,
+ *  `full_application_modal` or `unknown`.
+ * @tparam[opt] boolean hints.status.tearoff_window
+ * @propemits false false
  */
 
 /**
  * Set the client sticky, i.e. available on all tags.
  *
- * **Signal:**
- *
- *  * *property::sticky*
+ * Please note that AwesomeWM implements `sticky` clients
+ * per screens rather than globally like some other
+ * implementations.
  *
  * @property sticky
- * @param boolean
+ * @tparam boolean sticky
+ * @propemits false false
+ * @see skip_taskbar
  */
 
 /**
  * Indicate if the client is modal.
  *
- * **Signal:**
+ * A transient window is a client that "belongs" to another
+ * client. If the client is also `modal`, then it always has
+ * to be on top of the other window *and* the parent client
+ * cannot be focused while the child client exists.
+ * This is common for "Save as" dialogs or other dialogs where
+ * is not possible to modify the content of the "parent" client
+ * while the dialog is open.
  *
- *  * *property::modal*
+ * However, `modal` is not a requirement for using the `transient_for`
+ * concept. "Tools" such as popup palette in canvas-and-palettes
+ * applications can belong to each other without being modal.
  *
  * @property modal
- * @param boolean
+ * @tparam boolean modal
+ * @propemits false false
+ * @see transient_for
  */
 
 /**
  * True if the client can receive the input focus.
  *
- * **Signal:**
- *
- *  * *property::focusable*
+ * The client will not get focused even when the user
+ * click on it.
  *
  * @property focusable
- * @param boolean
+ * @tparam boolean focusable
+ * @propemits false false
+ * @see shape_input
+ * @see client.focus
+ * @see active
+ * @see activate
  */
 
 /**
  * The client's bounding shape as set by awesome as a (native) cairo surface.
  *
- * **Signal:**
+ * The bounding shape is the outer shape of the client. It is outside of the
+ * border.
  *
- *  * *property::shape\_bounding*
+ * Do not use this directly unless you want total control over the shape (such
+ * as shape with holes). Even then, it is usually recommended to use transparency
+ * in the titlebars and a compositing manager. For the vast majority of use
+ * cases, use the `shape` property.
  *
- * @see gears.surface.apply_shape_bounding
  * @property shape_bounding
- * @param surface
+ * @tparam surface shape_bounding
+ * @propemits false false
+ * @see shape
+ * @see gears.surface.apply_shape_bounding
+ * @see gears.shape
+ * @see shape_clip
+ * @see shape_input
+ * @see client_shape_bounding
+ * @see client_shape_clip
+ * @see gears.surface
  */
 
 /**
  * The client's clip shape as set by awesome as a (native) cairo surface.
  *
- * **Signal:**
- *
- *  * *property::shape\_clip*
+ * The shape_clip is the shape of the client *content*. It is *inside* the
+ * border.
  *
  * @property shape_clip
- * @param surface
+ * @tparam surface shape_clip
+ * @propemits false false
+ * @see shape_bounding
+ * @see shape_input
+ * @see shape
+ * @see gears.surface.apply_shape_bounding
+ * @see gears.shape
+ * @see client_shape_bounding
+ * @see client_shape_clip
+ * @see gears.surface
  */
 
 /**
  * The client's input shape as set by awesome as a (native) cairo surface.
  *
- * **Signal:**
- *
- *  * *property::shape\_input*
+ * The input shape is the shape where mouse input will be passed to the
+ * client rather than propagated below it.
  *
  * @property shape_input
- * @param surface
+ * @tparam surface shape_input
+ * @propemits false false
+ * @see shape_bounding
+ * @see shape_clip
+ * @see shape
+ * @see gears.surface.apply_shape_bounding
+ * @see gears.shape
+ * @see client_shape_bounding
+ * @see client_shape_clip
+ * @see gears.surface
  */
 
 /**
  * The client's bounding shape as set by the program as a (native) cairo surface.
  *
- * **Signal:**
- *
- *  * *property::shape\_client\_bounding*
- *
  * @property client_shape_bounding
- * @param surface
+ * @tparam surface client_shape_bounding
+ * @propemits false false
+ * @see shape_bounding
+ * @see shape_clip
+ * @see shape_input
+ * @see shape
+ * @see gears.surface.apply_shape_bounding
+ * @see gears.shape
+ * @see client_shape_clip
+ * @see gears.surface
  */
 
 /**
  * The client's clip shape as set by the program as a (native) cairo surface.
  *
- * **Signal:**
- *
- *  * *property::shape\_client\_clip*
- *
  * @property client_shape_clip
- * @param surface
+ * @tparam surface client_shape_clip
+ * @propemits false false
+ * @see shape_bounding
+ * @see shape_clip
+ * @see shape_input
+ * @see shape
+ * @see gears.surface.apply_shape_bounding
+ * @see gears.shape
+ * @see client_shape_bounding
+ * @see gears.surface
  */
 
 /**
@@ -845,16 +1180,13 @@
  *        blacklisted_snid[snid] = c
  *    end
  *
- *    awful.rules.add_rule_source(
- *        "snid", fix_startup_id, {}, {"awful.spawn", "awful.rules"}
+ *    ruled.client.add_rule_source(
+ *        "snid", fix_startup_id, {}, {"awful.spawn", "ruled.client"}
  *    )
  *
- * **Signal:**
- *
- *  * *property::startup\_id*
- *
  * @property startup_id
- * @param string
+ * @tparam string startup_id
+ * @propemits false false
  * @see awful.spawn
  */
 
@@ -865,84 +1197,62 @@
  *
  *    local is_valid = pcall(function() return c.valid end) and c.valid
  *
- * **Signal:**
- *
- *  * *property::valid*
- *
  * @property valid
- * @param boolean
+ * @tparam boolean valid
+ * @propemits false false
+ * @see kill
  */
 
 /**
- * The first tag of the client.  Optimized form of `c:tags()[1]`.
+ * The first tag of the client.
  *
- * **Signal:**
- *
- *  * *property::first\_tag*
+ * Optimized form of `c:tags()[1]`. Not every workflow uses the
+ * ability to set multiple tags to a client. It is often enough
+ * to only get the first tag and ignore everything else.
  *
  * @property first_tag
- * @param tag
- */
-
-/** When the height or width changed.
- * @signal property::size
- * @see client.geometry
- */
-
-/** When the x or y coordinate changed.
- * @signal property::position
- * @see client.geometry
- */
-
-/**
- * The border color when the client is focused.
- *
- * @beautiful beautiful.border_focus
- * @param string
- */
-
-/**
- * The border color when the client is not focused.
- *
- * @beautiful beautiful.border_normal
- * @param string
- */
-
-/**
- * The client border width.
- *
- * @beautiful beautiful.border_width
- * @param integer
+ * @tparam tag first_tag
+ * @propemits false false
+ * @see tags
  */
 
 /** Return client struts (reserved space at the edge of the screen).
  *
- * @param struts A table with new strut values, or none.
- * @return A table with strut values.
- * @function struts
+ * The struts area is a table with a `left`, `right`, `top` and `bottom`
+ * keys to define how much space of the screen `workarea` this client
+ * should reserve for itself.
+ *
+ * This corresponds to EWMH's `_NET_WM_STRUT` and `_NET_WM_STRUT_PARTIAL`.
+ *
+ * @tparam table struts A table with new strut values, or none.
+ * @treturn table A table with strut values.
+ * @method struts
+ * @see geometry
+ * @see screen.workarea
  */
 
 /** Get or set mouse buttons bindings for a client.
  *
- * @param buttons_table An array of mouse button bindings objects, or nothing.
- * @return A table with all buttons.
- * @function buttons
+ * @property buttons
+ * @tparam table buttons
+ * @propemits false false
+ * @see awful.button
  */
 
 /** Get the number of instances.
  *
- * @return The number of client objects alive.
- * @function instances
+ * @treturn integer The number of client objects alive.
+ * @staticfct instances
  */
 
 /* Set a __index metamethod for all client instances.
  * @tparam function cb The meta-method
- * @function set_index_miss_handler
+ * @staticfct set_index_miss_handler
  */
 
 /* Set a __newindex metamethod for all client instances.
  * @tparam function cb The meta-method
- * @function set_newindex_miss_handler
+ * @staticfct set_newindex_miss_handler
  */
 
 typedef enum {
@@ -1037,6 +1347,20 @@ DO_CLIENT_SET_STRING_PROPERTY(startup_id)
 DO_CLIENT_SET_STRING_PROPERTY(role)
 DO_CLIENT_SET_STRING_PROPERTY(machine)
 #undef DO_CLIENT_SET_STRING_PROPERTY
+
+void
+client_emit_scanned(void)
+{
+    lua_State *L = globalconf_get_lua_State();
+    luaA_class_emit_signal(L, &client_class, "scanned", 0);
+}
+
+void
+client_emit_scanning(void)
+{
+    lua_State *L = globalconf_get_lua_State();
+    luaA_class_emit_signal(L, &client_class, "scanning", 0);
+}
 
 void
 client_set_motif_wm_hints(lua_State *L, int cidx, motif_wm_hints_t hints)
@@ -1156,6 +1480,9 @@ client_unfocus_internal(client_t *c)
     globalconf.focus.client = NULL;
 
     luaA_object_push(L, c);
+
+    lua_pushboolean(L, false);
+    luaA_object_emit_signal(L, -2, "property::active", 1);
     luaA_object_emit_signal(L, -1, "unfocus", 0);
     lua_pop(L, 1);
 }
@@ -1241,7 +1568,7 @@ client_restore_enterleave_events(void)
     check(globalconf.pending_enter_leave_begin.sequence != 0);
     pair.begin = globalconf.pending_enter_leave_begin;
     pair.end = xcb_no_operation(globalconf.connection);
-    xcb_ungrab_server(globalconf.connection);
+    xutil_ungrab_server(globalconf.connection);
     globalconf.pending_enter_leave_begin.sequence = 0;
     sequence_pair_array_append(&globalconf.ignore_enter_leave_events, pair);
 }
@@ -1273,8 +1600,11 @@ client_focus_update(client_t *c)
     luaA_object_push(L, c);
     client_set_urgent(L, -1, false);
 
-    if(focused_new)
+    if(focused_new) {
+        lua_pushboolean(L, true);
+        luaA_object_emit_signal(L, -2, "property::active", 1);
         luaA_object_emit_signal(L, -1, "focus", 0);
+    }
 
     lua_pop(L, 1);
 
@@ -1587,7 +1917,7 @@ client_manage(xcb_window_t w, xcb_get_geometry_reply_t *wgeom, xcb_get_window_at
                                  globalconf.screen->root,
                                  XCB_CW_EVENT_MASK,
                                  ROOT_WINDOW_EVENT_MASK);
-    xcb_ungrab_server(globalconf.connection);
+    xutil_ungrab_server(globalconf.connection);
 
     /* Do this now so that we don't get any events for the above
      * (Else, reparent could cause an UnmapNotify) */
@@ -1674,7 +2004,19 @@ client_manage(xcb_window_t w, xcb_get_geometry_reply_t *wgeom, xcb_get_window_at
 
     luaA_class_emit_signal(L, &client_class, "list", 0);
 
+    /* Add the context */
+    if (globalconf.loop == NULL)
+        lua_pushstring(L, "startup");
+    else
+        lua_pushstring(L, "new");
+
+    /* Hints */
+    lua_newtable(L);
+
     /* client is still on top of the stack; emit signal */
+    luaA_object_emit_signal(L, -3, "request::manage", 2);
+
+    /*TODO v6: remove this*/
     luaA_object_emit_signal(L, -1, "manage", 0);
 
     xcb_generic_error_t *error = xcb_request_check(globalconf.connection, reparent_cookie);
@@ -1683,7 +2025,7 @@ client_manage(xcb_window_t w, xcb_get_geometry_reply_t *wgeom, xcb_get_window_at
                 NONULL(c->name), NONULL(c->class), NONULL(c->instance));
         event_handle((xcb_generic_event_t *) error);
         p_delete(&error);
-        client_unmanage(c, true);
+        client_unmanage(c, CLIENT_UNMANAGE_FAILED);
     }
 
     /* pop client */
@@ -1978,7 +2320,7 @@ client_set_minimized(lua_State *L, int cidx, bool s)
                                          c->window,
                                          XCB_CW_EVENT_MASK,
                                          client_select_input_val);
-            xcb_ungrab_server(globalconf.connection);
+            xutil_ungrab_server(globalconf.connection);
         }
         else
         {
@@ -2025,6 +2367,7 @@ client_set_sticky(lua_State *L, int cidx, bool s)
     {
         c->sticky = s;
         banning_need_update();
+        ewmh_client_update_desktop(c);
         if(strut_has_value(&c->strut))
             screen_update_workarea(c->screen);
         luaA_object_emit_signal(L, cidx, "property::sticky", 0);
@@ -2292,10 +2635,10 @@ client_unban(client_t *c)
 
 /** Unmanage a client.
  * \param c The client.
- * \param window_valid Is the client's window still valid?
+ * \param reason Why was the unmanage done.
  */
 void
-client_unmanage(client_t *c, bool window_valid)
+client_unmanage(client_t *c, client_unmanage_t reason)
 {
     lua_State *L = globalconf_get_lua_State();
 
@@ -2322,6 +2665,28 @@ client_unmanage(client_t *c, bool window_valid)
         untag_client(c, globalconf.tags.tab[i]);
 
     luaA_object_push(L, c);
+
+    /* Give the context to Lua */
+    switch (reason)
+    {
+            break;
+        case CLIENT_UNMANAGE_USER:
+            lua_pushstring(L, "user");
+            break;
+        case CLIENT_UNMANAGE_REPARENT:
+            lua_pushstring(L, "reparented");
+            break;
+        case CLIENT_UNMANAGE_UNMAP:
+        case CLIENT_UNMANAGE_FAILED:
+        case CLIENT_UNMANAGE_DESTROYED:
+            lua_pushstring(L, "destroyed");
+            break;
+    }
+
+    /* Hints */
+    lua_newtable(L);
+
+    luaA_object_emit_signal(L, -3, "request::unmanage", 2);
     luaA_object_emit_signal(L, -1, "unmanage", 0);
     lua_pop(L, 1);
 
@@ -2351,7 +2716,7 @@ client_unmanage(client_t *c, bool window_valid)
 
     /* Clear our event mask so that we don't receive any events from now on,
      * especially not for the following requests. */
-    if(window_valid)
+    if(reason != CLIENT_UNMANAGE_DESTROYED)
         xcb_change_window_attributes(globalconf.connection,
                                      c->window,
                                      XCB_CW_EVENT_MASK,
@@ -2361,7 +2726,7 @@ client_unmanage(client_t *c, bool window_valid)
                                  XCB_CW_EVENT_MASK,
                                  (const uint32_t []) { 0 });
 
-    if(window_valid)
+    if(reason != CLIENT_UNMANAGE_DESTROYED)
     {
         xcb_unmap_window(globalconf.connection, c->window);
         xcb_reparent_window(globalconf.connection, c->window, globalconf.screen->root,
@@ -2372,7 +2737,7 @@ client_unmanage(client_t *c, bool window_valid)
         window_array_append(&globalconf.destroy_later_windows, c->nofocus_window);
     window_array_append(&globalconf.destroy_later_windows, c->frame_window);
 
-    if(window_valid)
+    if(reason != CLIENT_UNMANAGE_DESTROYED)
     {
         /* Remove this window from the save set since this shouldn't be made visible
          * after a restart anymore. */
@@ -2425,7 +2790,10 @@ client_kill(client_t *c)
  * @tparam[opt] boolean stacked Return clients in stacking order? (ordered from
  *   top to bottom).
  * @treturn table A table with clients.
- * @function get
+ * @staticfct get
+ * @usage for _, c in client.get() do
+ *     -- do something
+ * end
  */
 static int
 luaA_client_get(lua_State *L)
@@ -2465,8 +2833,8 @@ luaA_client_get(lua_State *L)
 
 /** Check if a client is visible on its screen.
  *
- * @return A boolean value, true if the client is visible, false otherwise.
- * @function isvisible
+ * @treturn boolean A boolean value, true if the client is visible, false otherwise.
+ * @method isvisible
  */
 static int
 luaA_client_isvisible(lua_State *L)
@@ -2576,7 +2944,12 @@ out:
 
 /** Kill a client.
  *
- * @function kill
+ * This method can be used to close (kill) a **client** using the
+ * X11 protocol. To use the POSIX way to kill a **process**, use
+ * `awesome.kill`.
+ *
+ * @method kill
+ * @see awesome.kill
  */
 static int
 luaA_client_kill(lua_State *L)
@@ -2587,8 +2960,19 @@ luaA_client_kill(lua_State *L)
 }
 
 /** Swap a client with another one in global client list.
- * @client c A client to swap with.
- * @function swap
+ * @tparam client c A client to swap with.
+ * @method swap
+ * @emits swapped
+ * @emitstparam swapped client The other client.
+ * @emitstparam swapped boolean `true` when `:swap()` was called
+ *  on *self* rather than the other client. `false` when
+ *  `:swap()` was called on the other client.
+ * @emits list
+ * @see swapped
+ * @see awful.client.swap.bydirection
+ * @see awful.client.swap.global_bydirection
+ * @see awful.client.swap.byidx
+ * @see awful.client.cycle
  */
 static int
 luaA_client_swap(lua_State *L)
@@ -2631,14 +3015,13 @@ luaA_client_swap(lua_State *L)
  *
  * Use the `first_tag` field to access the first tag of a client directly.
  *
- * **Signal:**
- *
- *  * *property::tags*
- *
  * @tparam table tags_table A table with tags to set, or `nil` to get the
  *   current tags.
  * @treturn table A table with all tags.
- * @function tags
+ * @method tags
+ * @emits property::tags
+ * @see first_tag
+ * @see toggle_tag
  */
 static int
 luaA_client_tags(lua_State *L)
@@ -2707,7 +3090,12 @@ luaA_client_get_first_tag(lua_State *L, client_t *c)
 
 /** Raise a client on top of others which are on the same layer.
  *
- * @function raise
+ * @method raise
+ * @emits raised
+ * @see above
+ * @see below
+ * @see ontop
+ * @see lower
  */
 static int
 luaA_client_raise(lua_State *L)
@@ -2728,7 +3116,12 @@ luaA_client_raise(lua_State *L)
 
 /** Lower a client on bottom of others which are on the same layer.
  *
- * @function lower
+ * @method lower
+ * @emits lowered
+ * @see above
+ * @see below
+ * @see ontop
+ * @see raise
  */
 static int
 luaA_client_lower(lua_State *L)
@@ -2755,13 +3148,13 @@ luaA_client_lower(lua_State *L)
 
 /** Stop managing a client.
  *
- * @function unmanage
+ * @method unmanage
  */
 static int
 luaA_client_unmanage(lua_State *L)
 {
     client_t *c = luaA_checkudata(L, 1, &client_class);
-    client_unmanage(c, true);
+    client_unmanage(c, CLIENT_UNMANAGE_USER);
     return 0;
 }
 
@@ -2984,8 +3377,17 @@ HANDLE_TITLEBAR(left, CLIENT_TITLEBAR_LEFT)
 /** Return or set client geometry.
  *
  * @tparam table|nil geo A table with new coordinates, or nil.
+ * @tparam integer geo.x The horizontal position.
+ * @tparam integer geo.y The vertical position.
+ * @tparam integer geo.width The width.
+ * @tparam integer geo.width The height.
  * @treturn table A table with client geometry and coordinates.
- * @function geometry
+ * @method geometry
+ * @see struts
+ * @see x
+ * @see y
+ * @see width
+ * @see height
  */
 static int
 luaA_client_geometry(lua_State *L)
@@ -3018,11 +3420,19 @@ luaA_client_geometry(lua_State *L)
 
 /** Apply size hints to a size.
  *
- * @param width Desired width of client
- * @param height Desired height of client
- * @return Actual width of client
- * @return Actual height of client
- * @function apply_size_hints
+ * This method applies the client size hints. The client
+ * will be resized according to the size hints as long
+ * as `size_hints_honor` is true. Regardless of the
+ * status of `size_hints_honor`, this method will
+ * return the size with the size hints applied.
+ *
+ * @tparam integer width Desired width of client
+ * @tparam integer height Desired height of client
+ * @treturn integer Actual width of client
+ * @treturn integer Actual height of client
+ * @method apply_size_hints
+ * @see size_hints
+ * @see size_hints_honor
  */
 static int
 luaA_client_apply_size_hints(lua_State *L)
@@ -3637,9 +4047,10 @@ luaA_client_set_shape_input(lua_State *L, client_t *c)
 
 /** Get or set keys bindings for a client.
  *
- * @param keys_table An array of key bindings objects, or nothing.
- * @return A table with all keys.
- * @function keys
+ * @property keys
+ * @tparam table keys
+ * @propemits false false
+ * @see awful.key
  */
 static int
 luaA_client_keys(lua_State *L)
@@ -3682,14 +4093,10 @@ luaA_client_get_icon_sizes(lua_State *L, client_t *c)
 
 /** Get the client's n-th icon.
  *
- * **Signal:**
- *
- *  * *property::icon*
- *
  * @tparam interger index The index in the list of icons to get.
  * @treturn surface A lightuserdata for a cairo surface. This reference must be
  * destroyed!
- * @function get_icon
+ * @method get_icon
  */
 static int
 luaA_client_get_some_icon(lua_State *L)
@@ -3773,7 +4180,7 @@ client_class_setup(lua_State *L)
     {
         LUA_OBJECT_META(client)
         LUA_CLASS_META
-        { "keys", luaA_client_keys },
+        { "_keys", luaA_client_keys },
         { "isvisible", luaA_client_isvisible },
         { "geometry", luaA_client_geometry },
         { "apply_size_hints", luaA_client_apply_size_hints },
@@ -3957,5 +4364,7 @@ client_class_setup(lua_State *L)
 }
 
 /* @DOC_cobject_COMMON@ */
+
+/* @DOC_client_theme_COMMON@ */
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

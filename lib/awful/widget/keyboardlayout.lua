@@ -1,14 +1,13 @@
 ---------------------------------------------------------------------------
 -- @author Aleksey Fedotov &lt;lexa@cfotr.com&gt;
 -- @copyright 2015 Aleksey Fedotov
--- @classmod awful.widget.keyboardlayout
+-- @widgetmod awful.widget.keyboardlayout
 ---------------------------------------------------------------------------
 
 local capi = {awesome = awesome}
 local setmetatable = setmetatable
 local textbox = require("wibox.widget.textbox")
 local button = require("awful.button")
-local gtable = require("gears.table")
 local widget_base = require("wibox.widget.base")
 local gdebug = require("gears.debug")
 
@@ -135,6 +134,7 @@ end
 -- xkb_symbols pattern "vendor/file(section):group_idx".
 -- @tparam string group_names The string awesome.xkb_get_group_names() returns.
 -- @treturn table An array of tables whose keys are vendor, file, section, and group_idx.
+-- @staticfct awful.keyboardlayout.get_groups_from_group_names
 function keyboardlayout.get_groups_from_group_names(group_names)
     if group_names == nil then
         return nil
@@ -252,11 +252,18 @@ local function update_layout(self)
     update_status(self)
 end
 
---- Create a keyboard layout widget. It shows current keyboard layout name in a textbox.
+--- Select the next layout.
+-- @method next_layout
+
+--- Create a keyboard layout widget.
+--
+-- It shows current keyboard layout name in a textbox.
+--
+-- @constructorfct awful.widget.keyboardlayout
 -- @return A keyboard layout widget.
 function keyboardlayout.new()
     local widget = textbox()
-    local self = widget_base.make_widget(widget)
+    local self = widget_base.make_widget(widget, nil, {enable_properties=true})
 
     self.widget = widget
 
@@ -290,9 +297,9 @@ function keyboardlayout.new()
                                 function () update_status(self) end);
 
     -- Mouse bindings
-    self:buttons(
-        gtable.join(button({ }, 1, self.next_layout))
-    )
+    self.buttons = {
+        button({ }, 1, self.next_layout)
+    }
 
     return self
 end
@@ -305,6 +312,10 @@ function keyboardlayout.mt:__call(...)
     end
     return _instance
 end
+
+--@DOC_widget_COMMON@
+
+--@DOC_object_COMMON@
 
 return setmetatable(keyboardlayout, keyboardlayout.mt)
 

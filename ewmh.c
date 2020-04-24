@@ -35,6 +35,8 @@
 #define _NET_WM_STATE_ADD 1
 #define _NET_WM_STATE_TOGGLE 2
 
+#define ALL_DESKTOPS 0xffffffff
+
 /** Update client EWMH hints.
  * \param L The Lua VM state.
  */
@@ -236,8 +238,8 @@ ewmh_init_lua(void)
 
     luaA_class_connect_signal(L, &client_class, "focus", ewmh_update_net_active_window);
     luaA_class_connect_signal(L, &client_class, "unfocus", ewmh_update_net_active_window);
-    luaA_class_connect_signal(L, &client_class, "manage", ewmh_update_net_client_list);
-    luaA_class_connect_signal(L, &client_class, "unmanage", ewmh_update_net_client_list);
+    luaA_class_connect_signal(L, &client_class, "request::manage", ewmh_update_net_client_list);
+    luaA_class_connect_signal(L, &client_class, "request::unmanage", ewmh_update_net_client_list);
     luaA_class_connect_signal(L, &client_class, "property::modal" , ewmh_client_update_hints);
     luaA_class_connect_signal(L, &client_class, "property::fullscreen" , ewmh_client_update_hints);
     luaA_class_connect_signal(L, &client_class, "property::maximized_horizontal" , ewmh_client_update_hints);
@@ -254,7 +256,7 @@ ewmh_init_lua(void)
     luaA_class_connect_signal(L, &client_class, "property::titlebar_right" , ewmh_client_update_frame_extents);
     luaA_class_connect_signal(L, &client_class, "property::titlebar_left" , ewmh_client_update_frame_extents);
     luaA_class_connect_signal(L, &client_class, "property::border_width" , ewmh_client_update_frame_extents);
-    luaA_class_connect_signal(L, &client_class, "manage", ewmh_client_update_frame_extents);
+    luaA_class_connect_signal(L, &client_class, "request::manage", ewmh_client_update_frame_extents);
     /* NET_CURRENT_DESKTOP handling */
     luaA_class_connect_signal(L, &client_class, "focus", ewmh_update_net_current_desktop);
     luaA_class_connect_signal(L, &client_class, "unfocus", ewmh_update_net_current_desktop);
@@ -410,14 +412,17 @@ ewmh_process_state_atom(client_t *c, xcb_atom_t state, int set)
     {
         if(set == _NET_WM_STATE_REMOVE) {
             lua_pushboolean(L, false);
+            /*TODO v5: Add a context */
             luaA_object_emit_signal(L, -2, "request::urgent", 1);
         }
         else if(set == _NET_WM_STATE_ADD) {
             lua_pushboolean(L, true);
+            /*TODO v5: Add a context */
             luaA_object_emit_signal(L, -2, "request::urgent", 1);
         }
         else if(set == _NET_WM_STATE_TOGGLE) {
             lua_pushboolean(L, !c->urgent);
+            /*TODO v5: Add a context */
             luaA_object_emit_signal(L, -2, "request::urgent", 1);
         }
     }
@@ -430,10 +435,11 @@ ewmh_process_desktop(client_t *c, uint32_t desktop)
 {
     lua_State *L = globalconf_get_lua_State();
     int idx = desktop;
-    if(desktop == 0xffffffff)
+    if(desktop == ALL_DESKTOPS)
     {
         luaA_object_push(L, c);
         lua_pushboolean(L, true);
+        /*TODO v5: Move the context argument to arg1 */
         luaA_object_emit_signal(L, -2, "request::tag", 1);
         /* Pop the client, arguments are already popped */
         lua_pop(L, 1);
@@ -442,6 +448,7 @@ ewmh_process_desktop(client_t *c, uint32_t desktop)
     {
         luaA_object_push(L, c);
         luaA_object_push(L, globalconf.tags.tab[idx]);
+        /*TODO v5: Move the context argument to arg1 */
         luaA_object_emit_signal(L, -2, "request::tag", 1);
         /* Pop the client, arguments are already popped */
         lua_pop(L, 1);
@@ -460,7 +467,8 @@ ewmh_process_client_message(xcb_client_message_event_t *ev)
         {
             lua_State *L = globalconf_get_lua_State();
             luaA_object_push(L, globalconf.tags.tab[idx]);
-            luaA_object_emit_signal(L, -1, "request::select", 0);
+            lua_pushstring(L, "ewmh");
+            luaA_object_emit_signal(L, -1, "request::select", 1);
             lua_pop(L, 1);
         }
     }
@@ -517,6 +525,13 @@ ewmh_client_update_desktop(client_t *c)
 {
     int i;
 
+    if(c->sticky)
+    {
+        xcb_change_property(globalconf.connection, XCB_PROP_MODE_REPLACE,
+                            c->window, _NET_WM_DESKTOP, XCB_ATOM_CARDINAL, 32, 1,
+                            (uint32_t[]) { ALL_DESKTOPS });
+        return;
+    }
     for(i = 0; i < globalconf.tags.len; i++)
         if(is_client_tagged(c, globalconf.tags.tab[i]))
         {

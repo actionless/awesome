@@ -44,7 +44,7 @@ end
 
 --- Remove a client from the focus history
 --
--- @client c The client that must be removed.
+-- @tparam client c The client that must be removed.
 -- @function awful.client.focus.history.delete
 function focus.history.delete(c)
     for k, v in ipairs(focus.history.list) do
@@ -59,7 +59,9 @@ end
 --
 -- @function awful.client.focus.byidx
 -- @param i The index.
--- @client[opt] c The client.
+-- @tparam[opt] client c The client.
+-- @request client activate client.focus.byidx granted When `awful.focus.byidx`
+--  is called.
 function focus.byidx(i, c)
     local target = client.next(i, c)
     if target then
@@ -72,7 +74,7 @@ end
 -- This usually means that desktop, dock and splash windows are
 -- not registered and cannot get focus.
 --
--- @client c A client.
+-- @tparam client c A client.
 -- @return The same client if it's ok, nil otherwise.
 -- @function awful.client.focus.filter
 function focus.filter(c)
@@ -87,7 +89,7 @@ end
 
 --- Update client focus history.
 --
--- @client c The client that has been focused.
+-- @tparam client c The client that has been focused.
 -- @function awful.client.focus.history.add
 function focus.history.add(c)
     -- Remove the client if its in stack
@@ -141,6 +143,8 @@ end
 
 --- Focus the previous client in history.
 -- @function awful.client.focus.history.previous
+-- @request client activate client.focus.history.previous granted When
+--  `awful.focus.history.previous` is called.
 function focus.history.previous()
     local sel = capi.client.focus
     local s = sel and sel.screen or screen.focused()
@@ -155,9 +159,11 @@ end
 --
 -- @tparam string dir The direction, can be either
 --   `"up"`, `"down"`, `"left"` or `"right"`.
--- @client[opt] c The client.
+-- @tparam[opt] client c The client.
 -- @tparam[opt=false] boolean stacked Use stacking order? (top to bottom)
 -- @function awful.client.focus.bydirection
+-- @request client activate client.focus.bydirection granted When
+--  `awful.focus.bydirection` is called.
 function focus.bydirection(dir, c, stacked)
     local sel = c or capi.client.focus
     if sel then
@@ -180,9 +186,11 @@ end
 --- Focus a client by the given direction. Moves across screens.
 --
 -- @param dir The direction, can be either "up", "down", "left" or "right".
--- @client[opt] c The client.
+-- @tparam[opt] client c The client.
 -- @tparam[opt=false] boolean stacked Use stacking order? (top to bottom)
 -- @function awful.client.focus.global_bydirection
+-- @request client activate client.focus.global_bydirection granted When
+--  `awful.client.focus.global_bydirection` is called.
 function focus.global_bydirection(dir, c, stacked)
     local sel = c or capi.client.focus
     local scr = get_screen(sel and sel.screen or screen.focused())

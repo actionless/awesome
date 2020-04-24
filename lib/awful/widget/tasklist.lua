@@ -70,7 +70,7 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008-2009 Julien Danjou
--- @classmod awful.widget.tasklist
+-- @widgetmod awful.widget.tasklist
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
@@ -87,7 +87,13 @@ local timer = require("gears.timer")
 local gcolor = require("gears.color")
 local gstring = require("gears.string")
 local gdebug = require("gears.debug")
+local dpi = require("beautiful").xresources.apply_dpi
 local base = require("wibox.widget.base")
+local wfixed = require("wibox.layout.fixed")
+local wmargin = require("wibox.container.margin")
+local wtextbox = require("wibox.widget.textbox")
+local clienticon = require("awful.widget.clienticon")
+local wbackground = require("wibox.container.background")
 
 local function get_screen(s)
     return s and screen[s]
@@ -163,10 +169,42 @@ local instances
 
 --- Disable the extra tasklist client property notification icons.
 --
--- See the <a href="status_icons">Status icons</a> section for more details.
+-- See the <a href="#status_icons">Status icons</a> section for more details.
 --
 -- @beautiful beautiful.tasklist_plain_task_name
 -- @tparam[opt=false] boolean tasklist_plain_task_name
+
+--- Extra tasklist client property notification icon for clients with the sticky property set.
+-- @beautiful beautiful.tasklist_sticky
+-- @tparam[opt=nil] string tasklist_sticky
+
+--- Extra tasklist client property notification icon for clients with the ontop property set.
+-- @beautiful beautiful.tasklist_ontop
+-- @tparam[opt=nil] string tasklist_ontop
+
+--- Extra tasklist client property notification icon for clients with the above property set.
+-- @beautiful beautiful.tasklist_above
+-- @tparam[opt=nil] string tasklist_above
+
+--- Extra tasklist client property notification icon for clients with the below property set.
+-- @beautiful beautiful.tasklist_below
+-- @tparam[opt=nil] string tasklist_below
+
+--- Extra tasklist client property notification icon for clients with the floating property set.
+-- @beautiful beautiful.tasklist_floating
+-- @tparam[opt=nil] string tasklist_floating
+
+--- Extra tasklist client property notification icon for clients with the maximized property set.
+-- @beautiful beautiful.tasklist_maximized
+-- @tparam[opt=nil] string tasklist_maximized
+
+--- Extra tasklist client property notification icon for clients with the maximized_horizontal property set.
+-- @beautiful beautiful.tasklist_maximized_horizontal
+-- @tparam[opt=nil] string maximized_horizontal
+
+--- Extra tasklist client property notification icon for clients with the maximized_vertical property set.
+-- @beautiful beautiful.tasklist_maximized_vertical
+-- @tparam[opt=nil] string maximized_vertical
 
 --- The tasklist font.
 -- @beautiful beautiful.tasklist_font
@@ -247,6 +285,32 @@ local instances
 -- Public structures
 tasklist.filter, tasklist.source = {}, {}
 
+-- This is the same template as awful.widget.common, but with an clienticon widget
+local default_template = {
+    {
+        {
+            clienticon,
+            id     = "icon_margin_role",
+            left   = dpi(4),
+            widget = wmargin
+        },
+        {
+            {
+                id     = "text_role",
+                widget = wtextbox,
+            },
+            id     = "text_margin_role",
+            left   = dpi(4),
+            right  = dpi(4),
+            widget = wmargin
+        },
+        fill_space = true,
+        layout     = wfixed.horizontal
+    },
+    id     = "background_role",
+    widget = wbackground
+}
+
 local function tasklist_label(c, args, tb)
     if not args then args = {} end
     local theme = beautiful.get()
@@ -279,6 +343,7 @@ local function tasklist_label(c, args, tb)
     local shape              = args.shape or theme.tasklist_shape
     local shape_border_width = args.shape_border_width or theme.tasklist_shape_border_width
     local shape_border_color = args.shape_border_color or theme.tasklist_shape_border_color
+    local icon_size = args.icon_size or theme.tasklist_icon_size
 
     -- symbol to use to indicate certain client properties
     local sticky = args.sticky or theme.tasklist_sticky or "▪"
@@ -319,7 +384,7 @@ local function tasklist_label(c, args, tb)
         end
     end
 
-    local focused = capi.client.focus == c
+    local focused = c.active
     -- Handle transient_for: the first parent that does not skip the taskbar
     -- is considered to be focused, if the real client has skip_taskbar.
     if not focused and capi.client.focus and capi.client.focus.skip_taskbar
@@ -394,9 +459,15 @@ local function tasklist_label(c, args, tb)
         shape              = shape,
         shape_border_width = shape_border_width,
         shape_border_color = shape_border_color,
+        icon_size          = icon_size,
     }
 
     return text, bg, bg_image, not tasklist_disable_icon and c.icon or nil, other_args
+end
+
+-- Remove some callback boilerplate from the user provided templates.
+local function create_callback(w, t)
+    common._set_common_property(w, "client", t)
 end
 
 local function tasklist_update(s, w, buttons, filter, data, style, update_function, args)
@@ -415,7 +486,10 @@ local function tasklist_update(s, w, buttons, filter, data, style, update_functi
 
     local function label(c, tb) return tasklist_label(c, style, tb) end
 
-    update_function(w, buttons, label, data, clients, args)
+    update_function(w, buttons, label, data, clients, {
+        widget_template = args.widget_template or default_template,
+        create_callback = create_callback,
+    })
 end
 
 --- Create a new tasklist widget.
@@ -451,6 +525,15 @@ end
 -- @tparam[opt=nil] string args.style.bg_image_urgent
 -- @tparam[opt=nil] string args.style.bg_image_minimize
 -- @tparam[opt=nil] boolean args.style.tasklist_disable_icon
+-- @tparam[opt=nil] number args.style.icon_size The size of the icon
+-- @tparam[opt='▪'] string args.style.sticky Extra icon when client is sticky
+-- @tparam[opt='⌃'] string args.style.ontop Extra icon when client is ontop
+-- @tparam[opt='▴'] string args.style.above Extra icon when client is above
+-- @tparam[opt='▾'] string args.style.below Extra icon when client is below
+-- @tparam[opt='✈'] string args.style.floating Extra icon when client is floating
+-- @tparam[opt='<b>+</b>'] string args.style.maximized Extra icon when client is maximized
+-- @tparam[opt='⬌'] string args.style.maximized_horizontal Extra icon when client is maximized_horizontal
+-- @tparam[opt='⬍'] string args.style.maximized_vertical Extra icon when client is maximized_vertical
 -- @tparam[opt=false] boolean args.style.disable_task_name
 -- @tparam[opt=nil] string args.style.font
 -- @tparam[opt=left] string args.style.align *left*, *right* or *center*
@@ -475,7 +558,7 @@ end
 -- @param style **DEPRECATED** use args.style
 -- @param update_function **DEPRECATED** use args.update_function
 -- @param base_widget **DEPRECATED** use args.base_widget
--- @function awful.tasklist
+-- @constructorfct awful.widget.tasklist
 function tasklist.new(args, filter, buttons, style, update_function, base_widget)
     local screen = nil
 
@@ -578,7 +661,7 @@ function tasklist.new(args, filter, buttons, style, update_function, base_widget
         capi.client.connect_signal("property::hidden", u)
         capi.client.connect_signal("tagged", u)
         capi.client.connect_signal("untagged", u)
-        capi.client.connect_signal("unmanage", function(c)
+        capi.client.connect_signal("request::unmanage", function(c)
             u(c)
             for _, i in pairs(instances) do
                 for _, tlist in pairs(i) do
@@ -587,8 +670,7 @@ function tasklist.new(args, filter, buttons, style, update_function, base_widget
             end
         end)
         capi.client.connect_signal("list", u)
-        capi.client.connect_signal("focus", u)
-        capi.client.connect_signal("unfocus", u)
+        capi.client.connect_signal("property::active", u)
         capi.screen.connect_signal("removed", function(s)
             instances[get_screen(s)] = nil
         end)
@@ -680,7 +762,7 @@ end
 -- @filterfunction awful.tasklist.filter.focused
 function tasklist.filter.focused(c, screen)
     -- Only print client on the same screen as this widget
-    return get_screen(c.screen) == get_screen(screen) and capi.client.focus == c
+    return get_screen(c.screen) == get_screen(screen) and c.active
 end
 
 --- Get all the clients in an undefined order.
@@ -695,6 +777,10 @@ end
 function tasklist.mt:__call(...)
     return tasklist.new(...)
 end
+
+--@DOC_widget_COMMON@
+
+--@DOC_object_COMMON@
 
 return setmetatable(tasklist, tasklist.mt)
 

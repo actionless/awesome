@@ -3,7 +3,7 @@
 --@DOC_wibox_layout_defaults_fixed_EXAMPLE@
 -- @author Uli Schlachter
 -- @copyright 2010 Uli Schlachter
--- @classmod wibox.layout.fixed
+-- @layoutmod wibox.layout.fixed
 ---------------------------------------------------------------------------
 
 local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
@@ -62,23 +62,30 @@ function fixed:layout(context, width, height)
     return result
 end
 
---- Add some widgets to the given fixed layout
--- @param ... Widgets that should be added (must at least be one)
+--- Add some widgets to the given layout.
+--
+-- @method add
+-- @tparam widget ... Widgets that should be added (must at least be one).
+-- @interface layout
 function fixed:add(...)
     -- No table.pack in Lua 5.1 :-(
     local args = { n=select('#', ...), ... }
     assert(args.n > 0, "need at least one widget to add")
     for i=1, args.n do
-        base.check_widget(args[i])
-        table.insert(self._private.widgets, args[i])
+        local w = base.make_widget_from_value(args[i])
+        base.check_widget(w)
+        table.insert(self._private.widgets, w)
     end
     self:emit_signal("widget::layout_changed")
 end
 
 
---- Remove a widget from the layout
+--- Remove a widget from the layout.
+--
+-- @method remove
 -- @tparam number index The widget index to remove
 -- @treturn boolean index If the operation is successful
+-- @interface layout
 function fixed:remove(index)
     if not index or index < 1 or index > #self._private.widgets then return false end
 
@@ -89,11 +96,14 @@ function fixed:remove(index)
     return true
 end
 
---- Remove one or more widgets from the layout
+--- Remove one or more widgets from the layout.
+--
 -- The last parameter can be a boolean, forcing a recursive seach of the
 -- widget(s) to remove.
--- @param widget ... Widgets that should be removed (must at least be one)
+-- @method remove_widgets
+-- @tparam widget ... Widgets that should be removed (must at least be one)
 -- @treturn boolean If the operation is successful
+-- @interface layout
 function fixed:remove_widgets(...)
     local args = { ... }
 
@@ -127,11 +137,13 @@ function fixed:set_children(children)
     end
 end
 
---- Replace the first instance of `widget` in the layout with `widget2`
--- @param widget The widget to replace
--- @param widget2 The widget to replace `widget` with
+--- Replace the first instance of `widget` in the layout with `widget2`.
+-- @method replace_widget
+-- @tparam widget widget The widget to replace
+-- @tparam widget widget2 The widget to replace `widget` with
 -- @tparam[opt=false] boolean recursive Digg in all compatible layouts to find the widget.
 -- @treturn boolean If the operation is successful
+-- @interface layout
 function fixed:replace_widget(widget, widget2, recursive)
     local idx, l = self:index(widget, recursive)
 
@@ -212,18 +224,27 @@ end
 --@DOC_wibox_layout_fixed_spacing_widget_EXAMPLE@
 --
 -- @property spacing_widget
--- @param widget
+-- @tparam widget spacing_widget
+-- @propemits true false
+-- @interface layout
 
 function fixed:set_spacing_widget(wdg)
     self._private.spacing_widget = base.make_widget_from_value(wdg)
     self:emit_signal("widget::layout_changed")
+    self:emit_signal("property::spacing_widget", wdg)
 end
 
---- Insert a new widget in the layout at position `index`
--- **Signal:** widget::inserted The arguments are the widget and the index
--- @tparam number index The position
--- @param widget The widget
--- @treturn boolean If the operation is successful
+--- Insert a new widget in the layout at position `index`.
+--
+-- @method insert
+-- @tparam number index The position.
+-- @tparam widget widget The widget.
+-- @treturn boolean If the operation is successful.
+-- @emits widget::inserted
+-- @emitstparam widget::inserted widget self The fixed layout.
+-- @emitstparam widget::inserted widget widget index The inserted widget.
+-- @emitstparam widget::inserted number count The widget count.
+-- @interface layout
 function fixed:insert(index, widget)
     if not index or index < 1 or index > #self._private.widgets + 1 then return false end
 
@@ -235,7 +256,7 @@ function fixed:insert(index, widget)
     return true
 end
 
--- Fit the fixed layout into the given space
+-- Fit the fixed layout into the given space.
 -- @param context The context in which we are fit.
 -- @param orig_width The available width.
 -- @param orig_height The available height.
@@ -280,17 +301,21 @@ function fixed:reset()
     self._private.widgets = {}
     self:emit_signal("widget::layout_changed")
     self:emit_signal("widget::reseted")
+    self:emit_signal("widget::reset")
 end
 
 --- Set the layout's fill_space property. If this property is true, the last
 -- widget will get all the space that is left. If this is false, the last widget
 -- won't be handled specially and there can be space left unused.
 -- @property fill_space
+-- @tparam boolean fill_space
+-- @propemits true false
 
 function fixed:fill_space(val)
     if self._private.fill_space ~= val then
         self._private.fill_space = not not val
         self:emit_signal("widget::layout_changed")
+        self:emit_signal("property::fill_space", val)
     end
 end
 
@@ -317,7 +342,7 @@ end
 -- Note that widgets ignore `forced_height`. They will use the preferred/minimum width
 -- on the horizontal axis, and a stretched height on the vertical axis.
 -- @tparam widget ... Widgets that should be added to the layout.
--- @function wibox.layout.fixed.horizontal
+-- @constructorfct wibox.layout.fixed.horizontal
 function fixed.horizontal(...)
     return get_layout("x", ...)
 end
@@ -328,7 +353,7 @@ end
 -- Note that widgets ignore `forced_width`. They will use the preferred/minimum height
 -- on the vertical axis, and a stretched width on the horizontal axis.
 -- @tparam widget ... Widgets that should be added to the layout.
--- @function wibox.layout.fixed.vertical
+-- @constructorfct wibox.layout.fixed.vertical
 function fixed.vertical(...)
     return get_layout("y", ...)
 end
@@ -339,11 +364,14 @@ end
 --
 -- @property spacing
 -- @tparam number spacing Spacing between widgets.
+-- @propemits true false
+-- @interface layout
 
 function fixed:set_spacing(spacing)
     if self._private.spacing ~= spacing then
         self._private.spacing = spacing
         self:emit_signal("widget::layout_changed")
+        self:emit_signal("property::spacing", spacing)
     end
 end
 

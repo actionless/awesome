@@ -2,18 +2,26 @@ local root = {_tags={}}
 
 local gtable = require("gears.table")
 
-local hotkeys = nil
-
 function root:tags()
     return root._tags
 end
 
-function root:size() --TODO use the screens
-    return 0, 0
+function root.size()
+    local geo = {x1 = math.huge, y1 = math.huge, x2 = 0, y2 = 0}
+
+    for s in screen do
+        geo.x1 = math.min( geo.x1, s.geometry.x                   )
+        geo.y1 = math.min( geo.y1, s.geometry.y                   )
+        geo.x2 = math.max( geo.x2, s.geometry.x+s.geometry.width  )
+        geo.y2 = math.max( geo.y2, s.geometry.y+s.geometry.height )
+    end
+
+    return math.max(0, geo.x2-geo.x1), math.max(0, geo.y2 - geo.y1)
 end
 
-function root:size_mm()
-    return 0, 0
+function root.size_mm()
+    local w, h = root.size()
+    return (w/96)*25.4, (h/96)*25.4
 end
 
 function root.cursor() end
@@ -22,7 +30,7 @@ function root.cursor() end
 
 local keys = {}
 
-function root.keys(k)
+function root._keys(k)
     keys = k or keys
     return keys
 end
@@ -76,15 +84,9 @@ local function match_modifiers(mods1, mods2)
 end
 
 local function execute_keybinding(key, event)
-    -- It *could* be extracted from gears.object private API, but it's equally
-    -- ugly as using the list used by the hotkey widget.
-    if not hotkeys then
-        hotkeys = require("awful.key").hotkeys
-    end
-
-    for _, v in ipairs(hotkeys) do
-        if key == v.key and match_modifiers(v.mod, get_mods()) and v[event] then
-            v[event]()
+    for _, v in ipairs(keys) do
+        if key == v.key and match_modifiers(v.modifiers, get_mods()) then
+            v:emit_signal(event)
             return
         end
     end
@@ -118,6 +120,9 @@ function root.fake_input(event_type, detail, x, y)
     fake_input_handlers[event_type](detail, x, y)
 end
 
+function root._buttons()
+    return {}
+end
 
 -- Send an artificial set of key events to trigger a key combination.
 -- It only works in the shims and should not be used with UTF-8 chars.
@@ -164,6 +169,31 @@ function root._write_string(string, c)
     end
 end
 
-return root
+
+function root.set_newindex_miss_handler(h)
+    rawset(root, "_ni_handler", h)
+end
+
+function root.set_index_miss_handler(h)
+    rawset(root, "_i_handler", h)
+end
+
+return setmetatable(root, {
+    __index = function(self, key)
+        if key == "screen" then
+            return screen[1]
+        end
+        local h = rawget(root,"_i_handler")
+        if h then
+            return h(self, key)
+        end
+    end,
+    __newindex = function(...)
+        local h = rawget(root,"_ni_handler")
+        if h then
+            h(...)
+        end
+    end,
+})
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

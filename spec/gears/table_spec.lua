@@ -42,6 +42,56 @@ describe("gears.table", function()
         end)
     end)
 
+
+    describe("table.cycle_value", function()
+        it("nil argument", function()
+            local t = { "a", "b", "c", "d" }
+            local f = gtable.cycle_value(t, "a")
+            assert.is.same(f, "b")
+        end)
+        it("with step size", function()
+            local t = { "a", "b", "c", "d" }
+            local f = gtable.cycle_value(t, "a", 2)
+            assert.is.same(f, "c")
+        end)
+        it("b filter", function()
+            local t = { "a", "b", "c", "d" }
+            local f = gtable.cycle_value(t, "a", 1, function(i) return i == "b" end)
+            assert.is.equal(f, "b")
+        end)
+        it("e filter", function()
+            local t = { "a", "b", "c", "d" }
+            local f = gtable.cycle_value(t, "a", 1, function(i) return i == "e" end)
+            assert.is.equal(f, nil)
+        end)
+        it("b filter and step size", function()
+            local t = { "a", "b", "c", "d" }
+            local f = gtable.cycle_value(t, "b", 2, function(i) return i == "b" end)
+            assert.is.equal(f, nil)
+        end)
+    end)
+
+    describe("table.find_keys", function()
+        it("nil argument", function()
+            local t = { "a", "b", c = "c", "d" }
+            local f = gtable.find_keys(t, function(k) return k == "c" end)
+            assert.is.same(f, {"c"})
+        end)
+    end)
+
+    describe("table.hasitem", function()
+        it("exist", function()
+            local t = {"a", "b", c = "c"}
+            local f = gtable.hasitem(t, "c")
+            assert.is.equal(f, "c")
+        end)
+        it("nil", function()
+            local t = {"a", "b"}
+            local f = gtable.hasitem(t, "c")
+            assert.is.equal(f, nil)
+        end)
+    end)
+
     describe("table.join", function()
         it("nil argument", function()
             local t = gtable.join({"a"}, nil, {"b"})

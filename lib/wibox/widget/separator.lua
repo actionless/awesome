@@ -19,7 +19,7 @@
 --
 -- @author Emmanuel Lepage Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2014, 2017 Emmanuel Lepage Vallee
--- @classmod wibox.widget.separator
+-- @widgetmod wibox.widget.separator
 ---------------------------------------------------------------------------
 local beautiful = require( "beautiful"         )
 local base      = require( "wibox.widget.base" )
@@ -42,14 +42,17 @@ local separator = {}
 --@DOC_wibox_widget_separator_orientation_EXAMPLE@
 --
 -- @property orientation
--- @param string
+-- @tparam string orientation
+-- @propemits true false
 
 --- The separator's thickness.
 --
 -- This is used by the default line separator, but ignored when a shape is used.
 --
 -- @property thickness
--- @param number
+-- @tparam number thickness
+-- @propbeautiful
+-- @propemits true false
 
 --- The separator's shape.
 --
@@ -57,15 +60,22 @@ local separator = {}
 --
 -- @property shape
 -- @tparam function shape A valid shape function
+-- @propbeautiful
+-- @propemits true false
 -- @see gears.shape
 
 --- The relative percentage covered by the bar.
+--
 -- @property span_ratio
 -- @tparam[opt=1] number A number between 0 and 1.
+-- @propbeautiful
+-- @propemits true false
 
 --- The separator's color.
 -- @property color
--- @param string
+-- @tparam color color
+-- @propbeautiful
+-- @propemits true false
 -- @see gears.color
 
 --- The separator's border color.
@@ -73,12 +83,16 @@ local separator = {}
 --@DOC_wibox_widget_separator_border_color_EXAMPLE@
 --
 -- @property border_color
--- @param string
+-- @tparam color border_color
+-- @propbeautiful
+-- @propemits true false
 -- @see gears.color
 
 --- The separator's border width.
 -- @property border_width
--- @param number
+-- @tparam number border_width
+-- @propbeautiful
+-- @propemits true false
 
 --- The separator thickness.
 -- @beautiful beautiful.separator_thickness
@@ -87,7 +101,7 @@ local separator = {}
 
 --- The separator border color.
 -- @beautiful beautiful.separator_border_color
--- @param gears.color
+-- @param color
 -- @see border_color
 
 --- The separator border width.
@@ -177,13 +191,17 @@ for _, prop in ipairs {"orientation", "color", "thickness", "span_ratio",
                        "border_width", "border_color", "shape" } do
     separator["set_"..prop] = function(self, value)
         self._private[prop] = value
-        self:emit_signal("property::"..prop)
+        self:emit_signal("property::"..prop, value)
         self:emit_signal("widget::redraw_needed")
     end
     separator["get_"..prop] = function(self)
         return self._private[prop] or beautiful["separator_"..prop]
     end
 end
+
+--- Create a new separator.
+-- @constructorfct wibox.widget.separator
+-- @tparam table args The arguments (all properties are available).
 
 local function new(args)
     local ret = base.make_widget(nil, nil, {

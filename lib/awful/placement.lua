@@ -89,8 +89,7 @@ local capi =
     mouse = mouse,
     client = client
 }
-local client = require("awful.client")
-local layout = require("awful.layout")
+local floating = require("awful.layout.suit.floating")
 local a_screen = require("awful.screen")
 local grect = require("gears.geometry").rectangle
 local gdebug = require("gears.debug")
@@ -392,31 +391,29 @@ local function geometry_common(obj, args, new_geo, ignore_border_width)
             and obj.coords(new_geo) or obj.coords()
         return {x=coords.x, y=coords.y, width=0, height=0}
     elseif obj.geometry then
-        local geo = obj.geometry
-
-        -- It is either a drawable or something that implement its API
-        if type(geo) == "function" then
-            local dgeo = area_common(
-                obj, fix_new_geometry(new_geo, args), ignore_border_width, args
-            )
-
-            -- Apply the margins
-            if args.margins then
-                local delta = get_decoration(args)
-
-                return {
-                    x      = dgeo.x      - (delta.left or 0),
-                    y      = dgeo.y      - (delta.top  or 0),
-                    width  = dgeo.width  + (delta.left or 0) + (delta.right  or 0),
-                    height = dgeo.height + (delta.top  or 0) + (delta.bottom or 0),
-                }
-            end
-
-            return dgeo
+        if obj.get_bounding_geometry then
+            -- It is a screen, it doesn't support setting new sizes.
+            return obj:get_bounding_geometry(args)
         end
 
-        -- It is a screen, it doesn't support setting new sizes.
-        return obj:get_bounding_geometry(args)
+        -- It is either a drawable or something that implement its API
+        local dgeo = area_common(
+            obj, fix_new_geometry(new_geo, args), ignore_border_width, args
+        )
+
+        -- Apply the margins
+        if args.margins then
+            local delta = get_decoration(args)
+
+            return {
+                x      = dgeo.x      - (delta.left or 0),
+                y      = dgeo.y      - (delta.top  or 0),
+                width  = dgeo.width  + (delta.left or 0) + (delta.right  or 0),
+                height = dgeo.height + (delta.top  or 0) + (delta.bottom or 0),
+            }
+        end
+
+        return dgeo
     else
         assert(false, "Invalid object")
     end
@@ -711,7 +708,7 @@ local function get_relative_regions(geo, mode, is_absolute)
     -- Detect various types of geometry table and (try) to get rid of the
     -- differences so the code below don't have to care anymore.
     if geo.drawin then
-        bw, dgeo = geo.drawin.border_width, geo.drawin:geometry()
+        bw, dgeo = geo.drawin._border_width, geo.drawin:geometry()
     elseif geo.drawable and geo.drawable.get_wibox then
         bw   = geo.drawable.get_wibox().border_width
         dgeo = geo.drawable.get_wibox():geometry()
@@ -811,7 +808,8 @@ end
 --   or `wibox`)
 -- @tparam[opt={}] table args The arguments
 -- @treturn table The new geometry
--- @treturn string The corner name
+-- @treturn string The corner name.
+-- @staticfct awful.placement.closest_corner
 function placement.closest_corner(d, args)
     args = add_context(args, "closest_corner")
     d = d or capi.client.focus
@@ -851,10 +849,11 @@ end
 
 --- Place the client so no part of it will be outside the screen (workarea).
 --@DOC_awful_placement_no_offscreen_EXAMPLE@
--- @client c The client.
+-- @tparam client c The client.
 -- @tparam[opt={}] table args The arguments
 -- @tparam[opt=client's screen] integer args.screen The screen.
 -- @treturn table The new client geometry.
+-- @staticfct awful.placement.no_offscreen
 function placement.no_offscreen(c, args)
 
     --compatibility with the old API
@@ -892,23 +891,72 @@ function placement.no_offscreen(c, args)
     return fix_new_geometry(geometry, args, true)
 end
 
+-- Check whether the client is on at least one of selected tags (similar to
+-- `c:isvisible()`, but without checks for the hidden or minimized state).
+local function client_on_selected_tags(c)
+    if c.sticky then
+        return true
+    else
+        for _, t in pairs(c:tags()) do
+            if t.selected then
+                return true
+            end
+        end
+        return false
+    end
+end
+
+-- Check whether the client would be visible if the specified set of tags is
+-- selected (using the same set of conditions as `c:isvisible()`, but checking
+-- against the specified tags instead of currently selected ones).
+local function client_visible_on_tags(c, tags)
+    if c.hidden or c.minimized then
+        return false
+    elseif c.sticky then
+        return true
+    else
+        for _, t in pairs(c:tags()) do
+            if gtable.hasitem(tags, t) then
+                return true
+            end
+        end
+        return false
+    end
+end
+
 --- Place the client where there's place available with minimum overlap.
 --@DOC_awful_placement_no_overlap_EXAMPLE@
 -- @param c The client.
 -- @tparam[opt={}] table args Other arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.no_overlap
 function placement.no_overlap(c, args)
     c = c or capi.client.focus
     args = add_context(args, "no_overlap")
     local geometry = geometry_common(c, args)
     local screen   = get_screen(c.screen or a_screen.getbycoord(geometry.x, geometry.y))
-    local cls = client.visible(screen)
-    local curlay = layout.get()
+    local cls, curlay
+    if client_on_selected_tags(c) then
+        cls = screen:get_clients(false)
+        local t = screen.selected_tag
+        curlay = t.layout or floating
+    else
+        -- When placing a client on unselected tags, place it as if all tags of
+        -- that client are selected.
+        local tags = c:tags()
+        cls = {}
+        for _, other_c in pairs(capi.client.get(screen)) do
+            if client_visible_on_tags(other_c, tags) then
+                table.insert(cls, other_c)
+            end
+        end
+        curlay = tags[1] and tags[1].layout
+    end
     local areas = { screen.workarea }
     for _, cl in pairs(cls) do
         if cl ~= c
            and cl.type ~= "desktop"
-           and (cl.floating or curlay == layout.suit.floating)
+           and (cl.floating or curlay == floating)
            and not (cl.maximized or cl.fullscreen) then
             areas = grect.area_remove(areas, area_common(cl))
         end
@@ -969,6 +1017,7 @@ end
 -- @tparam drawable d A drawable (like `client`, `mouse` or `wibox`)
 -- @tparam[opt={}] table args Other arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.under_mouse
 function placement.under_mouse(d, args)
     args = add_context(args, "under_mouse")
     d = d or capi.client.focus
@@ -993,6 +1042,7 @@ end
 -- @tparam drawable d A drawable (like `client`, `mouse` or `wibox`)
 -- @tparam[opt={}] table args Other arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.next_to_mouse
 function placement.next_to_mouse(d, args)
     if type(args) == "number" then
         gdebug.deprecate(
@@ -1042,6 +1092,7 @@ end
 -- @tparam drawable d A drawable (like `client`, `mouse` or `wibox`)
 -- @tparam[opt={}] table args Other arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.resize_to_mouse
 function placement.resize_to_mouse(d, args)
     d    = d or capi.client.focus
     args = add_context(args, "resize_to_mouse")
@@ -1119,6 +1170,7 @@ end
 -- @tparam drawable d A drawable (like `client`, `mouse` or `wibox`)
 -- @tparam[opt={}] table args Other arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.align
 function placement.align(d, args)
     args = add_context(args, "align")
     d    = d or capi.client.focus
@@ -1193,6 +1245,7 @@ end
 -- @tparam[opt=client.focus] drawable d A drawable (like `client` or `wibox`)
 -- @tparam[opt={}] table args The arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.stretch
 function placement.stretch(d, args)
     args = add_context(args, "stretch")
 
@@ -1265,6 +1318,7 @@ end
 -- @tparam[opt=client.focus] drawable d A drawable (like `client` or `wibox`)
 -- @tparam[opt={}] table args The arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.maximize
 function placement.maximize(d, args)
     args = add_context(args, "maximize")
     d    = d or capi.client.focus
@@ -1318,6 +1372,7 @@ end
 -- @tparam[opt=client.focus] drawable d A drawable (like `client` or `wibox`)
 -- @tparam[opt={}] table args The arguments
 -- @treturn table The new geometry
+-- @staticfct awful.placement.scale
 function placement.scale(d, args)
     args = add_context(args, "scale_to_percent")
     d    = d or capi.client.focus
@@ -1400,11 +1455,12 @@ end
 -- @treturn table The new geometry
 -- @treturn string The choosen position ("left", "right", "top" or "bottom")
 -- @treturn string The choosen anchor ("front", "middle" or "back")
+-- @staticfct awful.placement.next_to
 function placement.next_to(d, args)
     args = add_context(args, "next_to")
     d    = d or capi.client.focus
 
-    local osize = type(d.geometry) == "function"  and d:geometry() or nil
+    local osize = type(d.geometry) == "function"  and d:geometry() or d.geometry
     local original_pos, original_anchors = args.preferred_positions, args.preferred_anchors
 
     if type(original_pos) == "string" then
@@ -1477,14 +1533,18 @@ function placement.next_to(d, args)
 
             geo.width, geo.height = dgeo.width, dgeo.height
 
-            fit = fit_in_bounding(pos.region.screen, geo, args)
+            fit = fit_in_bounding(pos.region, geo, args)
 
             if fit then break end
         end
 
         does_fit[pos.name] = fit and {geo, dir} or nil
 
-        if fit and preferred_positions[pos.name] and preferred_positions[pos.name] < pref_idx then
+        -- preferred_positions is optional
+        local better_pos_idx = preferred_positions[pos.name]
+            and preferred_positions[pos.name] < pref_idx or false
+
+        if fit and (better_pos_idx or not pref_name) then
             pref_idx  = preferred_positions[pos.name]
             pref_name = pos.name
         end
@@ -1493,7 +1553,11 @@ function placement.next_to(d, args)
         if fit then break end
     end
 
-    local ngeo, dir = unpack(does_fit[pref_name] or {}) --FIXME why does this happen
+    if not pref_name then return end
+
+    assert(does_fit[pref_name])
+
+    local ngeo, dir = unpack(does_fit[pref_name])
 
     -- The requested placement isn't possible due to the lack of space, better
     -- do nothing an try random things
@@ -1519,6 +1583,7 @@ end
 -- @tparam[opt=client.focus] drawable d A drawable (like `client` or `wibox`)
 -- @tparam[opt={}] table args The arguments
 -- @treturn boolean If the geometry was restored
+-- @staticfct awful.placement.restore
 function placement.restore(d, args)
     if not args or not args.context then return false end
     d = d or capi.client.focus

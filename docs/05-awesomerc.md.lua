@@ -29,6 +29,7 @@ Here are the modules that we import:
 ]]
 
 sections.DOC_ERROR_HANDLING = [[
+
 Awesome is a window managing framework. It allows its users great (ultimate?)
 flexibility. However, it also allows the user to write invalid code. Here's a
 non-exhaustive list of possible errors:
@@ -207,12 +208,6 @@ sections.DOC_DIALOG_RULE = [[
  &nbsp;
 ]]
 
-
-sections.DOC_MANAGE_HOOK = [[
- &nbsp;
-]]
-
-
 sections.DOC_TITLEBARS = [[
  &nbsp;
 ]]
@@ -224,11 +219,6 @@ sections.DOC_CSD_TITLEBARS = [[
  `titlebars_enabled = function(c) return not c.requests_no_titlebar end`
 
  See `client.requests_no_titlebar` for more details.
-]]
-
-
-sections.DOC_BORDER = [[
- &nbsp;
 ]]
 
 -- Ask ldoc to generate links

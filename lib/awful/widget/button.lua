@@ -1,15 +1,15 @@
 ---------------------------------------------------------------------------
 -- A simple button widget.
--- @usage local button = awful.widget.button()
--- button:buttons(gears.table.join(
---     button:buttons(),
---     awful.button({}, 1, nil, function ()
---         print("Mouse was clicked")
---     end)
--- ))
+--
+--    button.buttons = {
+--        awful.button({}, 1, nil, function ()
+--            print("Mouse was clicked")
+--        end)
+--    }
+--
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008-2009 Julien Danjou
--- @classmod awful.widget.button
+-- @widgetmod awful.widget.button
 ---------------------------------------------------------------------------
 
 local setmetatable = setmetatable
@@ -24,6 +24,7 @@ local button = { mt = {} }
 --- Create a button widget. When clicked, the image is deplaced to make it like
 -- a real button.
 --
+-- @constructorfct awful.widget.button
 -- @param args Widget arguments. "image" is the image to display.
 -- @return A textbox widget configured as a button.
 function button.new(args)
@@ -45,8 +46,11 @@ function button.new(args)
         orig_set_image(self, img_release)
     end
     w:set_image(args.image)
-    w:buttons(abutton({}, 1, function () orig_set_image(w, img_press) end,
-                             function () orig_set_image(w, img_release) end))
+
+    w.buttons = {
+        abutton({}, 1, function () orig_set_image(w, img_press) end,
+                       function () orig_set_image(w, img_release) end)
+    }
 
     w:connect_signal("mouse::leave", function(self) orig_set_image(self, img_release) end)
 

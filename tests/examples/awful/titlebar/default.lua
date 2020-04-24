@@ -11,11 +11,11 @@ local c = client.gen_fake {hide_first=true} --DOC_HIDE
 place.maximize(c, {honor_padding=true, honor_workarea=true}) --DOC_HIDE
 
     -- Create a titlebar for the client.
-    -- By default, `awful.rules` will create one, but all it does is to call this
+    -- By default, `ruled.client` will create one, but all it does is to call this
     -- function.
 
     local top_titlebar = awful.titlebar(c, {
-        height    = 20,
+        size      = 20,
         bg_normal = "#ff0000",
     })
 

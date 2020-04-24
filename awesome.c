@@ -36,6 +36,7 @@
 #include "spawn.h"
 #include "systray.h"
 #include "xwindow.h"
+#include "options.h"
 
 #include <getopt.h>
 
@@ -53,6 +54,7 @@
 #include <xcb/xinerama.h>
 #include <xcb/xtest.h>
 #include <xcb/shape.h>
+#include <xcb/xfixes.h>
 
 #include <glib-unix.h>
 
@@ -69,6 +71,33 @@ static float main_loop_iteration_limit = 0.1;
 
 /** A pipe that is used to asynchronously handle SIGCHLD */
 static int sigchld_pipe[2];
+
+/* Initialise various random number generators */
+static void
+init_rng(void)
+{
+    /* LuaJIT uses its own, internal RNG, so initialise that */
+    lua_State *L = globalconf_get_lua_State();
+
+    /* Get math.randomseed */
+    lua_getglobal(L, "math");
+    lua_getfield(L, -1, "randomseed");
+
+    /* Push a seed */
+    lua_pushnumber(L, g_random_int() + g_random_double());
+
+    /* Call math.randomseed */
+    lua_call(L, 1, 0);
+
+    /* Remove "math" global */
+    lua_pop(L, 1);
+
+    /* Lua 5.1, Lua 5.2, and (sometimes) Lua 5.3 use rand()/srand() */
+    srand(g_random_int());
+
+    /* When Lua 5.3 is built with LUA_USE_POSIX, it uses random()/srandom() */
+    srandom(g_random_int());
+}
 
 /** Call before exiting.
  */
@@ -103,6 +132,8 @@ awesome_atexit(bool restart)
     /* Close Lua */
     lua_close(L);
 
+    screen_cleanup();
+
     /* X11 is a great protocol. There is a save-set so that reparenting WMs
      * don't kill clients when they shut down. However, when a focused windows
      * is saved, the focus will move to its parent with revert-to none.
@@ -117,6 +148,9 @@ awesome_atexit(bool restart)
 
     /* Disconnect *after* closing lua */
     xcb_cursor_context_free(globalconf.cursor_ctx);
+#ifdef WITH_XCB_ERRORS
+    xcb_errors_context_free(globalconf.errors_ctx);
+#endif
     xcb_disconnect(globalconf.connection);
 
     close(sigchld_pipe[0]);
@@ -317,8 +351,7 @@ acquire_timestamp(void)
             atom, type, 8, 0, "");
     xcb_change_window_attributes(globalconf.connection, win,
             XCB_CW_EVENT_MASK, (uint32_t[]) { 0 });
-    xcb_ungrab_server(globalconf.connection);
-    xcb_flush(globalconf.connection);
+    xutil_ungrab_server(globalconf.connection);
 
     /* Now wait for the event */
     while((event = xcb_wait_for_event(globalconf.connection)))
@@ -520,25 +553,6 @@ true_config_callback(const char *unused)
     return true;
 }
 
-/** Print help and exit(2) with given exit_code.
- * \param exit_code The exit code.
- */
-static void __attribute__ ((noreturn))
-exit_help(int exit_code)
-{
-    FILE *outfile = (exit_code == EXIT_SUCCESS) ? stdout : stderr;
-    fprintf(outfile,
-"Usage: awesome [OPTION]\n\
-  -h, --help             show help\n\
-  -v, --version          show version\n\
-  -c, --config FILE      configuration file to use\n\
-      --search DIR       add a directory to the library search path\n\
-  -k, --check            check configuration file syntax\n\
-  -a, --no-argb          disable client transparency support\n\
-  -r, --replace          replace an existing window manager\n");
-    exit(exit_code);
-}
-
 /** Hello, this is main.
  * \param argc Who knows.
  * \param argv Who knows.
@@ -547,26 +561,15 @@ exit_help(int exit_code)
 int
 main(int argc, char **argv)
 {
-    char *confpath = NULL;
     string_array_t searchpath;
-    int xfd, opt;
+    int xfd;
     xdgHandle xdg;
-    bool no_argb = false;
-    bool run_test = false;
-    bool replace_wm = false;
     xcb_query_tree_cookie_t tree_c;
-    static struct option long_options[] =
-    {
-        { "help",    0, NULL, 'h' },
-        { "version", 0, NULL, 'v' },
-        { "config",  1, NULL, 'c' },
-        { "check",   0, NULL, 'k' },
-        { "search",  1, NULL, 's' },
-        { "no-argb", 0, NULL, 'a' },
-        { "replace", 0, NULL, 'r' },
-        { "reap",    1, NULL, '\1' },
-        { NULL,      0, NULL, 0 }
-    };
+
+    /* The default values for the init flags */
+    int default_init_flags = INIT_FLAG_NONE
+        | INIT_FLAG_ARGB
+        | INIT_FLAG_AUTO_SCREEN;
 
     /* Make stdout/stderr line buffered. */
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -577,6 +580,7 @@ main(int argc, char **argv)
     globalconf.keygrabber = LUA_REFNIL;
     globalconf.mousegrabber = LUA_REFNIL;
     globalconf.exit_code = EXIT_SUCCESS;
+    globalconf.api_level = awesome_default_api_level();
     buffer_init(&globalconf.startup_errors);
     string_array_init(&searchpath);
 
@@ -586,41 +590,11 @@ main(int argc, char **argv)
     /* Text won't be printed correctly otherwise */
     setlocale(LC_CTYPE, "");
 
-    /* check args */
-    while((opt = getopt_long(argc, argv, "vhkc:ar",
-                             long_options, NULL)) != -1)
-        switch(opt)
-        {
-          case 'v':
-            eprint_version();
-            break;
-          case 'h':
-            exit_help(EXIT_SUCCESS);
-            break;
-          case 'k':
-            run_test = true;
-            break;
-          case 'c':
-            if (confpath != NULL)
-                fatal("--config may only be specified once");
-            confpath = a_strdup(optarg);
-            break;
-          case 's':
-            string_array_append(&searchpath, a_strdup(optarg));
-            break;
-          case 'a':
-            no_argb = true;
-            break;
-          case 'r':
-            replace_wm = true;
-            break;
-          case '\1':
-            /* Silently ignore --reap and its argument */
-            break;
-          default:
-            exit_help(EXIT_FAILURE);
-            break;
-        }
+    char *confpath = options_detect_shebang(argc, argv);
+
+    /* if no shebang is detected, check the args. Shebang (#!) args are parsed later */
+    if (!confpath)
+        confpath = options_check_args(argc, argv, &default_init_flags, &searchpath);
 
     /* Get XDG basedir data */
     if(!xdgInitHandle(&xdg))
@@ -639,7 +613,8 @@ main(int argc, char **argv)
         string_array_append(&searchpath, entry);
     }
 
-    if (run_test)
+    /* Check the configfile syntax and exit */
+    if (default_init_flags & INIT_FLAG_RUN_TEST)
     {
         bool success = true;
         /* Get the first config that will be tried */
@@ -667,6 +642,10 @@ main(int argc, char **argv)
             return EXIT_SUCCESS;
         }
     }
+
+    /* Parse `rc.lua` to see if it has an AwesomeWM modeline */
+    if (!(default_init_flags & INIT_FLAG_FORCE_CMD_ARGS))
+        options_init_config(awesome_argv[0], confpath, &default_init_flags, &searchpath);
 
     /* Setup pipe for SIGCHLD processing */
     {
@@ -709,7 +688,7 @@ main(int argc, char **argv)
 
     globalconf.screen = xcb_aux_get_screen(globalconf.connection, globalconf.default_screen);
     globalconf.default_visual = draw_default_visual(globalconf.screen);
-    if(!no_argb)
+    if(default_init_flags & INIT_FLAG_ARGB)
         globalconf.visual = draw_argb_visual(globalconf.screen);
     if(!globalconf.visual)
         globalconf.visual = globalconf.default_visual;
@@ -724,6 +703,11 @@ main(int argc, char **argv)
                 globalconf.visual->visual_id);
     }
 
+#ifdef WITH_XCB_ERRORS
+    if (xcb_errors_context_new(globalconf.connection, &globalconf.errors_ctx) < 0)
+        fatal("Failed to initialize xcb-errors");
+#endif
+
     /* Get a recent timestamp */
     acquire_timestamp();
 
@@ -733,6 +717,7 @@ main(int argc, char **argv)
     xcb_prefetch_extension_data(globalconf.connection, &xcb_randr_id);
     xcb_prefetch_extension_data(globalconf.connection, &xcb_xinerama_id);
     xcb_prefetch_extension_data(globalconf.connection, &xcb_shape_id);
+    xcb_prefetch_extension_data(globalconf.connection, &xcb_xfixes_id);
 
     if (xcb_cursor_context_new(globalconf.connection, globalconf.screen, &globalconf.cursor_ctx) < 0)
         fatal("Failed to initialize xcb-cursor");
@@ -746,7 +731,7 @@ main(int argc, char **argv)
     draw_test_cairo_xcb();
 
     /* Acquire the WM_Sn selection */
-    acquire_WM_Sn(replace_wm);
+    acquire_WM_Sn(default_init_flags & INIT_FLAG_REPLACE_WM);
 
     /* initialize dbus */
     a_dbus_init();
@@ -793,6 +778,13 @@ main(int argc, char **argv)
                 (reply->major_version == 1 && reply->minor_version >= 1));
         p_delete(&reply);
     }
+
+    /* check for xfixes extension */
+    query = xcb_get_extension_data(globalconf.connection, &xcb_xfixes_id);
+    globalconf.have_xfixes = query && query->present;
+    if (globalconf.have_xfixes)
+        xcb_discard_reply(globalconf.connection,
+                xcb_xfixes_query_version(globalconf.connection, 1, 0).sequence);
 
     event_init();
 
@@ -846,8 +838,7 @@ main(int argc, char **argv)
                                  ROOT_WINDOW_EVENT_MASK);
 
     /* we will receive events, stop grabbing server */
-    xcb_ungrab_server(globalconf.connection);
-    xcb_flush(globalconf.connection);
+    xutil_ungrab_server(globalconf.connection);
 
     /* get the current wallpaper, from now on we are informed when it changes */
     root_update_wallpaper();
@@ -855,22 +846,47 @@ main(int argc, char **argv)
     /* init lua */
     luaA_init(&xdg, &searchpath);
     string_array_wipe(&searchpath);
+    init_rng();
 
     ewmh_init_lua();
+
+    /* Parse and run configuration file before adding the screens */
+    if (globalconf.no_auto_screen)
+    {
+        /* Disable automatic screen creation, awful.screen has a fallback */
+        globalconf.ignore_screens = true;
+
+        if(!luaA_parserc(&xdg, confpath))
+            fatal("couldn't find any rc file");
+    }
 
     /* init screens information */
     screen_scan();
 
-    /* Parse and run configuration file */
-    if (!luaA_parserc(&xdg, confpath))
+    /* Parse and run configuration file after adding the screens */
+    if (((!globalconf.no_auto_screen) && !luaA_parserc(&xdg, confpath)))
         fatal("couldn't find any rc file");
 
     p_delete(&confpath);
 
     xdgWipeHandle(&xdg);
 
+    /* Both screen scanning mode have this signal, it cannot be in screen_scan
+       since the automatic screen generation don't have executed rc.lua yet. */
+    screen_emit_scanned();
+
+    /* Exit if the user doesn't read the instructions properly */
+    if (globalconf.no_auto_screen && !globalconf.screens.len)
+        fatal("When -m/--screen is set to \"off\", you **must** create a "
+              "screen object before or inside the screen \"scanned\" "
+              " signal. Using AwesomeWM with no screen is **not supported**.");
+
+    client_emit_scanning();
+
     /* scan existing windows */
     scan(tree_c);
+
+    client_emit_scanned();
 
     luaA_emit_startup();
 

@@ -4,6 +4,7 @@ local hotkeys_widget = require("awful.hotkeys_popup").widget
 -- luacheck: globals modkey
 
 local old_c = nil
+local called = false
 
 
 -- Get a tag and a client
@@ -23,6 +24,8 @@ local function num_pairs(container_table)
   end
   return number_of_items
 end
+
+local test_context = {}
 
 local steps = {
     function(count)
@@ -46,7 +49,7 @@ local steps = {
         local l = old_c.screen.selected_tag.layout
         assert(l)
 
-        --awful.key.execute({modkey}, " ")
+        --awful.keyboard.emulate_key_combination({modkey}, " ")
         awful.layout.inc(1)
 
         assert(old_c.screen.selected_tag.layout ~= l)
@@ -54,7 +57,7 @@ local steps = {
         -- Test ontop
 
         assert(not old_c.ontop)
-        awful.key.execute({modkey}, "t")
+        awful.keyboard.emulate_key_combination({modkey}, "t")
         awesome.sync()
 
         return true
@@ -72,7 +75,7 @@ local steps = {
         -- Now, test the master_width_factor
         assert(t.master_width_factor == 0.5)
 
-        awful.key.execute({modkey}, "l")
+        awful.keyboard.emulate_key_combination({modkey}, "l")
         awesome.sync()
 
         return true
@@ -87,7 +90,7 @@ local steps = {
         -- Now, test the master_count
         assert(t.master_count == 1)
 
-        awful.key.execute({modkey, "Shift"}, "h")
+        awful.keyboard.emulate_key_combination({modkey, "Shift"}, "h")
         awesome.sync()
 
         return true
@@ -102,8 +105,8 @@ local steps = {
         -- Now, test the column_count
         assert(t.column_count == 1)
 
-        awful.key.execute({modkey, "Control"}, "h")
-        awful.key.execute({modkey, "Shift"  }, "l")
+        awful.keyboard.emulate_key_combination({modkey, "Control"}, "h")
+        awful.keyboard.emulate_key_combination({modkey, "Shift"  }, "l")
         awesome.sync()
 
         return true
@@ -118,7 +121,7 @@ local steps = {
         -- Now, test the switching tag
         assert(t.index == 1)
 
-        awful.key.execute({modkey, }, "Right")
+        awful.keyboard.emulate_key_combination({modkey, }, "Right")
         awesome.sync()
 
         return true
@@ -198,7 +201,7 @@ local steps = {
         -- tags[1] and the client history should be kept
         assert(client.focus == old_c)
 
-        --awful.key.execute({modkey, "Shift"  }, "#"..(9+i)) --FIXME
+        --awful.keyboard.emulate_key_combination({modkey, "Shift"  }, "#"..(9+i)) --FIXME
         client.focus:move_to_tag(tags[2])
 
         assert(not client.focus)
@@ -226,6 +229,25 @@ local steps = {
         return true
     end,
 
+    -- Add more keybindings for make sure the popup has many pages.
+    function()
+        for j=1, 10 do
+            for i=1, 200 do
+                awful.keyboard.append_global_keybinding(
+                    awful.key {
+                        key = "#"..(300+i),
+                        modifiers = {},
+                        on_press = function() end,
+                        description = "Fake "..i,
+                        group = "Fake"..j,
+                    }
+                )
+            end
+        end
+
+        return true
+    end,
+
     -- Hotkeys popup should be displayed and hidden
     function(count)
         local s = awful.screen.focused()
@@ -233,32 +255,118 @@ local steps = {
 
         if count == 1 then
             assert(num_pairs(cached_wiboxes) == 0)
-            awful.key.execute({modkey}, "s")
+            awful.keyboard.emulate_key_combination({modkey}, "s")
             return nil
 
         elseif count == 2 then
             assert(num_pairs(cached_wiboxes) > 0)
             assert(num_pairs(cached_wiboxes[s]) == 1)
+
+        elseif (
+            test_context.hotkeys01_count_vim and
+            (count - test_context.hotkeys01_count_vim) == 2
+        ) then
+            -- new wibox instance should be generated for including vim hotkeys:
+            assert(num_pairs(cached_wiboxes[s]) == 2)
         end
 
-        local hotkeys_wibox
+        local hotkeys_popup
+        local visible_hotkeys_widget
         for _, widget in pairs(cached_wiboxes[s]) do
-            hotkeys_wibox = widget.wibox
+            hotkeys_popup = widget.popup
+            if hotkeys_popup.visible then
+                visible_hotkeys_widget = widget
+            end
         end
 
         if count == 2 then
-            assert(hotkeys_wibox ~= nil)
-            assert(hotkeys_wibox.visible)
+            assert(hotkeys_popup ~= nil)
+            assert(hotkeys_popup.visible)
             -- Should disappear on anykey
             root.fake_input("key_press", "Super_L")
 
         elseif count == 3 then
-            assert(not hotkeys_wibox.visible)
+            assert(not hotkeys_popup.visible)
             root.fake_input("key_release", "Super_L")
-            return true
+            test_context.hotkeys01_clients_before = #client.get()
+            -- imitate fake client with name "vim"
+            -- so hotkeys widget will offer vim hotkeys:
+            awful.spawn("xterm -title vim cat")
+
+        elseif not test_context.hotkeys01_count_vim then
+            -- if xterm with vim got already opened:
+            if (
+                    test_context.hotkeys01_clients_before and
+                    test_context.hotkeys01_clients_before < #client.get()
+            ) then
+                -- open hotkeys popup with vim hotkeys:
+                awful.keyboard.emulate_key_combination({modkey}, "s")
+                test_context.hotkeys01_count_vim = count
+            end
+
+        elseif test_context.hotkeys01_count_vim then
+            if (count - test_context.hotkeys01_count_vim) == 1 then
+                assert(visible_hotkeys_widget ~= nil)
+                assert(visible_hotkeys_widget.current_page == 1)
+                -- Should change the page on PgDn:
+                root.fake_input("key_press", "Next")
+            elseif (count - test_context.hotkeys01_count_vim) == 2 then
+                assert(visible_hotkeys_widget ~= nil)
+                assert(visible_hotkeys_widget.current_page == 2)
+                root.fake_input("key_release", "Next")
+                -- Should disappear on anykey
+                root.fake_input("key_press", "Super_L")
+            elseif (count - test_context.hotkeys01_count_vim) == 3 then
+                assert(not visible_hotkeys_widget)
+                root.fake_input("key_release", "Super_L")
+                return true
+            end
         end
     end,
+    -- Test the `c:activate{}` keybindings.
+    function()
+        client.connect_signal("request::activate", function()
+            called = true
+        end)
 
+        old_c = client.focus
+
+        root.fake_input("key_press", "Super_L")
+        awful.placement.centered(mouse, {parent=old_c})
+        root.fake_input("button_press",1)
+        root.fake_input("button_release",1)
+        root.fake_input("key_release", "Super_L")
+
+        return true
+    end,
+    function()
+        if not called then return end
+
+        client.focus = nil
+        called = false
+        root.fake_input("key_press", "Super_L")
+        root.fake_input("button_press",1)
+        root.fake_input("button_release",1)
+        root.fake_input("key_release", "Super_L")
+        return true
+    end,
+    -- Test resize.
+    function()
+        if not called then return end
+
+        called = false
+        root.fake_input("key_press", "Super_L")
+        root.fake_input("button_press",3)
+        root.fake_input("button_release",3)
+        root.fake_input("key_release", "Super_L")
+
+        return true
+    end,
+    function()
+        if not called then return end
+
+        return true
+    end
 }
 
 require("_runner").run_steps(steps)

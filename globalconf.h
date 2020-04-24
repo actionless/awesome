@@ -33,6 +33,11 @@
 #include <xcb/xcb_xrm.h>
 #include <X11/Xresource.h>
 
+#include "config.h"
+#ifdef WITH_XCB_ERRORS
+#include <xcb/xcb_errors.h>
+#endif
+
 #include "objects/key.h"
 #include "common/xembed.h"
 #include "common/buffer.h"
@@ -50,6 +55,7 @@
     }
 
 typedef struct drawable_t drawable_t;
+typedef struct a_screen_area screen_area_t;
 typedef struct drawin_t drawin_t;
 typedef struct a_screen screen_t;
 typedef struct button_t button_t;
@@ -82,6 +88,10 @@ typedef struct
     int default_screen;
     /** xcb-cursor context */
     xcb_cursor_context_t *cursor_ctx;
+#ifdef WITH_XCB_ERRORS
+    /** xcb-errors context */
+    xcb_errors_context_t *errors_ctx;
+#endif
     /** Keys symbol table */
     xcb_key_symbols_t *keysyms;
     /** Logical screens */
@@ -101,7 +111,11 @@ typedef struct
     /** Do we have RandR 1.5 or newer? */
     bool have_randr_15;
     /** Do we have a RandR screen update pending? */
-    bool screen_need_refresh;
+    bool screen_refresh_pending;
+    /** Should screens be created before rc.lua is loaded? */
+    bool no_auto_screen;
+    /** Should the screen be created automatically? */
+    bool ignore_screens;
     /** Check for XTest extension */
     bool have_xtest;
     /** Check for SHAPE extension */
@@ -110,9 +124,16 @@ typedef struct
     bool have_input_shape;
     /** Check for XKB extension */
     bool have_xkb;
+    /** Check for XFixes extension */
+    bool have_xfixes;
+    /** Custom searchpaths are present, the runtime is tinted */
+    bool have_searchpaths;
+    /** When --no-argb is used in the modeline or command line */
+    bool had_overriden_depth;
     uint8_t event_base_shape;
     uint8_t event_base_xkb;
     uint8_t event_base_randr;
+    uint8_t event_base_xfixes;
     /** Clients list */
     client_array_t clients;
     /** Embedded windows */
@@ -186,6 +207,8 @@ typedef struct
     struct xkb_context *xkb_ctx;
     /* xkb state of dead keys on keyboard */
     struct xkb_state *xkb_state;
+    /* Do we have a pending xkb update call? */
+    bool xkb_update_pending;
     /* Do we have a pending reload? */
     bool xkb_reload_keymap;
     /* Do we have a pending map change? */
@@ -205,6 +228,8 @@ typedef struct
     xcb_generic_event_t *pending_event;
     /** The exit code that main() will return with */
     int exit_code;
+    /** The Global API level */
+    int api_level;
 } awesome_t;
 
 extern awesome_t globalconf;

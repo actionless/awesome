@@ -1,4 +1,16 @@
 ---------------------------------------------------------------------------
+--- Cache object with data that can be garbage-collected.
+--
+-- Here is an example with a basic cache:
+--
+--@DOC_text_gears_cache_cache_EXAMPLE@
+--
+-- The example below demonstrates how the garbage collector will clear the
+-- cache:
+--
+--@DOC_text_gears_cache_another_cache_EXAMPLE@
+--
+--
 -- @author Uli Schlachter
 -- @copyright 2015 Uli Schlachter
 -- @classmod gears.cache
@@ -37,6 +49,7 @@ end
 -- garbage-collected at any time, but might be useful to keep.
 -- @param creation_cb Callback that is used for creating missing cache entries.
 -- @return A new cache object.
+-- @constructorfct gears.cache
 function cache.new(creation_cb)
     return setmetatable({
         _cache = setmetatable({}, { __mode = "v" }),

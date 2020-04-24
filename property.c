@@ -25,6 +25,8 @@
 #include "ewmh.h"
 #include "objects/client.h"
 #include "objects/drawin.h"
+#include "objects/selection_getter.h"
+#include "objects/selection_transfer.h"
 #include "xwindow.h"
 
 #include <xcb/xcb_atom.h>
@@ -52,14 +54,13 @@
         lua_pop(L, 1); \
         p_delete(&reply); \
     } \
-    static int \
+    static void \
     property_handle_##funcname(uint8_t state, \
                                xcb_window_t window) \
     { \
         client_t *c = client_getbywin(window); \
         if(c) \
             property_update_##funcname(c, property_get_##funcname(c));\
-        return 0; \
     }
 
 
@@ -73,14 +74,13 @@ HANDLE_TEXT_PROPERTY(wm_window_role, WM_WINDOW_ROLE, client_set_role)
 #undef HANDLE_TEXT_PROPERTY
 
 #define HANDLE_PROPERTY(name) \
-    static int \
+    static void \
     property_handle_##name(uint8_t state, \
                            xcb_window_t window) \
     { \
         client_t *c = client_getbywin(window); \
         if(c) \
             property_update_##name(c, property_get_##name(c));\
-        return 0; \
     }
 
 HANDLE_PROPERTY(wm_protocols)
@@ -199,6 +199,7 @@ property_update_wm_hints(client_t *c, xcb_get_property_cookie_t cookie)
 
     luaA_object_push(L, c);
 
+    /*TODO v5: Add a context */
     lua_pushboolean(L, xcb_icccm_wm_hints_get_urgency(&wmh));
     luaA_object_emit_signal(L, -2, "request::urgent", 1);
 
@@ -250,7 +251,7 @@ property_update_wm_class(client_t *c, xcb_get_property_cookie_t cookie)
     xcb_icccm_get_wm_class_reply_wipe(&hint);
 }
 
-static int
+static void
 property_handle_net_wm_strut_partial(uint8_t state,
                                      xcb_window_t window)
 {
@@ -258,8 +259,6 @@ property_handle_net_wm_strut_partial(uint8_t state,
 
     if(c)
         ewmh_process_client_strut(c);
-
-    return 0;
 }
 
 xcb_get_property_cookie_t
@@ -374,7 +373,7 @@ property_update_wm_protocols(client_t *c, xcb_get_property_cookie_t cookie)
  * \param state currently unused
  * \param window The window to obtain update the property with.
  */
-static int
+static void
 property_handle_xembed_info(uint8_t state,
                             xcb_window_t window)
 {
@@ -391,11 +390,9 @@ property_handle_xembed_info(uint8_t state,
                                globalconf.timestamp, propr);
         p_delete(&propr);
     }
-
-    return 0;
 }
 
-static int
+static void
 property_handle_net_wm_opacity(uint8_t state,
                                xcb_window_t window)
 {
@@ -418,18 +415,15 @@ property_handle_net_wm_opacity(uint8_t state,
             lua_pop(L, 1);
         }
     }
-
-    return 0;
 }
 
-static int
+static void
 property_handle_xrootpmap_id(uint8_t state,
                              xcb_window_t window)
 {
     lua_State *L = globalconf_get_lua_State();
     root_update_wallpaper();
     signal_object_emit(L, &global_signals, "wallpaper_changed", 0);
-    return 0;
 }
 
 /** The property notify event handler handling xproperties.
@@ -480,12 +474,13 @@ property_handle_propertynotify_xproperty(xcb_property_notify_event_t *ev)
 void
 property_handle_propertynotify(xcb_property_notify_event_t *ev)
 {
-    int (*handler)(uint8_t state,
+    void (*handler)(uint8_t state,
                    xcb_window_t window) = NULL;
 
     globalconf.timestamp = ev->time;
 
     property_handle_propertynotify_xproperty(ev);
+    selection_transfer_handle_propertynotify(ev);
 
     /* Find the correct event handler */
 #define HANDLE(atom_, cb) \
@@ -523,6 +518,9 @@ property_handle_propertynotify(xcb_property_notify_event_t *ev)
 
     /* background change */
     HANDLE(_XROOTPMAP_ID, property_handle_xrootpmap_id)
+
+    /* selection transfers */
+    HANDLE(AWESOME_SELECTION_ATOM, property_handle_awesome_selection_atom)
 
     /* If nothing was found, return */
     END;

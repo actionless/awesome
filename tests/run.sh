@@ -23,16 +23,19 @@ Usage: $0 [OPTION]... [FILE]...
 Options:
   -v: verbose mode
   -W: warnings become errors
+  -m: Use --screen off
   -h: show this help
 EOF
     exit "$1"
 }
 fail_on_warning=
+manual_screens=
 verbose=${VERBOSE:-0}
-while getopts vWh opt; do
+while getopts vWmh opt; do
     case $opt in
         v) verbose=1 ;;
         W) fail_on_warning=1 ;;
+        m) manual_screens=" --screen off" ;;
         h) usage 0 ;;
         *) usage 64 ;;
     esac
@@ -57,7 +60,6 @@ if [ -z "$build_dir" ]; then
         build_dir="$source_dir"
     fi
 fi
-export build_dir
 
 # Get test files: test*, or the ones provided as args (relative to tests/).
 if [ $# != 0 ]; then
@@ -79,8 +81,8 @@ export TEST_PAUSE_ON_ERRORS  # Used in tests/_runner.lua.
 XEPHYR=Xephyr
 XVFB=Xvfb
 AWESOME=$build_dir/awesome
-if ! [ -x "$AWESOME" ]; then
-    echo "$AWESOME is not executable." >&2
+if ! $AWESOME --version; then
+    echo "$AWESOME cannot be run." >&2
     exit 1
 fi
 AWESOME_CLIENT="$source_dir/utils/awesome-client"
@@ -92,6 +94,11 @@ SIZE="${TESTS_SCREEN_SIZE:-1024x768}"
 export GDK_SCALE=1
 # No idea what this does, but it silences a warning that GTK init might print
 export NO_AT_BRIDGE=1
+
+# Enable partial maximization tests if wmctrl is found.
+if command -v wmctrl >/dev/null 2>&1; then
+    export HAS_WMCTRL=1
+fi
 
 if [ $HEADLESS = 1 ]; then
     "$XVFB" $D -noreset -screen 0 "${SIZE}x24" &
@@ -106,8 +113,9 @@ fi
 
 # Add test dir (for _runner.lua).
 # shellcheck disable=SC2206
-awesome_options=($AWESOME_OPTIONS --search lib --search "$this_dir")
-export XDG_CONFIG_HOME="$build_dir"
+awesome_options=($AWESOME_OPTIONS $manual_screens --search lib --search "$this_dir")
+
+awesome_options+=(--screen off --force)
 
 # Cleanup on errors / aborting.
 cleanup() {
@@ -174,11 +182,13 @@ fi
 # Start awesome.
 start_awesome() {
     cd "$build_dir"
+
     # Kill awesome after $TEST_TIMEOUT seconds (e.g. for errors during test setup).
     # SOURCE_DIRECTORY is used by .luacov.
     DISPLAY="$D" SOURCE_DIRECTORY="$source_dir" \
         AWESOME_THEMES_PATH="$AWESOME_THEMES_PATH" \
         AWESOME_ICON_PATH="$AWESOME_ICON_PATH" \
+        XDG_CONFIG_HOME="$build_dir" \
         timeout "$TEST_TIMEOUT" "$AWESOME" -c "$RC_FILE" "${awesome_options[@]}" > "$awesome_log" 2>&1 &
     awesome_pid=$!
     cd - >/dev/null
@@ -216,9 +226,10 @@ for f in $tests; do
             continue
         fi
     fi
+
     # Make the filename absolute if it is not.
-    if [ "$f#/" = "$f" ]; then
-        f="$source_dir/$f"
+    if [ "${f#/}" = "$f" ]; then
+        f="$PWD/$f"
     fi
 
     # Execute the test file in awesome.
@@ -249,7 +260,7 @@ for f in $tests; do
     error="$(echo "$error" | grep -vE ".{19} W: awesome: (Can't read color .* from GTK)" || true)"
     if [[ $fail_on_warning ]]; then
         # Filter out ignored warnings.
-        error="$(echo "$error" | grep -vE ".{19} W: awesome: (a_glib_poll|Cannot reliably detect EOF|beautiful: can't get colorscheme from xrdb|Can't read color .* from GTK+3 theme)" || true)"
+        error="$(echo "$error" | grep -vE ".{19} W: awesome: (Removing last screen through fake_remove|a_glib_poll|Cannot reliably detect EOF|beautiful: can't get colorscheme from xrdb|Can't read color .* from GTK+3 theme|A notification|Notification)" || true)"
     fi
     if [[ -n "$error" ]]; then
         color_red

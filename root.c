@@ -19,10 +19,10 @@
  *
  */
 
-/** awesome root window API
+/** awesome root window API.
  * @author Julien Danjou &lt;julien@danjou.info&gt;
  * @copyright 2008-2009 Julien Danjou
- * @module root
+ * @coreclassmod root
  */
 
 #include "globalconf.h"
@@ -31,6 +31,7 @@
 #include "common/xcursor.h"
 #include "common/xutil.h"
 #include "objects/button.h"
+#include "common/luaclass.h"
 #include "xwindow.h"
 
 #include "math.h"
@@ -38,6 +39,10 @@
 #include <xcb/xtest.h>
 #include <xcb/xcb_aux.h>
 #include <cairo-xcb.h>
+
+static int miss_index_handler    = LUA_REFNIL;
+static int miss_newindex_handler = LUA_REFNIL;
+static int miss_call_handler     = LUA_REFNIL;
 
 static void
 root_set_wallpaper_pixmap(xcb_connection_t *c, xcb_pixmap_t p)
@@ -124,8 +129,7 @@ root_set_wallpaper(cairo_pattern_t *pattern)
                                  globalconf.screen->root,
                                  XCB_CW_EVENT_MASK,
                                  ROOT_WINDOW_EVENT_MASK);
-    xcb_ungrab_server(globalconf.connection);
-    xcb_flush(globalconf.connection);
+    xutil_ungrab_server(globalconf.connection);
 
     /* Make sure our pixmap is not destroyed when we disconnect. */
     xcb_set_close_down_mode(c, XCB_CLOSE_DOWN_RETAIN_PERMANENT);
@@ -224,7 +228,7 @@ _string_to_key_code(const char *s)
  * "Shift". Here is a list of the "real" key names matching the modifiers in
  * `fake_input`:
  *
- * <table>
+ * <table class='widget_list' border=1>
  *  <tr style='font-weight: bold;'>
  *   <th align='center'>Modifier name </th>
  *   <th align='center'>Key name</th>
@@ -267,7 +271,7 @@ _string_to_key_code(const char *s)
  *  coordinates relatives.
  * @param x In case of a motion event, this is the X coordinate.
  * @param y In case of a motion event, this is the Y coordinate.
- * @function fake_input
+ * @staticfct fake_input
  */
 static int
 luaA_root_fake_input(lua_State *L)
@@ -331,11 +335,12 @@ luaA_root_fake_input(lua_State *L)
 }
 
 /** Get or set global key bindings.
- * These bindings will be available when you press keys on the root window.
+ * These bindings will be available when you press keys on the root window
+ * (the wallpaper).
  *
- * @tparam table|nil keys_array An array of key binding objects, or nothing.
- * @return The array of key bindings objects of this client.
- * @function keys
+ * @property keys
+ * @param table
+ * @see awful.key
  */
 static int
 luaA_root_keys(lua_State *L)
@@ -370,13 +375,22 @@ luaA_root_keys(lua_State *L)
     return 1;
 }
 
-/** Get or set global mouse bindings.
- * This binding will be available when you click on the root window.
+/**
+ * Store the list of mouse buttons to be applied on the wallpaper (also
+ * known as root window).
  *
- * @param button_table An array of mouse button bindings objects, or nothing.
- * @return The array of mouse button bindings objects.
- * @function buttons
+ * @property buttons
+ * @tparam[opt={}] table buttons The list of buttons.
+ * @see awful.button
+ *
+ * @usage
+ * root.buttons = {
+ *     awful.button({ }, 3, function () mymainmenu:toggle() end),
+ *     awful.button({ }, 4, awful.tag.viewnext),
+ *     awful.button({ }, 5, awful.tag.viewprev),
+ * }
  */
+
 static int
 luaA_root_buttons(lua_State *L)
 {
@@ -414,7 +428,7 @@ luaA_root_buttons(lua_State *L)
  *@DOC_cursor_c_COMMON@
  *
  * @param cursor_name A X cursor name.
- * @function cursor
+ * @staticfct cursor
  */
 static int
 luaA_root_cursor(lua_State *L)
@@ -440,7 +454,7 @@ luaA_root_cursor(lua_State *L)
 /** Get the drawins attached to a screen.
  *
  * @return A table with all drawins.
- * @function drawins
+ * @staticfct drawins
  */
 static int
 luaA_root_drawins(lua_State *L)
@@ -460,7 +474,7 @@ luaA_root_drawins(lua_State *L)
  *
  * @param pattern A cairo pattern as light userdata
  * @return A cairo surface or nothing.
- * @function wallpaper
+ * @staticfct wallpaper
  */
 static int
 luaA_root_wallpaper(lua_State *L)
@@ -485,7 +499,7 @@ luaA_root_wallpaper(lua_State *L)
  *
  * @return Width of the root window.
  * @return height of the root window.
- * @function size
+ * @staticfct size
  */
 static int
 luaA_root_size(lua_State *L)
@@ -499,7 +513,7 @@ luaA_root_size(lua_State *L)
  *
  * @return Width of the root window, in millimeters.
  * @return height of the root window, in millimeters.
- * @function size_mm
+ * @staticfct size_mm
  */
 static int
 luaA_root_size_mm(lua_State *L)
@@ -511,7 +525,7 @@ luaA_root_size_mm(lua_State *L)
 
 /** Get the attached tags.
  * @return A table with all tags.
- * @function tags
+ * @staticfct tags
  */
 static int
 luaA_root_tags(lua_State *L)
@@ -526,10 +540,65 @@ luaA_root_tags(lua_State *L)
     return 1;
 }
 
-const struct luaL_Reg awesome_root_lib[] =
+/**
+* Add a custom call handler.
+*/
+static int
+luaA_root_set_call_handler(lua_State *L)
 {
-    { "buttons", luaA_root_buttons },
-    { "keys", luaA_root_keys },
+    return luaA_registerfct(L, 1, &miss_call_handler);
+}
+
+/**
+* Add a custom property handler (getter).
+*/
+static int
+luaA_root_set_index_miss_handler(lua_State *L)
+{
+    return luaA_registerfct(L, 1, &miss_index_handler);
+}
+
+/**
+* Add a custom property handler (setter).
+*/
+static int
+luaA_root_set_newindex_miss_handler(lua_State *L)
+{
+    return luaA_registerfct(L, 1, &miss_newindex_handler);
+}
+
+/** Root library.
+ * \param L The Lua VM state.
+ * \return The number of elements pushed on stack.
+ * \luastack
+ */
+static int
+luaA_root_index(lua_State *L)
+{
+    if (miss_index_handler != LUA_REFNIL)
+        return luaA_call_handler(L, miss_index_handler);
+
+    return luaA_default_index(L);
+}
+
+/** Newindex for root.
+ * \param L The Lua VM state.
+ * \return The number of elements pushed on stack.
+ */
+static int
+luaA_root_newindex(lua_State *L)
+{
+    /* Call the lua root property handler */
+    if (miss_newindex_handler != LUA_REFNIL)
+        return luaA_call_handler(L, miss_newindex_handler);
+
+    return luaA_default_newindex(L);
+}
+
+const struct luaL_Reg awesome_root_methods[] =
+{
+    { "_buttons", luaA_root_buttons },
+    { "_keys", luaA_root_keys },
     { "cursor", luaA_root_cursor },
     { "fake_input", luaA_root_fake_input },
     { "drawins", luaA_root_drawins },
@@ -537,8 +606,17 @@ const struct luaL_Reg awesome_root_lib[] =
     { "size", luaA_root_size },
     { "size_mm", luaA_root_size_mm },
     { "tags", luaA_root_tags },
-    { "__index", luaA_default_index },
-    { "__newindex", luaA_default_newindex },
+    { "__index", luaA_root_index },
+    { "__newindex", luaA_root_newindex },
+    { "set_index_miss_handler", luaA_root_set_index_miss_handler},
+    { "set_call_handler", luaA_root_set_call_handler},
+    { "set_newindex_miss_handler", luaA_root_set_newindex_miss_handler},
+
+    { NULL, NULL }
+};
+
+const struct luaL_Reg awesome_root_meta[] =
+{
     { NULL, NULL }
 };
 

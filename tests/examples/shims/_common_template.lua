@@ -1,3 +1,5 @@
+pcall(require, "luarocks.loader")
+
 -- luacheck: globals string
 function string.wlen(self)
     return #self
@@ -26,6 +28,13 @@ return function(_, _)
 
     -- Silence debug warnings
     require("gears.debug").print_warning = function() end
+
+    -- Revert the background widget to something compatible with Cairo SVG
+    -- backend.
+    local bg = require("wibox.container.background")
+    bg._use_fallback_algorithm()
+
+    require("awful._compat")
 end
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

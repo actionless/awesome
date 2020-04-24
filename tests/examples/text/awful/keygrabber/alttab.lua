@@ -2,7 +2,8 @@
 
 local was_called = {} --DOC_HIDE
 
-local awful = {keygrabber = require("awful.keygrabber"), --DOC_HIDE
+local awful = { keygrabber = require("awful.keygrabber"), --DOC_HIDE
+    key = require("awful.key"), --DOC_HIDE
     client={focus={history={--DOC_HIDE
         disable_tracking = function() was_called[1] = true end, --DOC_HIDE
         enable_tracking  = function() was_called[2] = true end, --DOC_HIDE
@@ -12,11 +13,19 @@ local awful = {keygrabber = require("awful.keygrabber"), --DOC_HIDE
 
     awful.keygrabber {
         keybindings = {
-            {{"Mod1"         }, "Tab", awful.client.focus.history.select_previous},
-            {{"Mod1", "Shift"}, "Tab", awful.client.focus.history.select_next    },
+            awful.key {
+                modifiers = {"Mod1"},
+                key       = "Tab",
+                on_press  = awful.client.focus.history.select_previous
+            },
+            awful.key {
+                modifiers = {"Mod1", "Shift"},
+                key       = "Tab",
+                on_press  = awful.client.focus.history.select_next
+            },
         },
         -- Note that it is using the key name and not the modifier name.
-        stop_key           = "Alt_L",
+        stop_key           = "Mod1",
         stop_event         = "release",
         start_callback     = awful.client.focus.history.disable_tracking,
         stop_callback      = awful.client.focus.history.enable_tracking,
@@ -24,7 +33,7 @@ local awful = {keygrabber = require("awful.keygrabber"), --DOC_HIDE
     }
 
 --DOC_HIDE Trigger the keybinging
-awesome.emit_signal("refresh") --DOC_HIDE `export_keybindings` is async
+require("gears.timer").run_delayed_calls_now() --DOC_HIDE `export_keybindings` is async
 root.fake_input("key_press", "Alt_L")--DOC_HIDE
 root.fake_input("key_press", "Tab")--DOC_HIDE
 root.fake_input("key_release", "Tab")--DOC_HIDE

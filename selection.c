@@ -38,7 +38,7 @@
 /** Get the selection (clipboard) content.
  *
  * @return A string with the selection (clipboard) content.
- * @function selection
+ * @staticfct  selection
  */
 
 static xcb_window_t selection_window = XCB_NONE;
@@ -49,9 +49,10 @@ static xcb_window_t selection_window = XCB_NONE;
  * \luastack
  * \lreturn A string with the current X selection buffer.
  */
-int
+static int
 luaA_selection_get(lua_State *L)
 {
+    luaA_deprecate(L, "selection.getter(\"PRIMARY\", \"UTF8_STRING\")");
     if(selection_window == XCB_NONE)
     {
         xcb_screen_t *screen = globalconf.screen;
@@ -130,6 +131,51 @@ luaA_selection_get(lua_State *L)
 
     p_delete(&event);
     return 0;
+}
+
+static void
+move_global_to_table(lua_State *L, int index, const char *global_name, const char *local_name)
+{
+    index = luaA_absindex(L, index);
+
+    /* Get the global */
+    lua_getglobal(L, global_name);
+    assert(!lua_isnil(L, -1));
+
+    /* Save it locally */
+    lua_setfield(L, index, local_name);
+
+    /* Set the global to nil */
+    lua_pushnil(L);
+    lua_setglobal(L, global_name);
+}
+
+void
+selection_setup(lua_State *L)
+{
+    /* This table will be the "selection" global */
+    lua_newtable(L);
+
+    /* Setup a metatable */
+    lua_newtable(L);
+
+    /* metatable.__index = metatable */
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index");
+
+    /* Set some more fields */
+    lua_pushcfunction(L, luaA_selection_get);
+    lua_setfield(L, -2, "__call");
+
+    move_global_to_table(L, -2, "selection_acquire", "acquire");
+    move_global_to_table(L, -2, "selection_getter", "getter");
+    move_global_to_table(L, -2, "selection_watcher", "watcher");
+
+    /* Set the metatable */
+    lua_setmetatable(L, -2);
+
+    /* Set the "selection" global */
+    lua_setglobal(L, "selection");
 }
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

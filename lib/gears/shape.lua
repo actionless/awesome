@@ -38,13 +38,50 @@
 --
 -- @author Emmanuel Lepage Vallee
 -- @copyright 2011-2016 Emmanuel Lepage Vallee
--- @module gears.shape
+-- @themelib gears.shape
 ---------------------------------------------------------------------------
 local g_matrix = require( "gears.matrix" )
 local unpack   = unpack or table.unpack -- luacheck: globals unpack (compatibility with Lua 5.1)
 local atan2    = math.atan2 or math.atan -- lua 5.3 compat
+local min      = math.min
+local cos      = math.cos
+local sin      = math.sin
 
 local module = {}
+
+--- Add a star shape to the current path.
+-- The star size will be the minimum of the given width and weight
+--
+-- @DOC_gears_shape_star_EXAMPLE@
+--
+-- @param cr A cairo context
+-- @tparam number width The width constraint
+-- @tparam number height The height constraint
+-- @tparam number n Number of grams (default n = 5 -> pentagram)
+-- @staticfct gears.shape.star
+function module.star(cr, width, height, n)
+    -- use the minimum as size
+    local s = min(width, height) / 2
+
+    -- draw pentagram by default
+    n = n or 5
+    local a = 2 * math.pi / n
+
+    -- place the star at the center
+    cr:save()
+    cr:translate(width/2, height/2)
+    cr:rotate(-math.pi/2)
+
+    for i = 0,(n - 1) do
+        cr:line_to(s   * cos((i      ) * a), s   * sin((i      ) * a))
+        cr:line_to(s/2 * cos((i + 0.5) * a), s/2 * sin((i + 0.5) * a))
+    end
+
+    -- restore the context
+    cr:restore()
+
+    cr:close_path()
+end
 
 --- Add a rounded rectangle to the current path.
 -- Note: If the radius is bigger than either half side, it will be reduced.
@@ -55,6 +92,7 @@ local module = {}
 -- @tparam number width The rectangle width
 -- @tparam number height The rectangle height
 -- @tparam number radius the corner radius
+-- @staticfct gears.shape.rounded_rect
 function module.rounded_rect(cr, width, height, radius)
 
     radius = radius or 10
@@ -83,7 +121,8 @@ end
 --
 -- @param cr A cairo content
 -- @param width The rectangle width
--- @param height The rectangle height
+-- @param height The rectangle height.
+-- @staticfct gears.shape.rounded_bar
 function module.rounded_bar(cr, width, height)
     module.rounded_rect(cr, width, height, height / 2)
 end
@@ -100,6 +139,7 @@ end
 -- @tparam boolean br If the bottom right corner is rounded
 -- @tparam boolean bl If the bottom left corner is rounded
 -- @tparam number rad The corner radius
+-- @staticfct gears.shape.partially_rounded_rect
 function module.partially_rounded_rect(cr, width, height, tl, tr, br, bl, rad)
     rad = rad or 10
     if width / 2 < rad then
@@ -109,6 +149,10 @@ function module.partially_rounded_rect(cr, width, height, tl, tr, br, bl, rad)
     if height / 2 < rad then
         rad = height / 2
     end
+
+    -- In case there is already some other path on the cairo context:
+    -- Make sure the close_path() below goes to the right position.
+    cr:new_sub_path()
 
     -- Top left
     if tl then
@@ -151,6 +195,7 @@ end
 -- @tparam[opt=5] number corner_radius The corner radius
 -- @tparam[opt=10] number arrow_size The width and height of the arrow
 -- @tparam[opt=width/2 - arrow_size/2] number arrow_position The position of the arrow
+-- @staticfct gears.shape.infobubble
 function module.infobubble(cr, width, height, corner_radius, arrow_size, arrow_position)
     arrow_size     = arrow_size     or 10
     corner_radius  = math.min((height-arrow_size)/2, corner_radius or 5)
@@ -184,6 +229,7 @@ end
 -- @tparam number width The shape width
 -- @tparam number height The shape height
 -- @tparam[opt=height/2] number arrow_length The length of the arrow part
+-- @staticfct gears.shape.rectangular_tag
 function module.rectangular_tag(cr, width, height, arrow_length)
     arrow_length = arrow_length or height/2
     if arrow_length > 0 then
@@ -213,6 +259,7 @@ end
 -- @tparam[opt=head_width] number head_width The width of the head (/\) of the arrow
 -- @tparam[opt=width /2] number shaft_width The width of the shaft of the arrow
 -- @tparam[opt=height/2] number shaft_length The head_length of the shaft (the rest is the head)
+-- @staticfct gears.shape.arrow
 function module.arrow(cr, width, height, head_width, shaft_width, shaft_length)
     shaft_length = shaft_length or height / 2
     shaft_width  = shaft_width  or width  / 2
@@ -237,6 +284,7 @@ end
 -- @param cr A cairo context
 -- @tparam number width The shape width
 -- @tparam number height The shape height
+-- @staticfct gears.shape.hexagon
 function module.hexagon(cr, width, height)
     cr:move_to(height/2,0)
     cr:line_to(width-height/2,0)
@@ -256,6 +304,7 @@ end
 -- @tparam number width The shape width
 -- @tparam number height The shape height
 -- @tparam[opt=height/2] number arrow_depth The width of the arrow part of the shape
+-- @staticfct gears.shape.powerline
 function module.powerline(cr, width, height, arrow_depth)
     arrow_depth = arrow_depth or height/2
     local offset = 0
@@ -283,6 +332,7 @@ end
 -- @param cr A cairo context
 -- @tparam number width The shape width
 -- @tparam number height The shape height
+-- @staticfct gears.shape.isosceles_triangle
 function module.isosceles_triangle(cr, width, height)
     cr:move_to( width/2, 0      )
     cr:line_to( width  , height )
@@ -298,6 +348,7 @@ end
 -- @tparam number width The shape width
 -- @tparam number height The shape height
 -- @tparam[opt=width/3] number thickness The cross section thickness
+-- @staticfct gears.shape.cross
 function module.cross(cr, width, height, thickness)
     thickness = thickness or width/3
     local xpadding   = (width  - thickness) / 2
@@ -325,6 +376,7 @@ end
 -- @tparam number width The shape width
 -- @tparam number height The shape height
 -- @tparam number corner_radius
+-- @staticfct gears.shape.octogon
 function module.octogon(cr, width, height, corner_radius)
     corner_radius = corner_radius or math.min(10, math.min(width, height)/4)
     local offset = math.sqrt( (corner_radius*corner_radius) / 2 )
@@ -348,6 +400,7 @@ end
 -- @tparam number width The shape width
 -- @tparam number height The shape height
 -- @tparam[opt=math.min(width  height) / 2)] number radius The radius
+-- @staticfct gears.shape.circle
 function module.circle(cr, width, height, radius)
     radius = radius or math.min(width, height) / 2
     cr:move_to(width/2+radius, height/2)
@@ -362,6 +415,7 @@ end
 -- @param cr A cairo context
 -- @tparam number width The shape width
 -- @tparam number height The shape height
+-- @staticfct gears.shape.rectangle
 function module.rectangle(cr, width, height)
     cr:rectangle(0, 0, width, height)
 end
@@ -375,6 +429,7 @@ end
 -- @tparam number width The shape width
 -- @tparam number height The shape height
 -- @tparam[opt=width/3] number base_width The parallelogram base width
+-- @staticfct gears.shape.parallelogram
 function module.parallelogram(cr, width, height, base_width)
     base_width = base_width or width/3
     cr:move_to(width-base_width, 0      )
@@ -391,6 +446,7 @@ end
 -- @param cr A cairo context
 -- @tparam number width The shape width
 -- @tparam number height The shape height
+-- @staticfct gears.shape.losange
 function module.losange(cr, width, height)
     cr:move_to(width/2 , 0        )
     cr:line_to(width   , height/2 )
@@ -411,9 +467,14 @@ end
 -- @tparam[opt=0] number start_angle The start angle (in radian)
 -- @tparam[opt=math.pi/2] number end_angle The end angle (in radian)
 -- @tparam[opt=math.min(width height)/2] number radius The shape height
+-- @staticfct gears.shape.pie
 function module.pie(cr, width, height, start_angle, end_angle, radius)
     radius = radius or math.floor(math.min(width, height)/2)
     start_angle, end_angle = start_angle or 0, end_angle or math.pi/2
+
+    -- In case there is already some other path on the cairo context:
+    -- Make sure the close_path() below goes to the right position.
+    cr:new_sub_path()
 
     -- If the shape is a circle, then avoid the lines
     if math.abs(start_angle + end_angle - 2*math.pi) <= 0.01  then
@@ -444,9 +505,14 @@ end
 -- @tparam[opt=math.pi/2] number end_angle The end angle (in radian)
 -- @tparam[opt=false] boolean start_rounded if the arc start rounded
 -- @tparam[opt=false] boolean end_rounded if the arc end rounded
+-- @staticfct gears.shape.arc
 function module.arc(cr, width, height, thickness, start_angle, end_angle, start_rounded, end_rounded)
     start_angle = start_angle or 0
     end_angle   = end_angle   or math.pi/2
+
+    -- In case there is already some other path on the cairo context:
+    -- Make sure the close_path() below goes to the right position.
+    cr:new_sub_path()
 
     -- This shape is a partial circle
     local radius = math.min(width, height)/2
@@ -472,8 +538,11 @@ function module.arc(cr, width, height, thickness, start_angle, end_angle, start_
     if end_rounded then
         arc_length = arc_length - thickness/2
 
-        -- And back to angles
-        end_angle = start_angle + (arc_length/(radius - thickness/2))
+        -- And back to angles. Also make sure to avoid underflowing when the
+        -- rounded edge radius is greater than the angle delta.
+        end_angle = start_angle + math.max(
+            0, arc_length/(radius - thickness/2)
+        )
     end
 
     -- The path is a curcular arc joining 4 points
@@ -559,6 +628,7 @@ end
 -- @tparam number h The shape height
 -- @tparam number percent The progressbar percent
 -- @tparam boolean hide_left Do not draw the left side of the shape
+-- @staticfct gears.shape.radial_progress
 function module.radial_progress(cr, w, h, percent, hide_left)
     percent = percent or 1
     local total_length = (2*(w-h))+2*((h/2)*math.pi)
@@ -625,6 +695,7 @@ end
 --
 -- @param shape A shape function
 -- @return A transformation handle, also act as a shape function
+-- @staticfct gears.shape.transform
 function module.transform(shape)
 
     -- Apply the transformation matrix and apply the shape, then restore

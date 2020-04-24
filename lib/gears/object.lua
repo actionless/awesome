@@ -6,7 +6,7 @@
 --
 -- @author Uli Schlachter
 -- @copyright 2010 Uli Schlachter
--- @classmod gears.object
+-- @utillib gears.object
 ---------------------------------------------------------------------------
 
 local setmetatable = setmetatable
@@ -49,6 +49,7 @@ end
 --@DOC_text_gears_object_signal_EXAMPLE@
 -- @tparam string name The name of the signal
 -- @tparam function func The callback to call when the signal is emitted
+-- @method connect_signal
 function object:connect_signal(name, func)
     assert(type(func) == "function", "callback must be a function, got: " .. type(func))
     local sig = find_signal(self, name)
@@ -95,6 +96,7 @@ end
 -- collected and automatically disconnects the signal when that happens.
 -- @tparam string name The name of the signal
 -- @tparam function func The callback to call when the signal is emitted
+-- @method weak_connect_signal
 function object:weak_connect_signal(name, func)
     assert(type(func) == "function", "callback must be a function, got: " .. type(func))
     local sig = find_signal(self, name)
@@ -105,6 +107,7 @@ end
 --- Disonnect to a signal.
 -- @tparam string name The name of the signal
 -- @tparam function func The callback that should be disconnected
+-- @method disconnect_signal
 function object:disconnect_signal(name, func)
     local sig = find_signal(self, name)
     sig.weak[func] = nil
@@ -117,6 +120,7 @@ end
 -- @param ... Extra arguments for the callback functions. Each connected
 --   function receives the object as first argument and then any extra arguments
 --   that are given to emit_signal()
+-- @method emit_signal
 function object:emit_signal(name, ...)
     local sig = find_signal(self, name)
     for func in pairs(sig.strong) do
@@ -128,6 +132,55 @@ function object:emit_signal(name, ...)
     for _, func in ipairs(self._global_receivers) do
         func(name, self, ...)
     end
+end
+
+function object._setup_class_signals(t, args)
+    args = args or {}
+    local conns = {}
+
+    function t.connect_signal(name, func)
+        assert(name)
+        conns[name] = conns[name] or {}
+        table.insert(conns[name], func)
+    end
+
+    -- A variant of emit_signal which stops once a condition is met.
+    if args.allow_chain_of_responsibility then
+        function t._emit_signal_if(name, condition, ...)
+            assert(name)
+            for _, func in pairs(conns[name] or {}) do
+                if condition(...) then return end
+                func(...)
+            end
+        end
+    end
+
+
+    --- Emit a notification signal.
+    -- @tparam string name The signal name.
+    -- @param ... The signal callback arguments
+    function t.emit_signal(name, ...)
+        assert(name)
+        for _, func in pairs(conns[name] or {}) do
+            func(...)
+        end
+    end
+
+    --- Disconnect a signal from a source.
+    -- @tparam string name The name of the signal
+    -- @tparam function func The attached function
+    -- @treturn boolean If the disconnection was successful
+    function t.disconnect_signal(name, func)
+        for k, v in ipairs(conns[name] or {}) do
+            if v == func then
+                table.remove(conns[name], k)
+                return true
+            end
+        end
+        return false
+    end
+
+    return conns
 end
 
 local function get_miss(self, key)
@@ -179,7 +232,8 @@ end
 --   when an unknown property is set.
 -- @tparam[opt=nil] table args.class
 -- @treturn table A new object
--- @function gears.object
+-- @constructorfct gears.object
+
 local function new(args)
     args = args or {}
     local ret = {}
@@ -236,6 +290,7 @@ end
 -- @tparam[opt=2] integer level Level for `debug.getinfo(level, "S")`.
 --   Typically 2 or 3.
 -- @treturn string The module name, e.g. "wibox.container.background".
+-- @staticfct gears.object.modulename
 function object.modulename(level)
     return debug.getinfo(level, "S").source:gsub(".*/lib/", ""):gsub("/", "."):gsub("%.lua", "")
 end

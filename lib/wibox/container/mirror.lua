@@ -1,9 +1,10 @@
 ---------------------------------------------------------------------------
+-- Reflect a widget along one or both axis.
 --
 --@DOC_wibox_container_defaults_mirror_EXAMPLE@
 -- @author dodo
 -- @copyright 2012 dodo
--- @classmod wibox.container.mirror
+-- @containermod wibox.container.mirror
 ---------------------------------------------------------------------------
 
 local type = type
@@ -37,7 +38,7 @@ function mirror:layout(_, width, height)
     return { base.place_widget_via_matrix(self._private.widget, m, width, height) }
 end
 
--- Fit this layout into the given area
+-- Fit this layout into the given area.
 function mirror:fit(context, ...)
     if not self._private.widget then
         return 0, 0
@@ -46,35 +47,29 @@ function mirror:fit(context, ...)
 end
 
 --- The widget to be reflected.
+--
 -- @property widget
--- @tparam widget widget The widget
+-- @tparam widget widget The widget.
+-- @interface container
 
-function mirror:set_widget(widget)
-    if widget then
-        base.check_widget(widget)
-    end
-    self._private.widget = widget
-    self:emit_signal("widget::layout_changed")
-end
+mirror.set_widget = base.set_widget_common
 
 function mirror:get_widget()
     return self._private.widget
 end
 
---- Get the number of children element
--- @treturn table The children
 function mirror:get_children()
     return {self._private.widget}
 end
 
---- Replace the layout children
--- This layout only accept one children, all others will be ignored
--- @tparam table children A table composed of valid widgets
 function mirror:set_children(children)
     self:set_widget(children[1])
 end
 
 --- Reset this layout. The widget will be removed and the axes reset.
+--
+-- @method reset
+-- @interface container
 function mirror:reset()
     self._private.horizontal = false
     self._private.vertical = false
@@ -92,27 +87,31 @@ function mirror:set_reflection(reflection)
         end
     end
     self:emit_signal("widget::layout_changed")
+    self:emit_signal("property::reflection", reflection)
 end
 
 --- Get the reflection of this mirror layout.
+--
 -- @property reflection
 -- @tparam table reflection A table of booleans with the keys "horizontal", "vertical".
 -- @tparam boolean reflection.horizontal
 -- @tparam boolean reflection.vertical
+-- @propemits true false
 
 function mirror:get_reflection()
     return { horizontal = self._private.horizontal, vertical = self._private.vertical }
 end
 
 --- Returns a new mirror container.
--- A mirror container mirrors a given widget. Use
--- `:set_widget()` to set the widget and
--- `:set_horizontal()` and `:set_vertical()` for the direction.
+--
+-- A mirror container mirrors a given widget. Use the `widget` property to set
+-- the widget and `reflection` property to set the direction.
 -- horizontal and vertical are by default false which doesn't change anything.
--- @param[opt] widget The widget to display.
--- @param[opt] reflection A table describing the reflection to apply.
+--
+-- @tparam[opt] widget widget The widget to display.
+-- @tparam[opt] table reflection A table describing the reflection to apply.
 -- @treturn table A new mirror container
--- @function wibox.container.mirror
+-- @constructorfct wibox.container.mirror
 local function new(widget, reflection)
     local ret = base.make_widget(nil, nil, {enable_properties = true})
     ret._private.horizontal = false

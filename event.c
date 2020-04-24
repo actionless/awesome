@@ -23,7 +23,10 @@
 #include "awesome.h"
 #include "property.h"
 #include "objects/tag.h"
+#include "objects/selection_getter.h"
 #include "objects/drawin.h"
+#include "objects/selection_acquire.h"
+#include "objects/selection_watcher.h"
 #include "xwindow.h"
 #include "ewmh.h"
 #include "objects/client.h"
@@ -43,6 +46,7 @@
 #include <xcb/xcb_icccm.h>
 #include <xcb/xcb_event.h>
 #include <xcb/xkb.h>
+#include <xcb/xfixes.h>
 
 #define DO_EVENT_HOOK_CALLBACK(type, xcbtype, xcbeventprefix, arraytype, match) \
     static void \
@@ -456,7 +460,7 @@ event_handle_configurenotify(xcb_configure_notify_event_t *ev)
     xcb_screen_t *screen = globalconf.screen;
 
     if(ev->window == screen->root)
-        globalconf.screen_need_refresh = true;
+        screen_schedule_refresh();
 
     /* Copy what XRRUpdateConfiguration() would do: Update the configuration */
     if(ev->window == screen->root) {
@@ -474,7 +478,7 @@ event_handle_destroynotify(xcb_destroy_notify_event_t *ev)
     client_t *c;
 
     if((c = client_getbywin(ev->window)))
-        client_unmanage(c, false);
+        client_unmanage(c, CLIENT_UNMANAGE_DESTROYED);
     else
         for(int i = 0; i < globalconf.embedded.len; i++)
             if(globalconf.embedded.tab[i].win == ev->window)
@@ -582,22 +586,42 @@ event_handle_leavenotify(xcb_leave_notify_event_t *ev)
 
     globalconf.timestamp = ev->time;
 
+    /*
+     * Ignore events with non-normal modes. Those are because a grab
+     * activated/deactivated. Everything will be "back to normal" after the
+     * grab.
+     */
     if(ev->mode != XCB_NOTIFY_MODE_NORMAL)
         return;
 
-    /* Ignore leave with detail inferior (we were left for a window contained in
-     * our window, so technically the pointer is still inside of this window).
-     */
-    if(ev->detail != XCB_NOTIFY_DETAIL_INFERIOR && (c = client_getbyframewin(ev->event)))
+    if((c = client_getbyframewin(ev->event)))
     {
-        luaA_object_push(L, c);
-        luaA_object_emit_signal(L, -1, "mouse::leave", 0);
+        /* The window was left in some way, so definitely no titlebar has the
+         * mouse cursor.
+         */
+        lua_pushnil(L);
+        event_drawable_under_mouse(L, -1);
+        lua_pop(L, 1);
+
+        /* If detail is inferior, it means that the cursor is now in some child
+         * window of our window. Thus, the titlebar was left, but now the cursor
+         * is in the actual child window. Thus, ignore detail=Inferior for
+         * leaving client windows.
+         */
+        if(ev->detail != XCB_NOTIFY_DETAIL_INFERIOR) {
+            luaA_object_push(L, c);
+            luaA_object_emit_signal(L, -1, "mouse::leave", 0);
+            lua_pop(L, 1);
+        }
+    } else if(ev->detail != XCB_NOTIFY_DETAIL_INFERIOR) {
+        /* Some window was left. This must be a drawin. Ignore detail=Inferior,
+         * because this means that some child window now contains the mouse
+         * cursor, i.e. a systray window. Everything else is a real 'leave'.
+         */
+        lua_pushnil(L);
+        event_drawable_under_mouse(L, -1);
         lua_pop(L, 1);
     }
-
-    lua_pushnil(L);
-    event_drawable_under_mouse(L, -1);
-    lua_pop(L, 1);
 }
 
 /** The enter notify event handler.
@@ -612,10 +636,24 @@ event_handle_enternotify(xcb_enter_notify_event_t *ev)
 
     globalconf.timestamp = ev->time;
 
+    /*
+     * Ignore events with non-normal modes. Those are because a grab
+     * activated/deactivated. Everything will be "back to normal" after the
+     * grab.
+     */
     if(ev->mode != XCB_NOTIFY_MODE_NORMAL)
         return;
 
-    if((drawin = drawin_getbywin(ev->event)))
+    /*
+     * We ignore events with detail "inferior".  This detail means that the
+     * cursor was previously inside of a child window and now left that child
+     * window. For our purposes, the cursor was already inside our window
+     * before.
+     * One exception are titlebars: They are not their own window, but are
+     * "outside of the actual client window".
+     */
+
+    if(ev->detail != XCB_NOTIFY_DETAIL_INFERIOR && (drawin = drawin_getbywin(ev->event)))
     {
         luaA_object_push(L, drawin);
         luaA_object_push_item(L, -1, drawin->drawable);
@@ -626,22 +664,25 @@ event_handle_enternotify(xcb_enter_notify_event_t *ev)
     if((c = client_getbyframewin(ev->event)))
     {
         luaA_object_push(L, c);
-        /* Ignore enter with detail inferior: The pointer was previously inside
-         * of a child window, so technically this isn't a 'real' enter.
+        /* Detail=Inferior means that a child of the frame window now contains
+         * the mouse cursor, i.e. the actual client now has the cursor. All
+         * other details mean that the client itself was really left.
          */
-        if (ev->detail != XCB_NOTIFY_DETAIL_INFERIOR)
+        if(ev->detail != XCB_NOTIFY_DETAIL_INFERIOR) {
             luaA_object_emit_signal(L, -1, "mouse::enter", 0);
+        }
 
         drawable_t *d = client_get_drawable(c, ev->event_x, ev->event_y);
         if (d)
         {
             luaA_object_push_item(L, -1, d);
-            event_drawable_under_mouse(L, -1);
-            lua_pop(L, 1);
+        } else {
+            lua_pushnil(L);
         }
-        lua_pop(L, 1);
+        event_drawable_under_mouse(L, -1);
+        lua_pop(L, 2);
     }
-    else if (ev->event == globalconf.screen->root) {
+    else if (ev->detail != XCB_NOTIFY_DETAIL_INFERIOR && ev->event == globalconf.screen->root) {
         /* When there are multiple X screens with awesome running separate
          * instances, reset focus.
          */
@@ -815,7 +856,7 @@ event_handle_unmapnotify(xcb_unmap_notify_event_t *ev)
     client_t *c;
 
     if((c = client_getbywin(ev->window)))
-        client_unmanage(c, true);
+        client_unmanage(c, CLIENT_UNMANAGE_UNMAP);
 }
 
 /** The randr screen change notify event handler.
@@ -841,7 +882,7 @@ event_handle_randr_screen_change_notify(xcb_randr_screen_change_notify_event_t *
         globalconf.screen->height_in_millimeters = ev->mheight;;
     }
 
-    globalconf.screen_need_refresh = true;
+    screen_schedule_refresh();
 }
 
 /** XRandR event handler for RRNotify subtype XRROutputChangeNotifyEvent
@@ -952,7 +993,7 @@ event_handle_reparentnotify(xcb_reparent_notify_event_t *ev)
         /* Ignore reparents to the root window, they *might* be caused by
          * ourselves if a client quickly unmaps and maps itself again. */
         if (ev->parent != globalconf.screen->root)
-            client_unmanage(c, true);
+            client_unmanage(c, CLIENT_UNMANAGE_REPARENT);
     }
     else if (ev->parent != globalconf.systray.window) {
         /* Embedded window moved elsewhere, end of embedding */
@@ -973,7 +1014,8 @@ event_handle_selectionclear(xcb_selection_clear_event_t *ev)
     {
         warn("Lost WM_Sn selection, exiting...");
         g_main_loop_quit(globalconf.loop);
-    }
+    } else
+        selection_handle_selectionclear(ev);
 }
 
 /** \brief awesome xerror function.
@@ -994,10 +1036,24 @@ xerror(xcb_generic_error_t *e)
            && e->major_code == XCB_CONFIGURE_WINDOW))
         return;
 
-    warn("X error: request=%s (major %d, minor %d), error=%s (%d)",
-         xcb_event_get_request_label(e->major_code),
+#ifdef WITH_XCB_ERRORS
+    const char *major = xcb_errors_get_name_for_major_code(
+            globalconf.errors_ctx, e->major_code);
+    const char *minor = xcb_errors_get_name_for_minor_code(
+            globalconf.errors_ctx, e->major_code, e->minor_code);
+    const char *extension = NULL;
+    const char *error = xcb_errors_get_name_for_error(
+            globalconf.errors_ctx, e->error_code, &extension);
+#else
+    const char *major = xcb_event_get_request_label(e->major_code);
+    const char *minor = NULL;
+    const char *extension = NULL;
+    const char *error = xcb_event_get_error_label(e->error_code);
+#endif
+    warn("X error: request=%s%s%s (major %d, minor %d), error=%s%s%s (%d)",
+         major, minor == NULL ? "" : "-", NONULL(minor),
          e->major_code, e->minor_code,
-         xcb_event_get_error_label(e->error_code),
+         NONULL(extension), extension == NULL ? "" : "-", error,
          e->error_code);
 
     return;
@@ -1068,6 +1124,8 @@ void event_handle(xcb_generic_event_t *event)
         EVENT(XCB_REPARENT_NOTIFY, event_handle_reparentnotify);
         EVENT(XCB_UNMAP_NOTIFY, event_handle_unmapnotify);
         EVENT(XCB_SELECTION_CLEAR, event_handle_selectionclear);
+        EVENT(XCB_SELECTION_NOTIFY, event_handle_selectionnotify);
+        EVENT(XCB_SELECTION_REQUEST, selection_handle_selectionrequest);
 #undef EVENT
     }
 
@@ -1079,6 +1137,7 @@ void event_handle(xcb_generic_event_t *event)
     EXTENSION_EVENT(randr, XCB_RANDR_NOTIFY, event_handle_randr_output_change_notify);
     EXTENSION_EVENT(shape, XCB_SHAPE_NOTIFY, event_handle_shape_notify);
     EXTENSION_EVENT(xkb, 0, event_handle_xkb_notify);
+    EXTENSION_EVENT(xfixes, XCB_XFIXES_SELECTION_NOTIFY, event_handle_xfixes_selection_notify);
 #undef EXTENSION_EVENT
 }
 
@@ -1097,6 +1156,10 @@ void event_init(void)
     reply = xcb_get_extension_data(globalconf.connection, &xcb_xkb_id);
     if (reply && reply->present)
         globalconf.event_base_xkb = reply->first_event;
+
+    reply = xcb_get_extension_data(globalconf.connection, &xcb_xfixes_id);
+    if (reply && reply->present)
+        globalconf.event_base_xfixes = reply->first_event;
 }
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

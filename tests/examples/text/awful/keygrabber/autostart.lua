@@ -1,17 +1,17 @@
 
 local awful = { keygrabber = require("awful.keygrabber") } --DOC_HIDE
 
-local naughty = { notify = function() end } --DOC_HIDE
+local naughty = { notification = function() end } --DOC_HIDE
 
 local autostart_works = false --DOC_HIDE
 
 awful.keygrabber {
     autostart      = true,
-    stop_key    = "Return",
+    stop_key       = "Return",
     stop_callback  = function(_, _, _, sequence)
         autostart_works = true --DOC_HIDE
         assert(sequence == "abc") --DOC_HIDE
-        naughty.notify{text="The keys were:"..sequence}
+        naughty.notification {message="The keys were:"..sequence}
     end,
 }
 

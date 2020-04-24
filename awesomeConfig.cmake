@@ -4,22 +4,20 @@ set(PROJECT_AWE_NAME awesome)
 # `git describe` later.
 set(VERSION devel)
 
-set(CODENAME "Human after all")
+set(CODENAME "Too long")
 
-option(WITH_DBUS "build with D-BUS" ON)
-option(GENERATE_MANPAGES "generate manpages" ON)
+include(AutoOption.cmake)
+
+autoOption(WITH_DBUS "build with D-BUS")
+autoOption(GENERATE_MANPAGES "generate manpages")
 option(COMPRESS_MANPAGES "compress manpages" ON)
 option(GENERATE_DOC "generate API documentation" ON)
 option(DO_COVERAGE "build with coverage" OFF)
+autoOption(WITH_XCB_ERRORS "build with xcb-errors")
 if (GENERATE_DOC AND DO_COVERAGE)
     message(STATUS "Not generating API documentation with DO_COVERAGE")
     set(GENERATE_DOC OFF)
 endif()
-
-# {{{ Endianness
-include(TestBigEndian)
-TEST_BIG_ENDIAN(AWESOME_IS_BIG_ENDIAN)
-# }}}
 
 # {{{ Find external utilities
 macro(a_find_program var prg req)
@@ -84,8 +82,7 @@ if(GENERATE_MANPAGES)
             SET(missing ${missing} " gzip")
         endif()
 
-        message(STATUS "Not generating manpages. Missing: " ${missing})
-        set(GENERATE_MANPAGES OFF)
+        autoDisable(GENERATE_MANPAGES "Not generating manpages. Missing: " ${missing})
     endif()
 endif()
 # }}}
@@ -141,6 +138,7 @@ set(AWESOME_DEPENDENCIES
     xcb-keysyms>=0.3.4
     xcb-icccm
     xcb-icccm>=0.3.8
+    xcb-xfixes
     # NOTE: it's not clear what version is required, but 1.10 works at least.
     # See https://github.com/awesomeWM/awesome/pull/149#issuecomment-94208356.
     xcb-xkb
@@ -213,8 +211,17 @@ if(WITH_DBUS)
         set(AWESOME_OPTIONAL_LDFLAGS ${AWESOME_OPTIONAL_LDFLAGS} ${DBUS_LDFLAGS})
         set(AWESOME_OPTIONAL_INCLUDE_DIRS ${AWESOME_OPTIONAL_INCLUDE_DIRS} ${DBUS_INCLUDE_DIRS})
     else()
-        set(WITH_DBUS OFF)
-        message(STATUS "DBUS not found. Disabled.")
+        autoDisable(WITH_DBUS "DBus not found.")
+    endif()
+endif()
+
+if(WITH_XCB_ERRORS)
+    pkg_check_modules(XCB_ERRORS xcb-errors)
+    if(XCB_ERRORS_FOUND)
+        set(AWESOME_OPTIONAL_LDFLAGS ${AWESOME_OPTIONAL_LDFLAGS} ${XCB_ERRORS_LDFLAGS})
+        set(AWESOME_OPTIONAL_INCLUDE_DIRS ${AWESOME_OPTIONAL_INCLUDE_DIRS} ${XCB_ERRORS_INCLUDE_DIRS})
+    else()
+        autoDisable(WITH_XCB_ERRORS "xcb-errors not found.")
     endif()
 endif()
 # }}}
@@ -264,6 +271,7 @@ else()
    set(AWESOME_MAN_PATH ${CMAKE_INSTALL_PREFIX}/share/man CACHE PATH "awesome manpage directory")
 endif()
 
+
 # Hide to avoid confusion
 mark_as_advanced(CMAKE_INSTALL_CMAKE_INSTALL_PREFIX)
 
@@ -273,20 +281,21 @@ set(AWESOME_SYSCONFDIR       ${XDG_CONFIG_DIR}/${PROJECT_AWE_NAME})
 set(AWESOME_LUA_LIB_PATH     ${AWESOME_DATA_PATH}/lib)
 set(AWESOME_ICON_PATH        ${AWESOME_DATA_PATH}/icons)
 set(AWESOME_THEMES_PATH      ${AWESOME_DATA_PATH}/themes)
+set(AWESOME_API_LEVEL        4)
 # }}}
 
 if(GENERATE_DOC)
     # Load the common documentation
     include(docs/load_ldoc.cmake)
 
-    # Use `include`, rather than `add_subdirectory`, to keep the variables
-    # The file is a valid CMakeLists.txt and can be executed directly if only
-    # the image artefacts are needed.
-    include(tests/examples/CMakeLists.txt)
-
     # Generate the widget lists
     include(docs/widget_lists.cmake)
 endif()
+
+# Use `include`, rather than `add_subdirectory`, to keep the variables
+# The file is a valid CMakeLists.txt and can be executed directly if only
+# the image artefacts are needed.
+include(tests/examples/CMakeLists.txt)
 
 # {{{ Configure files
 file(GLOB awesome_base_c_configure_files RELATIVE ${SOURCE_DIR}
@@ -373,21 +382,25 @@ add_custom_command(
             ${SOURCE_DIR}/docs/_parser.lua
 )
 
-add_custom_command(
-        OUTPUT ${BUILD_DIR}/docs/common/rules_index.ldoc
+foreach(RULE_TYPE client tag screen notification)
+    add_custom_command(
+        OUTPUT ${BUILD_DIR}/docs/common/${RULE_TYPE}_rules_index.ldoc
         COMMAND lua ${SOURCE_DIR}/docs/build_rules_index.lua
-            ${BUILD_DIR}/docs/common/rules_index.ldoc
+            ${BUILD_DIR}/docs/common/${RULE_TYPE}_rules_index.ldoc
+            ${RULE_TYPE}
 
         # Cheap trick until the ldoc `configure_file` is ported to be a build
         # step rather than part of cmake.
-        COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/docs/common/rules_index.ldoc
-            ${SOURCE_DIR}/docs/common/rules_index.ldoc
+        COMMAND ${CMAKE_COMMAND} -E
+            copy ${BUILD_DIR}/docs/common/${RULE_TYPE}_rules_index.ldoc
+                 ${SOURCE_DIR}/docs/common/${RULE_TYPE}_rules_index.ldoc
 
         DEPENDS
             lgi-check-run
             ${SOURCE_DIR}/docs/build_rules_index.lua
             ${SOURCE_DIR}/docs/_parser.lua
-)
+    )
+endforeach()
 
 add_custom_command(
         OUTPUT ${BUILD_DIR}/awesomerc.lua ${BUILD_DIR}/docs/05-awesomerc.md
@@ -414,7 +427,10 @@ add_custom_target(generate_awesomerc DEPENDS
     ${BUILD_DIR}/docs/06-appearance.md
     ${SOURCE_DIR}/docs/05-awesomerc.md.lua
     ${SOURCE_DIR}/docs/build_rules_index.lua
-    ${BUILD_DIR}/docs/common/rules_index.ldoc
+    ${BUILD_DIR}/docs/common/client_rules_index.ldoc
+    ${BUILD_DIR}/docs/common/tag_rules_index.ldoc
+    ${BUILD_DIR}/docs/common/screen_rules_index.ldoc
+    ${BUILD_DIR}/docs/common/notification_rules_index.ldoc
     ${SOURCE_DIR}/docs/sample_theme.lua
     ${SOURCE_DIR}/docs/sample_files.lua
     ${SOURCE_DIR}/awesomerc.lua

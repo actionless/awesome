@@ -1,7 +1,7 @@
 ---------------------------------------------------------------------------
 -- @author Uli Schlachter
 -- @copyright 2010 Uli Schlachter
--- @classmod wibox.widget.systray
+-- @widgetmod wibox.widget.systray
 ---------------------------------------------------------------------------
 
 local wbase = require("wibox.widget.base")
@@ -25,10 +25,12 @@ local reverse = false
 local display_on_screen = "primary"
 
 --- The systray background color.
+--
 -- @beautiful beautiful.bg_systray
 -- @param string The color (string like "#ff0000" only)
 
 --- The systray icon spacing.
+--
 -- @beautiful beautiful.systray_icon_spacing
 -- @tparam[opt=0] integer The icon spacing
 
@@ -64,10 +66,17 @@ function systray:draw(context, cr, width, height)
     else
         ortho, in_dir = width, height
     end
-    if ortho * num_entries <= in_dir then
+    -- The formula for a given base, spacing, and num_entries for the necessary
+    -- space is (draw a picture to convince yourself; this assumes horizontal):
+    --   height = base
+    --   width = (base + spacing) * num_entries - spacing
+    -- Now, we check if we are limited by horizontal or vertical space: Which of
+    -- the two limits the base size more?
+    if (ortho + spacing) * num_entries - spacing <= in_dir then
         base = ortho
     else
-        base = in_dir / num_entries
+        -- Solving the "width" formula above for "base" (with width=in_dir):
+        base = (in_dir + spacing) / num_entries - spacing
     end
     capi.awesome.systray(context.wibox.drawin, math.ceil(x), math.ceil(y),
                          base, is_rotated, bg, reverse, spacing)
@@ -114,51 +123,75 @@ local function get_args(self, ...)
 end
 
 --- Set the size of a single icon.
+--
 -- If this is set to nil, then the size is picked dynamically based on the
 -- available space. Otherwise, any single icon has a size of `size`x`size`.
+--
+-- @property base_size
 -- @tparam integer|nil size The base size
+-- @propemits true false
+
 function systray:set_base_size(size)
     base_size = get_args(self, size)
     if instance then
         instance:emit_signal("widget::layout_changed")
+        instance:emit_signal("property::base_size", size)
     end
 end
 
 --- Decide between horizontal or vertical display.
+--
+-- @property horizontal
 -- @tparam boolean horiz Use horizontal mode?
+-- @propemits true false
+
 function systray:set_horizontal(horiz)
     horizontal = get_args(self, horiz)
     if instance then
         instance:emit_signal("widget::layout_changed")
+        instance:emit_signal("property::horizontal", horiz)
     end
 end
 
 --- Should the systray icons be displayed in reverse order?
--- @tparam boolean rev Display in reverse order
+--
+-- @property reverse
+-- @tparam boolean rev Display in reverse order.
+-- @propemits true false
+
 function systray:set_reverse(rev)
     reverse = get_args(self, rev)
     if instance then
         instance:emit_signal("widget::redraw_needed")
+        instance:emit_signal("property::reverse", rev)
     end
 end
 
 --- Set the screen that the systray should be displayed on.
+--
 -- This can either be a screen, in which case the systray will be displayed on
 -- exactly that screen, or the string `"primary"`, in which case it will be
 -- visible on the primary screen. The default value is "primary".
+--
+-- @property screen
 -- @tparam screen|"primary" s The screen to display on.
+-- @propemits true false
+
 function systray:set_screen(s)
     display_on_screen = get_args(self, s)
     if instance then
         instance:emit_signal("widget::layout_changed")
+        instance:emit_signal("property::screen", s)
     end
 end
 
 --- Create the systray widget.
+--
 -- Note that this widget can only exist once.
+--
 -- @tparam boolean revers Show in the opposite direction
 -- @treturn table The new `systray` widget
--- @function wibox.widget.systray
+-- @constructorfct wibox.widget.systray
 
 local function new(revers)
     local ret = wbase.make_widget(nil, nil, {enable_properties = true})

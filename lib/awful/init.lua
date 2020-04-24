@@ -6,37 +6,13 @@
 -- @module awful
 ---------------------------------------------------------------------------
 
--- TODO: This is a hack for backwards-compatibility with 3.5, remove!
-local util = require("awful.util")
-local gtimer = require("gears.timer")
-local gdebug = require("gears.debug")
-function timer(...) -- luacheck: ignore
-    gdebug.deprecate("gears.timer", {deprecated_in=4})
-    return gtimer(...)
-end
+require("awful._compat")
 
---TODO: This is a hack for backwards-compatibility with 3.5, remove!
--- Set awful.util.spawn* and awful.util.pread.
-local spawn = require("awful.spawn")
+local deprecated = {
+    ewmh = true
+}
 
-util.spawn = function(...)
-   gdebug.deprecate("awful.spawn", {deprecated_in=4})
-   return spawn.spawn(...)
-end
-
-util.spawn_with_shell = function(...)
-   gdebug.deprecate("awful.spawn.with_shell", {deprecated_in=4})
-   return spawn.with_shell(...)
-end
-
-util.pread = function()
-    gdebug.deprecate("Use io.popen() directly or look at awful.spawn.easy_async() "
-            .. "for an asynchronous alternative", {deprecated_in=4})
-    return ""
-end
-
-return
-{
+local ret = {
     client = require("awful.client");
     completion = require("awful.completion");
     layout = require("awful.layout");
@@ -51,15 +27,27 @@ return
     mouse = require("awful.mouse");
     remote = require("awful.remote");
     key = require("awful.key");
+    keyboard = require("awful.keyboard");
     button = require("awful.button");
     wibar = require("awful.wibar");
     wibox = require("awful.wibox");
     startup_notification = require("awful.startup_notification");
     tooltip = require("awful.tooltip");
-    ewmh = require("awful.ewmh");
+    permissions = require("awful.permissions");
     titlebar = require("awful.titlebar");
     rules = require("awful.rules");
-    spawn = spawn;
+    popup = require("awful.popup");
+    spawn = require("awful.spawn");
 }
+
+-- Lazy load deprecated modules to reduce the numbers of loop dependencies.
+return setmetatable(ret,{
+    __index = function(_, key)
+        if deprecated[key] then
+            rawset(ret, key, require("awful."..key))
+        end
+        return rawget(ret, key)
+    end
+})
 
 -- vim: filetype=lua:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

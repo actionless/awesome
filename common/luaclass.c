@@ -22,6 +22,8 @@
 #include "common/luaclass.h"
 #include "common/luaobject.h"
 
+#define CONNECTED_SUFFIX "::connected"
+
 struct lua_class_property
 {
     /** Name of the property */
@@ -131,7 +133,7 @@ luaA_openlib(lua_State *L, const char *name,
     lua_pushvalue(L, -1);           /* dup metatable                      2 */
     lua_setfield(L, -2, "__index"); /* metatable.__index = metatable      1 */
 
-    luaA_registerlib(L, NULL, meta);                                   /* 1 */
+    luaA_setfuncs(L, meta);                                            /* 1 */
     luaA_registerlib(L, name, methods);                                /* 2 */
     lua_pushvalue(L, -1);           /* dup self as metatable              3 */
     lua_setmetatable(L, -2);        /* set self as metatable              2 */
@@ -267,7 +269,7 @@ luaA_class_setup(lua_State *L, lua_class_t *class,
 
     lua_setfield(L, -2, "__index"); /* metatable.__index = metatable      1 */
 
-    luaA_registerlib(L, NULL, meta);                                   /* 1 */
+    luaA_setfuncs(L, meta);                                            /* 1 */
     luaA_registerlib(L, name, methods);                                /* 2 */
     lua_pushvalue(L, -1);           /* dup self as metatable              3 */
     lua_setmetatable(L, -2);        /* set self as metatable              2 */
@@ -300,6 +302,24 @@ luaA_class_connect_signal_from_stack(lua_State *L, lua_class_t *lua_class,
                                      const char *name, int ud)
 {
     luaA_checkfunction(L, ud);
+
+    /* Duplicate the function in the stack */
+    lua_pushvalue(L, ud);
+
+    char *buf = p_alloca(char, a_strlen(name) + a_strlen(CONNECTED_SUFFIX) + 1);
+
+    /* Create a new signal to notify there is a global connection. */
+    sprintf(buf, "%s%s", name, CONNECTED_SUFFIX);
+
+    /* Emit a signal to notify Lua of the global connection.
+     *
+     * This can useful during initialization where the signal needs to be
+     * artificially emitted for existing objects as soon as something connects
+     * to it
+     */
+    luaA_class_emit_signal(L, lua_class, buf, 1);
+
+    /* Register the signal to the CAPI list */
     signal_connect(&lua_class->signals, name, luaA_object_ref(L, ud));
 }
 
@@ -417,11 +437,18 @@ luaA_class_index(lua_State *L)
 
     lua_class_property_t *prop = luaA_class_property_get(L, class, 2);
 
-    /* Is this the special 'data' property? This is available on all objects and
-     * thus not implemented as a lua_class_property_t.
+    /* This is the table storing the object private variables.
      */
-    if (A_STREQ(attr, "data"))
+    if (A_STREQ(attr, "_private"))
     {
+        luaA_checkudata(L, 1, class);
+        luaA_getuservalue(L, 1);
+        lua_getfield(L, -1, "data");
+        return 1;
+    }
+    else if (A_STREQ(attr, "data"))
+    {
+        luaA_deprecate(L, "Use `._private` instead of `.data`");
         luaA_checkudata(L, 1, class);
         luaA_getuservalue(L, 1);
         lua_getfield(L, -1, "data");
@@ -511,5 +538,7 @@ luaA_class_new(lua_State *L, lua_class_t *lua_class)
 
     return 1;
 }
+
+#undef CONNECTED_SUFFIX
 
 // vim: filetype=c:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=80

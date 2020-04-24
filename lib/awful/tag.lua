@@ -143,6 +143,8 @@ end
 
 --- The tag index.
 --
+-- @DOC_sequences_tag_index_EXAMPLE@
+--
 -- The index is the position as shown in the `awful.widget.taglist`.
 --
 -- **Signal:**
@@ -218,8 +220,11 @@ function tag.move(new_index, target_tag)
     tag.object.set_index(target_tag, new_index)
 end
 
---- Swap 2 tags
--- @function tag.swap
+--- Swap 2 tags.
+--
+-- @DOC_sequences_tag_swap_EXAMPLE@
+--
+-- @method swap
 -- @param tag2 The second tag
 -- @see client.swap
 function tag.object.swap(self, tag2)
@@ -259,7 +264,7 @@ end
 --        layout = awful.layout.suit.max,
 --    })
 --
--- @function awful.tag.add
+-- @constructorfct awful.tag.add
 -- @param name The tag name, a string
 -- @param props The tags inital properties, a table
 -- @return The created tag
@@ -278,7 +283,7 @@ function tag.add(name, props)
     local newtag = capi.tag{ name = name }
 
     -- Start with a fresh property table to avoid collisions with unsupported data
-    newtag.data.awful_tag_properties = {screen=properties.screen, index=properties.index}
+    newtag._private.awful_tag_properties = {screen=properties.screen, index=properties.index}
 
     newtag.activated = true
 
@@ -296,11 +301,20 @@ function tag.add(name, props)
 end
 
 --- Create a set of tags and attach it to a screen.
--- @function awful.tag.new
--- @param names The tag name, in a table
--- @param screen The tag screen, or 1 if not set.
--- @param layout The layout or layout table to set for this tags by default.
--- @return A table with all created tags.
+--
+-- This is what's performed by the default config:
+--
+-- @DOC_sequences_tag_default_config_EXAMPLE@
+--
+-- It is also possible to set multiple layouts:
+--
+-- @DOC_sequences_tag_new_with_layouts_EXAMPLE@
+--
+-- @staticfct awful.tag.new
+-- @tparam table names The tag name, in a table
+-- @tparam[opt=1] screen|number screen The tag screen (defaults to screen 1).
+-- @tparam table layout The layout or layout table to set for this tags by default.
+-- @treturn table A table with all created tags.
 function tag.new(names, screen, layout)
     screen = get_screen(screen or 1)
     -- True if `layout` should be used as the layout of each created tag
@@ -322,7 +336,7 @@ function tag.new(names, screen, layout)
 end
 
 --- Find a suitable fallback tag.
--- @function awful.tag.find_fallback
+-- @staticfct awful.tag.find_fallback
 -- @param screen The screen to look for a tag on. [awful.screen.focused()]
 -- @param invalids A table of tags we consider unacceptable. [selectedlist(scr)]
 function tag.find_fallback(screen, invalids)
@@ -338,9 +352,9 @@ end
 --
 -- To delete the current tag:
 --
---    mouse.screen.selected_tag:delete()
+-- @DOC_sequences_tag_delete_EXAMPLE@
 --
--- @function tag.delete
+-- @method delete
 -- @see awful.tag.add
 -- @see awful.tag.find_fallback
 -- @tparam[opt=awful.tag.find_fallback()] tag fallback_tag Tag to assign
@@ -388,7 +402,7 @@ function tag.object.delete(self, fallback_tag, force)
     end
 
     -- delete the tag
-    self.data.awful_tag_properties.screen = nil
+    tag.setproperty(self, "screen", nil)
     self.activated = false
 
     -- Update all indexes
@@ -429,7 +443,7 @@ function tag.delete(target_tag, fallback_tag)
 end
 
 --- Update the tag history.
--- @function awful.tag.history.update
+-- @staticfct awful.tag.history.update
 -- @param obj Screen object.
 function tag.history.update(obj)
     local s = get_screen(obj)
@@ -470,7 +484,7 @@ function tag.history.update(obj)
 end
 
 --- Revert tag history.
--- @function awful.tag.history.restore
+-- @staticfct awful.tag.history.restore
 -- @param screen The screen.
 -- @param idx Index in history. Defaults to "previous" which is a special index
 -- toggling between last two selected sets of tags. Number (eg 1) will go back
@@ -522,6 +536,7 @@ end
 -- @tparam screen s The screen of the tag
 -- @tparam string name The name of the tag
 -- @return The tag found, or `nil`
+-- @staticfct awful.tag.find_by_name
 -- @usage -- For the current screen
 -- local t = awful.tag.find_by_name(awful.screen.focused(), "name")
 --
@@ -696,7 +711,7 @@ function tag.setmwfact(mwfact, t)
 end
 
 --- Increase master width factor.
--- @function awful.tag.incmwfact
+-- @staticfct awful.tag.incmwfact
 -- @see master_width_factor
 -- @param add Value to add to master width factor.
 -- @param t The tag to modify, if null tag.selected() is used.
@@ -741,11 +756,11 @@ end
 --         -- awful.layout.suit.corner.se,
 --     }
 --
--- @field awful.tag.layouts
+-- @tfield table awful.tag.layouts
 
 --- The tag client layout.
 --
--- This property hold the layout. A layout can be either stateless or stateful.
+-- This property holds the layout. A layout can be either stateless or stateful.
 -- Stateless layouts are used by default by Awesome. They tile clients without
 -- any other overhead. They take an ordered list of clients and place them on
 -- the screen. Stateful layouts create an object instance for each tags and
@@ -772,6 +787,12 @@ end
 -- instance everytime the layout is set. If they do, the instance will be
 -- cached and re-used.
 --
+--
+-- The client organized by the layout will fill the screen `tiling_area`
+-- section:
+--
+-- @DOC_screen_taglayout_EXAMPLE@
+--
 -- **Signal:**
 --
 -- * *property::layout*
@@ -794,6 +815,8 @@ end
 --
 -- @property layouts
 -- @param table
+-- @request tag layouts awful granted When the `layouts` property is first called
+--  and there is no layouts, then that signal is called.
 -- @see awful.layout.layouts
 -- @see layout
 
@@ -846,6 +869,22 @@ function tag.object.get_layouts(self)
 
     local cls = custom_layouts(self)
 
+    -- Request some layouts. Maybe a new module was added?
+    if #cls == 0 and not tag.getproperty(self, "_layouts_requested") then
+        tag.setproperty(self, "_layouts_requested", true)
+        local old_count = #cls
+        self:emit_signal("request::layouts", "awful", {})
+
+        -- When request::layouts is used, assume it takes precedence over
+        -- the fallback.
+        if #cls > old_count then
+            tag.setproperty(self, "_layouts", gtable.clone(cls, false))
+            return tag.getproperty(self, "_layouts")
+        end
+
+        return tag.object.get_layouts(self)
+    end
+
     -- Without the clone, the custom_layouts would grow
     return #cls > 0 and gtable.merge(gtable.clone(cls, false), alayout.layouts) or
         alayout.layouts
@@ -854,12 +893,75 @@ end
 function tag.object.set_layouts(self, layouts)
     tag.setproperty(self, "_custom_layouts", {})
     tag.setproperty(self, "_layouts", gtable.clone(layouts, false))
-    update_layouts(self, self.layout, self.layout)
+
+    local cur = tag.getproperty(self, "layout")
+    update_layouts(self, cur, cur)
+
     self:emit_signal("property::layouts")
 end
 
+function tag.object.append_layout(self, layout)
+    -- If the layouts are manually modified, don't request more.
+    tag.setproperty(self, "_layouts_requested", true)
+
+    local cls = tag.getproperty(self, "_layouts")
+
+    if not cls then
+        cls = custom_layouts(self)
+    end
+
+    table.insert(cls, layout)
+    self:emit_signal("property::layouts")
+end
+
+function tag.object.append_layouts(self, layouts)
+    -- If the layouts are manually modified, don't request more.
+    tag.setproperty(self, "_layouts_requested", true)
+
+    local cls = tag.getproperty(self, "_layouts")
+
+    if not cls then
+        cls = custom_layouts(self)
+    end
+
+    for _, l in ipairs(layouts) do
+        table.insert(cls, l)
+    end
+    self:emit_signal("property::layouts")
+end
+
+function tag.object.remove_layout(self, layout)
+    local cls = tag.getproperty(self, "_layouts")
+
+    if not cls then
+        cls = custom_layouts(self)
+    end
+
+    local pos = {}
+    for k, l in ipairs(cls) do
+        if l == layout then
+            table.insert(pos, k)
+        end
+    end
+
+    if #pos > 0 then
+        for i=#pos, 1, -1 do
+            table.remove(cls, i)
+        end
+        self:emit_signal("property::layouts")
+    end
+
+    return #pos > 0
+end
+
 function tag.object.get_layout(t)
-    return tag.getproperty(t, "layout") or require("awful.layout.suit.floating")
+    local l = tag.getproperty(t, "layout")
+    if l then return l end
+
+    local layouts = tag.getproperty(t, "_layouts")
+
+    return layouts and layouts[1]
+        or require("awful.layout.suit.floating")
 end
 
 --- Set layout.
@@ -877,16 +979,33 @@ end
 --- Define if the tag must be deleted when the last client is untagged.
 --
 -- This is useful to create "throw-away" tags for operation like 50/50
--- side-by-side views.
+-- (Windows "Aero Snap) side-by-side views. This keybinding code for this is:
 --
---    local t = awful.tag.add("Temporary", {
---         screen   = client.focus.screen,
---         volatile = true,
---         clients  = {
---             client.focus,
---             awful.client.focus.history.get(client.focus.screen, 1)
---         }
---    }
+--    local function aero_tag()
+--        local c = client.focus
+--
+--        if not c then return end
+--
+--        local c2 = awful.client.focus.history.list[2]
+--
+--        if (not c2) or c2 == c then return end
+--
+--        local t = awful.tag.add("Aero", {
+--            screen              = c.screen,
+--            volatile            = true,
+--            layout              = awful.layout.suit.tile,
+--            master_width_factor = 0.5
+--        })
+--
+--        t:clients({c, c2})
+--
+--        t:view_only()
+--    end
+--
+-- @DOC_sequences_tag_volatile_EXAMPLE@
+--
+-- As you can see, the "Volatile" tag has been automatically discarded while
+-- the "Non-volatile" tag is still there (but with zero clients).
 --
 -- **Signal:**
 --
@@ -894,6 +1013,7 @@ end
 --
 -- @property volatile
 -- @param boolean
+-- @see delete
 
 -- Volatile accessors are implicit
 
@@ -963,7 +1083,7 @@ function tag.setgap(useless_gap, t)
 end
 
 --- Increase the spacing between clients
--- @function awful.tag.incgap
+-- @staticfct awful.tag.incgap
 -- @see gap
 -- @param add Value to add to the spacing between clients
 -- @param t The tag to modify, if null tag.selected() is used.
@@ -1070,7 +1190,7 @@ end
 
 --- Toggle size fill policy for the master client(s)
 -- between "expand" and "master_width_factor".
--- @function awful.tag.togglemfpol
+-- @staticfct awful.tag.togglemfpol
 -- @see master_fill_policy
 -- @tparam tag t The tag to modify, if null tag.selected() is used.
 function tag.togglemfpol(t)
@@ -1106,6 +1226,8 @@ end
 -- @see master_count
 
 --- Set the number of master windows.
+--
+-- @DOC_sequences_tag_master_count_EXAMPLE@
 --
 -- **Signal:**
 --
@@ -1151,7 +1273,7 @@ function tag.getnmaster(t)
 end
 
 --- Increase the number of master windows.
--- @function awful.tag.incnmaster
+-- @staticfct awful.tag.incnmaster
 -- @see master_count
 -- @param add Value to add to number of master windows.
 -- @param[opt] t The tag to modify, if null tag.selected() is used.
@@ -1269,7 +1391,7 @@ function tag.getncol(t)
 end
 
 --- Increase number of column windows.
--- @function awful.tag.incncol
+-- @staticfct awful.tag.incncol
 -- @param add Value to add to number of column windows.
 -- @param[opt] t The tag to modify, if null tag.selected() is used.
 -- @tparam[opt=false] boolean sensible Limit column_count based on the number
@@ -1300,7 +1422,10 @@ function tag.incncol(add, t, sensible)
 end
 
 --- View no tag.
--- @function awful.tag.viewnone
+--
+-- @DOC_sequences_tag_viewnone_EXAMPLE@
+--
+-- @staticfct awful.tag.viewnone
 -- @tparam[opt] int|screen screen The screen.
 function tag.viewnone(screen)
     screen = screen or ascreen.focused()
@@ -1310,13 +1435,19 @@ function tag.viewnone(screen)
     end
 end
 
---- View a tag by its taglist index.
+--- Select a tag relative to the currently selected one.
+--
+-- Note that this doesn't work well with multiple selection.
+--
+-- @DOC_sequences_tag_viewidx_EXAMPLE@
 --
 -- This is equivalent to `screen.tags[i]:view_only()`
--- @function awful.tag.viewidx
+-- @staticfct awful.tag.viewidx
 -- @see screen.tags
--- @param i The **relative** index to see.
--- @param[opt] screen The screen.
+-- @tparam number i The **relative** index to see.
+-- @tparam[opt] screen screen The screen.
+-- @see awful.tag.viewnext
+-- @see awful.tag.viewprev
 function tag.viewidx(i, screen)
     screen = get_screen(screen or ascreen.focused())
     local tags = screen.tags
@@ -1347,22 +1478,40 @@ function tag.getidx(query_tag)
     return tag.object.get_index(query_tag or ascreen.focused().selected_tag)
 end
 
---- View next tag. This is the same as tag.viewidx(1).
--- @function awful.tag.viewnext
--- @param screen The screen.
+
+--- View next tag. This is the same as `tag.viewidx(1)`.
+--
+-- Note that this doesn't work well with multiple selection.
+--
+-- @DOC_sequences_tag_viewnext_EXAMPLE@
+--
+-- @staticfct awful.tag.viewnext
+-- @tparam screen screen The screen.
+-- @see awful.tag.viewidx
+-- @see awful.tag.viewprev
 function tag.viewnext(screen)
     return tag.viewidx(1, screen)
 end
 
---- View previous tag. This is the same a tag.viewidx(-1).
--- @function awful.tag.viewprev
--- @param screen The screen.
+--- View previous tag. This is the same a `tag.viewidx(-1)`.
+--
+-- Note that this doesn't work well with multiple selection.
+--
+-- @DOC_sequences_tag_viewprev_EXAMPLE@
+--
+-- @staticfct awful.tag.viewprev
+-- @tparam screen screen The screen.
+-- @see awful.tag.viewidx
+-- @see awful.tag.viewnext
 function tag.viewprev(screen)
     return tag.viewidx(-1, screen)
 end
 
 --- View only a tag.
--- @function tag.view_only
+--
+-- @DOC_sequences_tag_view_only_EXAMPLE@
+--
+-- @method view_only
 -- @see selected
 function tag.object.view_only(self)
     local tags = self.screen.tags
@@ -1382,7 +1531,7 @@ end
 --- View only a tag.
 -- @deprecated awful.tag.viewonly
 -- @see tag.view_only
--- @param t The tag object.
+-- @tparam tag t The tag object.
 function tag.viewonly(t)
     gdebug.deprecate("Use t:view_only() instead of awful.tag.viewonly", {deprecated_in=4})
 
@@ -1395,9 +1544,9 @@ end
 -- selected. The tags already selected do not count. To do nothing if one or
 -- more of the tags are already selected, set `maximum` to zero.
 --
--- @function awful.tag.viewmore
--- @param tags A table with tags to view only.
--- @param[opt] screen The screen of the tags.
+-- @staticfct awful.tag.viewmore
+-- @tparam table tags A table with tags to view only.
+-- @tparam[opt] screen screen The screen of the tags.
 -- @tparam[opt=#tags] number maximum The maximum number of tags to select.
 function tag.viewmore(tags, screen, maximum)
     maximum = maximum or #tags
@@ -1428,7 +1577,7 @@ function tag.viewmore(tags, screen, maximum)
 end
 
 --- Toggle selection of a tag
--- @function awful.tag.viewtoggle
+-- @staticfct awful.tag.viewtoggle
 -- @see selected
 -- @tparam tag t Tag to be toggled
 function tag.viewtoggle(t)
@@ -1444,7 +1593,7 @@ end
 -- @tparam tag _tag The tag.
 -- @return The data table.
 function tag.getdata(_tag)
-    return _tag.data.awful_tag_properties
+    return _tag._private.awful_tag_properties
 end
 
 --- Get a tag property.
@@ -1457,8 +1606,9 @@ end
 -- @return The property.
 function tag.getproperty(_tag, prop)
     if not _tag then return end -- FIXME: Turn this into an error?
-    if _tag.data.awful_tag_properties then
-       return _tag.data.awful_tag_properties[prop]
+
+    if _tag._private.awful_tag_properties then
+       return _tag._private.awful_tag_properties[prop]
     end
 end
 
@@ -1473,12 +1623,12 @@ end
 -- @param prop The property name.
 -- @param value The value.
 function tag.setproperty(_tag, prop, value)
-    if not _tag.data.awful_tag_properties then
-        _tag.data.awful_tag_properties = {}
+    if not _tag._private.awful_tag_properties then
+        _tag._private.awful_tag_properties = {}
     end
 
-    if _tag.data.awful_tag_properties[prop] ~= value then
-        _tag.data.awful_tag_properties[prop] = value
+    if _tag._private.awful_tag_properties[prop] ~= value then
+        _tag._private.awful_tag_properties[prop] = value
         _tag:emit_signal("property::" .. prop)
     end
 end
@@ -1521,8 +1671,8 @@ end
 --- Add a signal to all attached tags and all tags that will be attached in the
 -- future. When a tag is detached from the screen, its signal is removed.
 --
--- @function awful.tag.attached_connect_signal
--- @screen screen The screen concerned, or all if nil.
+-- @staticfct awful.tag.attached_connect_signal
+-- @tparam screen screen The screen concerned, or all if nil.
 -- @tparam[opt] string signal The signal name.
 -- @tparam[opt] function Callback
 function tag.attached_connect_signal(screen, ...)
@@ -1536,8 +1686,8 @@ end
 -- Register standard signals.
 capi.client.connect_signal("property::screen", function(c)
     -- First, the delayed timer is necessary to avoid a race condition with
-    -- awful.rules. It is also messing up the tags before the user have a chance
-    -- to set them manually.
+    -- `ruled.client`. It is also messing up the tags before the user have a
+    -- chance to set them manually.
     timer.delayed_call(function()
         if not c.valid then
             return
@@ -1551,6 +1701,7 @@ capi.client.connect_signal("property::screen", function(c)
         end
 
         if #new_tags == 0 then
+            --TODO v5: Add a context as first param
             c:emit_signal("request::tag", nil, {reason="screen"})
         elseif #new_tags < #tags then
             c:tags(new_tags)
@@ -1611,6 +1762,7 @@ capi.tag.connect_signal("request::select", tag.object.view_only)
 -- this, an handler for this request must simply set a new screen
 -- for the tag.
 -- @signal request::screen
+-- @tparam string context Why it was called.
 
 --- Emitted after `request::screen` if no new screen has been set.
 -- The tag will be deleted, this is a last chance to move its clients
@@ -1630,7 +1782,7 @@ end)
 capi.screen.connect_signal("removed", function(s)
     -- First give other code a chance to move the tag to another screen
     for _, t in pairs(s.tags) do
-        t:emit_signal("request::screen")
+        t:emit_signal("request::screen", "removed")
     end
     -- Everything that's left: Tell everyone that these tags go away (other code
     -- could e.g. save clients)
@@ -1639,6 +1791,7 @@ capi.screen.connect_signal("removed", function(s)
     end
     -- Give other code yet another change to save clients
     for _, c in pairs(capi.client.get(s)) do
+        --TODO v5: Add a context as first param
         c:emit_signal("request::tag", nil, { reason = "screen-removed" })
     end
     -- Then force all clients left to go somewhere random
@@ -1656,10 +1809,11 @@ capi.screen.connect_signal("removed", function(s)
     for _, t in pairs(s.tags) do
         t.activated = false
 
-        if t.data.awful_tag_properties then
-            t.data.awful_tag_properties.screen = nil
+        if t._private.awful_tag_properties then
+            t._private.awful_tag_properties.screen = nil
         end
     end
+    data.history[s] = nil
 end)
 
 function tag.mt:__call(...)
@@ -1675,6 +1829,8 @@ object.properties(capi.tag, {
     getter_fallback = tag.getproperty,
     setter_fallback = tag.setproperty,
 })
+
+--@DOC_object_COMMON@
 
 return setmetatable(tag, tag.mt)
 

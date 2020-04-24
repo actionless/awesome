@@ -7,7 +7,7 @@
 --@DOC_wibox_layout_defaults_manual_EXAMPLE@
 -- @author Emmanuel Lepage Vallee
 -- @copyright 2016 Emmanuel Lepage Vallee
--- @classmod wibox.layout.manual
+-- @layoutmod wibox.layout.manual
 ---------------------------------------------------------------------------
 local gtable = require("gears.table")
 local base = require("wibox.widget.base")
@@ -15,32 +15,50 @@ local unpack = unpack or table.unpack -- luacheck: globals unpack (compatibility
 
 local manual_layout = {}
 
---- Add some widgets to the given stack layout
--- @param layout The layout you are modifying.
+--- Add some widgets to the given stack layout.
+--
+-- @method add
 -- @tparam widget ... Widgets that should be added
--- @name add
--- @class function
 
---- Remove a widget from the layout
--- @tparam index The widget index to remove
+--- Remove a widget from the layout.
+--
+-- @method remove
+-- @tparam number index The widget index to remove
 -- @treturn boolean index If the operation is successful
--- @name remove
--- @class function
+-- @interface layout
 
---- Insert a new widget in the layout at position `index`
+--- Insert a new widget in the layout at position `index`.
+--
+-- @method insert
 -- @tparam number index The position
--- @param widget The widget
--- @treturn boolean If the operation is successful
--- @name insert
--- @class function
+-- @tparam widget widget The widget
+-- @treturn boolean If the operation is successful.
+-- @emits widget::inserted
+-- @emitstparam widget::inserted widget self The fixed layout.
+-- @emitstparam widget::inserted widget widget index The inserted widget.
+-- @emitstparam widget::inserted number count The widget count.
+-- @interface layout
+function manual_layout:insert(index, widget)
+    table.insert(self._private.widgets, index, widget)
 
---- Remove one or more widgets from the layout
+    -- Add the point
+    if widget.point then
+        table.insert(self._private.pos, index, widget.point)
+    end
+
+    self:emit_signal("widget::inserted", widget, #self._private.widgets)
+
+    self:emit_signal("widget::layout_changed")
+end
+
+--- Remove one or more widgets from the layout.
+--
 -- The last parameter can be a boolean, forcing a recursive seach of the
 -- widget(s) to remove.
--- @param widget ... Widgets that should be removed (must at least be one)
+--
+-- @method remove_widgets
+-- @tparam widget ... Widgets that should be removed (must at least be one)
 -- @treturn boolean If the operation is successful
--- @name remove_widgets
--- @class function
 
 
 function manual_layout:fit(_, width, height)
@@ -91,9 +109,16 @@ function manual_layout:layout(context, width, height)
 end
 
 function manual_layout:add(...)
-    local wdgs = {...}
+    local wdgs = {}
     local old_count = #self._private.widgets
-    gtable.merge(self._private.widgets, {...})
+
+    for _, v in ipairs {...} do
+        local w = base.make_widget_from_value(v)
+        base.check_widget(w)
+        table.insert(wdgs, w)
+    end
+
+    gtable.merge(self._private.widgets, wdgs)
 
     -- Add the points
     for k, v in ipairs(wdgs) do
@@ -135,6 +160,8 @@ end
 --           The function is compatible with the `awful.placement` prototype.
 --
 --@DOC_wibox_layout_manual_add_at_EXAMPLE@
+--
+-- @method add_at
 -- @tparam widget widget The widget.
 -- @tparam table|function point Either an `{x=x,y=y}` table or a function
 --  returning the new geometry.
@@ -153,10 +180,12 @@ function manual_layout:add_at(widget, point)
     end
 
     self._private.pos[#self._private.widgets+1] = point
-    self:add(widget)
+    self:add(base.make_widget_from_value(widget))
 end
 
 --- Move a widget (by index).
+--
+-- @method move
 -- @tparam number index The widget index.
 -- @tparam table|function point A new point value.
 -- @see add_at
@@ -169,6 +198,8 @@ end
 --- Move a widget.
 --
 --@DOC_wibox_layout_manual_move_widget_EXAMPLE@
+--
+-- @method move_widget
 -- @tparam widget widget The widget.
 -- @tparam table|function point A new point value.
 -- @see add_at
@@ -196,7 +227,10 @@ function manual_layout:reset()
 end
 
 --- Create a manual layout.
+--
+-- @constructorfct wibox.layout.manual
 -- @tparam table ... Widgets to add to the layout.
+
 local function new_manual(...)
     local ret = base.make_widget(nil, nil, {enable_properties = true})
 
@@ -209,6 +243,7 @@ local function new_manual(...)
     return ret
 end
 
+--@DOC_fixed_COMMON@
 
 --@DOC_widget_COMMON@
 

@@ -47,6 +47,8 @@ menu_gen.all_categories = {
                icon_name = "applications-office", use = true },
     internet = { app_type = "Network", name = "Internet",
                 icon_name = "applications-internet", use = true },
+    science = { app_type = "Science", name="Science",
+                icon_name = "applications-science", use = true },
     settings = { app_type = "Settings", name = "Settings",
                  icon_name = "applications-utilities", use = true },
     tools = { app_type = "System", name = "System Tools",
@@ -56,6 +58,7 @@ menu_gen.all_categories = {
 }
 
 --- Find icons for category entries.
+-- @staticfct menubar.menu_gen.lookup_category_icons
 function menu_gen.lookup_category_icons()
     for _, v in pairs(menu_gen.all_categories) do
         v.icon = utils.lookup_icon(v.icon_name)
@@ -77,6 +80,7 @@ end
 -- @tparam function callback Will be fired when all menu entries were parsed
 -- with the resulting list of menu entries as argument.
 -- @tparam table callback.entries All menu entries.
+-- @staticfct menubar.menu_gen.generate
 function menu_gen.generate(callback)
     -- Update icons for category entries
     menu_gen.lookup_category_icons()

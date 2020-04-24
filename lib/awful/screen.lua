@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
---- Screen module for awful
+--- Screen module for awful.
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2008 Julien Danjou
@@ -13,6 +13,7 @@ local capi =
     screen = screen,
     client = client,
     awesome = awesome,
+    root = root,
 }
 local gdebug = require("gears.debug")
 local gmath = require("gears.math")
@@ -57,7 +58,7 @@ function screen.getdistance_sq(s, x, y)
 end
 
 --- Get the square distance between a `screen` and a point.
--- @function screen.get_square_distance
+-- @method get_square_distance
 -- @tparam number x X coordinate of point
 -- @tparam number y Y coordinate of point
 -- @treturn number The squared distance of the screen to the provided point.
@@ -69,7 +70,7 @@ end
 --
 -- The number returned can be used as an index into the global
 -- `screen` table/object.
--- @function awful.screen.getbycoord
+-- @staticfct awful.screen.getbycoord
 -- @tparam number x The x coordinate
 -- @tparam number y The y coordinate
 -- @treturn ?number The screen index
@@ -86,8 +87,10 @@ end
 --
 -- This moves the mouse pointer to the last known position on the new screen,
 -- or keeps its position relative to the current focused screen.
--- @function awful.screen.focus
--- @screen _screen Screen number (defaults / falls back to mouse.screen).
+-- @staticfct awful.screen.focus
+-- @tparam screen _screen Screen number (defaults / falls back to mouse.screen).
+-- @request client activate screen.focus granted The most recent focused client
+--  for this screen should be re-activated.
 function screen.focus(_screen)
     client = client or require("awful.client")
     if type(_screen) == "number" and _screen > capi.screen.count() then _screen = screen.focused() end
@@ -128,7 +131,7 @@ end
 -- This gets the next screen relative to this one in
 -- the specified direction.
 --
--- @function screen:get_next_in_direction
+-- @method get_next_in_direction
 -- @param self Screen.
 -- @param dir The direction, can be either "up", "down", "left" or "right".
 function screen.object.get_next_in_direction(self, dir)
@@ -149,7 +152,7 @@ end
 --
 -- This moves the mouse pointer to the last known position on the new screen,
 -- or keeps its position relative to the current focused screen.
--- @function awful.screen.focus_bydirection
+-- @staticfct awful.screen.focus_bydirection
 -- @param dir The direction, can be either "up", "down", "left" or "right".
 -- @param _screen Screen.
 function screen.focus_bydirection(dir, _screen)
@@ -166,12 +169,36 @@ end
 -- This moves the mouse pointer to the last known position on the new screen,
 -- or keeps its position relative to the current focused screen.
 --
--- @function awful.screen.focus_relative
+-- @staticfct awful.screen.focus_relative
 -- @tparam int offset Value to add to the current focused screen index. 1 to
 --   focus the next one, -1 to focus the previous one.
 function screen.focus_relative(offset)
     return screen.focus(gmath.cycle(capi.screen.count(),
                                    screen.focused().index + offset))
+end
+
+--- The area where clients can be tiled.
+--
+-- This property holds the (read only) area where clients can be tiled. Use
+-- the `padding` property, `wibox.struts` and `client.struts` to modify this
+-- area.
+--
+-- @DOC_screen_tiling_area_EXAMPLE@
+--
+-- @property tiling_area
+-- @tparam table tiling_area
+-- @tparam number tiling_area.x
+-- @tparam number tiling_area.y
+-- @tparam number tiling_area.width
+-- @tparam number tiling_area.height
+-- @see padding
+-- @see get_bounding_geometry
+
+function screen.object.get_tiling_area(s)
+    return s:get_bounding_geometry {
+        honor_padding  = true,
+        honor_workarea = true,
+    }
 end
 
 --- Get or set the screen padding.
@@ -198,6 +225,8 @@ end
 -- **Signal:**
 --
 -- * *property::padding*
+--
+-- @DOC_screen_padding_EXAMPLE@
 --
 -- @property padding
 -- @param table
@@ -234,6 +263,58 @@ function screen.object.set_padding(self, padding)
     end
 end
 
+--- A list of outputs for this screen with their size in mm.
+--
+-- Please note that the table content may vary. In some case, it might also be
+-- empty.
+--
+-- An easy way to check if a screen is the laptop screen is usually:
+--
+--    if s.outputs["LVDS-1"] then
+--        -- do something
+--    end
+--
+-- **Signal:**
+--
+--  * *property::outputs*
+--
+-- **Immutable:** true
+-- @property outputs
+-- @param table
+-- @tfield table table.name A table with the screen name as key (like `eDP1` on a laptop)
+-- @tfield integer table.mm_width The screen physical width.
+-- @tfield integer table.mm_height The screen physical height.
+-- @tfield integer table.name The output name.
+-- @tfield integer table.viewport_id The identifier of the viewport this output
+--  corresponds to.
+
+function screen.object.get_outputs(s)
+    local ret = {}
+
+    local outputs = s._custom_outputs
+        or (s._private.viewport and s._private.viewport.outputs or s._outputs)
+
+    -- The reason this exists is because output with name as keys is very
+    -- convenient for quick name lookup by the users, but inconvenient in
+    -- the lower layers since knowing the output count (using #) is better.
+    for k, v in ipairs(outputs) do
+        ret[v.name or k] = v
+    end
+
+    return ret
+end
+
+function screen.object.set_outputs(self, outputs)
+    self._custom_outputs = outputs
+    self:emit_signal("property::outputs", screen.object.get_outputs(self))
+end
+
+capi.screen.connect_signal("property::_outputs", function(s)
+    if not s._custom_outputs then
+        s:emit_signal("property::outputs", screen.object.get_outputs(s))
+    end
+end)
+
 --- Get the preferred screen in the context of a client.
 --
 -- This is exactly the same as `awful.screen.focused` except that it avoids
@@ -242,19 +323,20 @@ end
 -- focused screen by default.
 -- @tparam client c A client.
 -- @treturn screen The preferred screen.
+-- @staticfct awful.screen.preferred
 function screen.preferred(c)
     return capi.awesome.startup and c.screen or screen.focused()
 end
 
 --- The defaults arguments for `awful.screen.focused`.
--- @tfield[opt=nil] table awful.screen.default_focused_args
+-- @tfield[opt={}] table awful.screen.default_focused_args
 
 --- Get the focused screen.
 --
 -- It is possible to set `awful.screen.default_focused_args` to override the
 -- default settings.
 --
--- @function awful.screen.focused
+-- @staticfct awful.screen.focused
 -- @tparam[opt] table args
 -- @tparam[opt=false] boolean args.client Use the client screen instead of the
 --   mouse screen.
@@ -272,16 +354,16 @@ end
 --
 -- This method computes the different variants of the "usable" screen geometry.
 --
--- @function screen.get_bounding_geometry
+-- @staticfct screen.get_bounding_geometry
 -- @tparam[opt={}] table args The arguments
 -- @tparam[opt=false] boolean args.honor_padding Whether to honor the screen's padding.
 -- @tparam[opt=false] boolean args.honor_workarea Whether to honor the screen's workarea.
 -- @tparam[opt] int|table args.margins Apply some margins on the output.
 --   This can either be a number or a table with *left*, *right*, *top*
 --   and *bottom* keys.
--- @tag[opt] args.tag Use this tag's screen.
+-- @tparam[opt] tag args.tag Use this tag's screen.
 -- @tparam[opt] drawable args.parent A parent drawable to use as base geometry.
--- @tab[opt] args.bounding_rect A bounding rectangle. This parameter is
+-- @tparam[opt] table args.bounding_rect A bounding rectangle. This parameter is
 --   incompatible with `honor_workarea`.
 -- @treturn table A table with *x*, *y*, *width* and *height*.
 -- @usage local geo = screen:get_bounding_geometry {
@@ -341,7 +423,7 @@ end
 --
 -- This is used by `screen.clients` internally (with `stacked=true`).
 --
--- @function screen:get_clients
+-- @method get_clients
 -- @tparam[opt=true] boolean stacked Use stacking order? (top to bottom)
 -- @treturn table The clients list.
 function screen.object.get_clients(s, stacked)
@@ -388,7 +470,7 @@ end
 --
 -- This is used by `all_clients` internally (with `stacked=true`).
 --
--- @function screen:get_all_clients
+-- @method get_all_clients
 -- @tparam[opt=true] boolean stacked Use stacking order? (top to bottom)
 -- @treturn table The clients list.
 function screen.object.get_all_clients(s, stacked)
@@ -403,6 +485,8 @@ end
 -- * maximized clients
 -- * floating clients
 --
+-- @DOC_screen_tiled_clients_EXAMPLE@
+--
 -- @property tiled_clients
 -- @param table The clients list, ordered from top to bottom.
 
@@ -410,7 +494,7 @@ end
 --
 -- This is used by `tiles_clients` internally (with `stacked=true`).
 --
--- @function screen:get_tiled_clients
+-- @method get_tiled_clients
 -- @tparam[opt=true] boolean stacked Use stacking order? (top to bottom)
 -- @treturn table The clients list.
 function screen.object.get_tiled_clients(s, stacked)
@@ -430,9 +514,9 @@ end
 
 --- Call a function for each existing and created-in-the-future screen.
 --
--- @function awful.screen.connect_for_each_screen
+-- @staticfct awful.screen.connect_for_each_screen
 -- @tparam function func The function to call.
--- @screen func.screen The screen.
+-- @tparam screen func.screen The screen.
 function screen.connect_for_each_screen(func)
     for s in capi.screen do
         func(s)
@@ -441,7 +525,7 @@ function screen.connect_for_each_screen(func)
 end
 
 --- Undo the effect of connect_for_each_screen.
--- @function awful.screen.disconnect_for_each_screen
+-- @staticfct awful.screen.disconnect_for_each_screen
 -- @tparam function func The function that should no longer be called.
 function screen.disconnect_for_each_screen(func)
     capi.screen.disconnect_signal("added", func)
@@ -459,7 +543,7 @@ end
 function screen.object.get_tags(s, unordered)
     local tags = {}
 
-    for _, t in ipairs(root.tags()) do
+    for _, t in ipairs(capi.root.tags()) do
         if get_screen(t.screen) == s then
             table.insert(tags, t)
         end
@@ -495,13 +579,113 @@ end
 
 --- The first selected tag.
 -- @property selected_tag
--- @param table
+-- @param tag
 -- @treturn ?tag The first selected tag or nil.
 -- @see tag.selected
 -- @see selected_tags
 
 function screen.object.get_selected_tag(s)
     return screen.object.get_selected_tags(s)[1]
+end
+
+local function normalize(ratios, size)
+    local sum = 0
+
+    for _, r in ipairs(ratios) do
+        sum = sum + r
+    end
+
+    -- Avoid to mutate the input.
+    local ret = {}
+    local sum2 = 0
+
+    for k, r in ipairs(ratios) do
+        ret[k] = (r*100)/sum
+        ret[k] = math.floor(size*ret[k]*0.01)
+        sum2 = sum2 + ret[k]
+    end
+
+    -- Ratios are random float number. Pixels cannot be divided. This adds the
+    -- remaining pixels to the end. A better approach would be to redistribute
+    -- them based on the ratios. However, nobody will notice.
+    ret[#ret] = ret[#ret] + (size - sum2)
+
+    return ret
+end
+
+--- Split the screen into multiple screens.
+--
+-- This is useful to turn ultrawide monitors into something more useful without
+-- fancy client layouts:
+--
+-- @DOC_awful_screen_split1_EXAMPLE@
+--
+-- It can also be used to turn a vertical "side" screen into 2 smaller screens:
+--
+-- @DOC_awful_screen_split2_EXAMPLE@
+--
+-- @tparam[opt] table ratios The different ratios to split into. If none is
+--  provided, it is split in half.
+-- @tparam[opt] string mode Either "vertical" or "horizontal". If none is
+--  specified, it will split along the longest axis.
+-- @method split
+function screen.object.split(s, ratios, mode, _geo)
+    s = get_screen(s)
+
+    _geo = _geo or s.geometry
+    ratios = ratios or {50,50}
+
+    -- In practice, this is almost always what the user wants.
+    mode = mode or (
+        _geo.height > _geo.width and "vertical" or "horizontal"
+    )
+
+    assert(mode == "horizontal" or mode == "vertical")
+
+    assert((not s) or s.valid)
+    assert(#ratios >= 2)
+
+    local sizes, ret = normalize(
+        ratios, mode == "horizontal" and _geo.width or _geo.height
+    ), {}
+
+    assert(#sizes >=2)
+
+    if s then
+        if mode == "horizontal" then
+            s:fake_resize(_geo.x, _geo.y, sizes[1], _geo.height)
+        else
+            s:fake_resize(_geo.x, _geo.y, _geo.width, sizes[1])
+        end
+        table.insert(ret, s)
+    end
+
+    local pos = _geo[mode == "horizontal" and "x" or "y"]
+        + (s and sizes[1] or 0)
+
+    for k=2, #sizes do
+        local ns
+
+        if mode == "horizontal" then
+            ns = capi.screen.fake_add(pos, _geo.y, sizes[k], _geo.height)
+        else
+            ns = capi.screen.fake_add(_geo.x, pos, _geo.width, sizes[k])
+        end
+
+        table.insert(ret, ns)
+
+        if s then
+            ns._private.viewport = s._private.viewport
+
+            if not ns._private.viewport then
+                ns.outputs = s.outputs
+            end
+        end
+
+        pos = pos + sizes[k]
+    end
+
+    return ret
 end
 
 --- Enable the automatic calculation of the screen DPI (experimental).
@@ -525,83 +709,301 @@ end
 -- defaulting to 96.
 --
 -- @tparam boolean enabled Enable or disable automatic DPI support.
+-- @staticfct awful.screen.set_auto_dpi_enabled
 function screen.set_auto_dpi_enabled(enabled)
     for s in capi.screen do
-        s.data.dpi_cache = nil
+        s._private.dpi_cache = nil
     end
     data.autodpi = enabled
 end
 
-
 --- The number of pixels per inch of the screen.
+--
+-- The default DPI comes from the X11 server. In most case, it will be 96. If
+-- `autodpi` is set to `true` on the screen, it will use the least dense dpi
+-- from the screen outputs. Most of the time, screens only have a single output,
+-- however it will have two (or more) when "clone mode" is used (eg, when a
+-- screen is duplicated on a projector).
+--
 -- @property dpi
--- @treturn number the DPI value.
+-- @param number the DPI value.
 
-local xft_dpi, fallback_dpi
+--- The lowest density DPI from all of the (physical) outputs.
+-- @property minimum_dpi
+-- @param number the DPI value.
 
-local function get_fallback()
-    local mm_per_inch = 25.4
+--- The highest density DPI from all of the (physical) outputs.
+-- @property maximum_dpi
+-- @param number the DPI value.
 
-    -- Following Keith Packard's whitepaper on Xft,
-    -- https://keithp.com/~keithp/talks/xtc2001/paper/xft.html#sec-editing
-    -- the proper fallback for Xft.dpi is the vertical DPI reported by
-    -- the X server. This will generally be 96 on Xorg, unless the user
-    -- has configured it differently
-    if root and not fallback_dpi then
-        local _, h = root.size()
-        local _, hmm = root.size_mm()
-        fallback_dpi = hmm ~= 0 and h * mm_per_inch / hmm
+--- The preferred DPI from all of the (physical) outputs.
+--
+-- This is computed by normalizing all output to fill the area, then picking
+-- the lowest of the resulting virtual DPIs.
+--
+-- @property preferred_dpi
+-- @param number the DPI value.
+
+--- The maximum diagonal size in millimeters.
+--
+-- @property mm_maximum_size
+-- @param number
+
+--- The minimum diagonal size in millimeters.
+--
+-- @property mm_minimum_size
+-- @param number
+
+--- The maximum diagonal size in inches.
+--
+-- @property inch_maximum_size
+-- @param number
+
+--- The minimum diagonal size in inches.
+--
+-- @property inch_minimum_size
+-- @param number
+
+--- Emitted when a new screen is added.
+--
+-- The handler(s) of this signal are responsible of adding elements such as
+-- bars, docks or other elements to a screen. The signal is emitted when a
+-- screen is added, including during startup.
+--
+-- The only default implementation is the one provided by `rc.lua`.
+--
+-- @signal request::desktop_decoration
+-- @tparam string context The context.
+-- @request screen wallpaper added granted When the decorations needs to be
+--  added to a new screen.
+
+--- Emitted when a new screen needs a wallpaper.
+--
+-- The handler(s) of this signal are responsible to set the wallpaper. The
+-- signal is emitted when a screen is added (including at startup), when its
+-- DPI changes or when its geometry changes.
+--
+-- The only default implementation is the one provided by `rc.lua`.
+--
+-- @signal request::wallpaper
+-- @tparam string context The context.
+-- @request screen wallpaper added granted When the wallpaper needs to be
+--  added to a new screen.
+-- @request screen wallpaper geometry granted When the wallpaper needs to be
+--  updated because the resolution changed.
+-- @request screen wallpaper dpi granted When the wallpaper needs to be
+--  updated because the DPI changed.
+
+--- When a new (physical) screen area has been added.
+--
+-- Important: This only exists when Awesome is started with `--screen off`.
+-- Please also note that this doesn't mean it will appear when a screen is
+-- physically plugged. Depending on the configuration a tool like `arandr` or
+-- the `xrandr` command is needed.
+--
+-- The default handler will create a screen that fills the area.
+--
+-- To disconnect the default handler, use:
+--
+--    screen.disconnect_signal(
+--        "request::create", awful.screen.create_screen_handler
+--    )
+--
+-- @signal request::create
+-- @tparam table viewport
+-- @tparam table viewport.geometry A table with `x`, `y`, `width` and `height`
+--  keys.
+-- @tparam table viewport.outputs A table with the monitor name and possibly the
+--  `mm_width` and `mm_height` values if they are available.
+-- @tparam number viewport.id An identifier for this viewport (by pixel
+--  resolution). It
+--  will not change when outputs are modified, but will change when the
+--  resolution changes. Note that if it fully disappear, the next time an
+--  viewport with the same resolution appears, it will have a different `id`.
+-- @tparam number viewport.minimum_dpi The least dense DPI.
+-- @tparam number viewport.maximum_dpi The most dense DPI.
+-- @tparam number viewport.preferred_dpi The relative least dense DPI.
+-- @tparam table args
+-- @tparam string args.context Why was this signal sent.
+-- @see outputs
+-- @see awful.screen.create_screen_handler
+
+--- When a physical monitor viewport has been removed.
+--
+-- Important: This only exists when Awesome is started with `--screen off`.
+--
+-- If you replace the default handler, it is up to you to find the screen(s)
+-- associated with this viewport.
+--
+-- To disconnect the default handler, use:
+--
+--    screen.disconnect_signal(
+--        "request::remove", awful.screen.remove_screen_handler
+--    )
+--
+-- @signal request::remove
+-- @tparam table viewport
+-- @tparam table viewport.geometry A table with `x`, `y`, `width` and `height`
+--  keys.
+-- @tparam table viewport.outputs A table with the monitor name and possibly the
+--  `mm_width` and `mm_height` values if they are available.
+-- @tparam number viewport.id An identifier for this viewport (by pixel
+--  resolution). It will not change when outputs are modified, but will change
+--  when the resolution changes. Note that if it fully disappear, the next time
+--  an viewport with the same resolution appears, it will have a different `id`.
+-- @tparam number viewport.minimum_dpi The least dense DPI.
+-- @tparam number viewport.maximum_dpi The most dense DPI.
+-- @tparam number viewport.preferred_dpi The relative least dense DPI.
+-- @tparam table args
+-- @tparam string args.context Why was this signal sent.
+-- @see awful.screen.remove_screen_handler
+
+--- When a physical viewport resolution has changed or it has been replaced.
+--
+-- Important: This only exists when Awesome is started with `--screen off`.
+--
+-- Note that given the viewports are not the same, the `id` wont be the same.
+-- Also note that if multiple new viewports fit within a single "old" viewport,
+-- the resized screen will be the one with the largest total overlapping
+-- viewport (`intersection.width*intersection.height`), regardless of the
+-- outputs names.
+--
+-- To disconnect the default handler, use:
+--
+--    screen.disconnect_signal(
+--        "request::resize", awful.screen.resize_screen_handler
+--    )
+--
+-- @signal request::resize
+-- @tparam table old_viewport
+-- @tparam table old_viewport.geometry A table with `x`, `y`, `width` and
+--  `height` keys.
+-- @tparam table old_viewport.outputs A table with the monitor name and
+--  possibly the `mm_width` and `mm_height` values if they are available.
+-- @tparam number old_viewport.id An identifier for this viewport (by pixel
+--  resolution). It will not change when outputs are modified, but will change
+--  when the resolution changes. Note that if it fully disappear, the next
+--  time an viewport with the same resolution appears, it will have a different
+--  `id`.
+-- @tparam number old_viewport.minimum_dpi The least dense DPI.
+-- @tparam number old_viewport.maximum_dpi The most dense DPI.
+-- @tparam number old_viewport.preferred_dpi The relative least dense DPI.
+-- @tparam table new_viewport
+-- @tparam table new_viewport.geometry A table with `x`, `y`, `width` and
+--  `height` keys.
+-- @tparam table new_viewport.outputs A table with the monitor name and
+--  possibly the
+--  `mm_width` and `mm_height` values if they are available.
+-- @tparam number new_viewport.id An identifier for this viewport (by pixel
+--  resolution). It will not change when outputs are modified, but will change
+--  when the  resolution changes. Note that if it fully disappear, the next time
+--  an viewport with the same resolution appears, it will have a different `id`.
+-- @tparam number new_viewport.minimum_dpi The least dense DPI.
+-- @tparam number new_viewport.maximum_dpi The most dense DPI.
+-- @tparam number new_viewport.preferred_dpi The relative least dense DPI.
+-- @tparam table args
+-- @tparam string args.context Why was this signal sent.
+-- @see awful.screen.resize_screen_handler
+
+--- Default handler for `request::create`.
+--
+-- Important: This only exists when Awesome is started with `--screen off`.
+--
+-- A simplified implementation looks like:
+--
+--    function(viewport --[[, args]])
+--        local geo = viewport.geometry
+--        local s = screen.fake_add(geo.x, geo.y, geo.width, geo.height)
+--        s:emit_signal("request::desktop_decoration")
+--        s:emit_signal("request::wallpaper")
+--    end
+--
+-- If you implement this by hand, you must also implement handler for the
+-- `request::remove` and `request::resize`.
+--
+-- @signalhandler awful.screen.create_screen_handler
+-- @see request::create
+
+--- Default handler for `request::remove`.
+--
+-- Important: This only exists when Awesome is started with `--screen off`.
+--
+-- A simplified version of the logic is:
+--
+--    function (viewport --[[, args]])
+--        local geo = viewport.geometry
+--        for s in screen do
+--            if gears.geometry.rectangle.are_equal(geo, s.geometry) then
+--                s:fake_remove()
+--                return
+--            end
+--        end
+--    end
+--
+-- @signalhandler awful.screen.remove_screen_handler
+-- @see request::remove
+
+--- Default handler for `request::resize`.
+--
+-- Important: This only exists when Awesome is started with `--screen off`.
+--
+-- A simplified version of the logic is:
+--
+--    function (old_viewport, new_viewport --[[, args]])
+--        local old_geo, new_geo = old_viewport.geometry, new_viewport.geometry
+--        for s in screen do
+--            local sgeo = new_viewport.geometry
+--            if gears.geometry.rectangle.are_equal(old_geo, s.geometry) then
+--                s:fake_resize(
+--                    sgeo.x, sgeo.y, sgeo.width, sgeo.height
+--                )
+--            end
+--        end
+--    end
+--
+-- @signalhandler awful.screen.resize_screen_handler
+-- @see request::resize
+
+-- Add the DPI properties.
+require("awful.screen.dpi")(screen, data)
+
+-- Set the wallpaper(s) and create the bar(s) for new screens
+
+capi.screen.connect_signal("_added", function(s)
+    -- If it was emited from here when screens are created with fake_add,
+    -- the Lua code would not have an opportunity to polutate the screen
+    -- metadata. Thus, the DPI may be wrong when setting the wallpaper.
+    if s._managed ~= "Lua" then
+        s:emit_signal("added")
+        s:emit_signal("request::desktop_decoration", "added")
+        s:emit_signal("request::wallpaper", "added")
     end
+end)
 
-    return fallback_dpi or 96
+-- Resize the wallpaper(s)
+for _, prop in ipairs {"geometry", "dpi" } do
+    capi.screen.connect_signal("property::"..prop, function(s)
+        s:emit_signal("request::wallpaper", prop)
+    end)
 end
 
-function screen.object.get_dpi(s)
-    local mm_per_inch = 25.4
-
-    if s.data.dpi or s.data.dpi_cache then
-        return s.data.dpi or s.data.dpi_cache
-    end
-
-    -- Xft.dpi is explicit user configuration, so honor it
-    if not xft_dpi and awesome and awesome.xrdb_get_value then
-        xft_dpi = tonumber(awesome.xrdb_get_value("", "Xft.dpi")) or false
-    end
-
-    if xft_dpi then
-        s.data.dpi_cache = xft_dpi
-        return s.data.dpi_cache
-    end
-
-    if not data.autodpi then
-        s.data.dpi_cache = get_fallback()
-        return s.data.dpi_cache
-    end
-
-    -- Try to compute DPI based on outputs (use the minimum)
-    local dpi = nil
-    local geo = s.geometry
-    for _, o in pairs(s.outputs) do
-        -- Ignore outputs with width/height 0
-        if o.mm_width ~= 0 and o.mm_height ~= 0 then
-            local dpix = geo.width * mm_per_inch / o.mm_width
-            local dpiy = geo.height * mm_per_inch / o.mm_height
-            dpi = math.min(dpix, dpiy, dpi or dpix)
+-- Create the bar for existing screens when an handler is added
+capi.screen.connect_signal("request::desktop_decoration::connected", function(new_handler)
+    if capi.screen.automatic_factory then
+        for s in capi.screen do
+            new_handler(s)
         end
     end
-    if dpi then
-        s.data.dpi_cache = dpi
-        return dpi
+end)
+
+-- Set the wallpaper when an handler is added.
+capi.screen.connect_signal("request::wallpaper::connected", function(new_handler)
+    if capi.screen.automatic_factory then
+        for s in capi.screen do
+            new_handler(s)
+        end
     end
-
-    s.data.dpi_cache = get_fallback()
-    return s.data.dpi_cache
-end
-
-function screen.object.set_dpi(s, dpi)
-    s.data.dpi = dpi
-end
-
+end)
 
 --- When the tag history changed.
 -- @signal tag::history::update
@@ -612,6 +1014,8 @@ object.properties(capi.screen, {
     setter_class = screen.object,
     auto_emit    = true,
 })
+
+--@DOC_object_COMMON@
 
 return screen
 

@@ -3,7 +3,7 @@
 --
 -- @author Julien Danjou &lt;julien@danjou.info&gt;
 -- @copyright 2009 Julien Danjou
--- @classmod wibox.widget.textclock
+-- @widgetmod wibox.widget.textclock
 ---------------------------------------------------------------------------
 
 local setmetatable = setmetatable
@@ -17,9 +17,23 @@ local TimeZone = glib.TimeZone
 
 local textclock = { mt = {} }
 
---- Set the clock's format
+local DateTime_new_now = DateTime.new_now
+
+-- When $SOURCE_DATE_EPOCH and $SOURCE_DIRECTORY are both set, then this code is
+-- most likely being run by the test runner. Ensure reproducible dates.
+local source_date_epoch = tonumber(os.getenv("SOURCE_DATE_EPOCH"))
+if source_date_epoch and os.getenv("SOURCE_DIRECTORY") then
+    DateTime_new_now = function()
+        return DateTime.new_from_unix_utc(source_date_epoch)
+    end
+end
+
+--- Set the clock's format.
+--
+-- For information about the format specifiers, see
+-- [the GLib docs](https://developer.gnome.org/glib/stable/glib-GDateTime.html#g-date-time-format).
 -- @property format
--- @tparam string format The new time format.  This can contain pango markup
+-- @tparam string format The new time format. This can contain pango markup.
 
 function textclock:set_format(format)
     self._private.format = format
@@ -30,7 +44,10 @@ function textclock:get_format()
     return self._private.format
 end
 
---- Set the clock's timezone
+--- Set the clock's timezone.
+--
+-- e.g. "Z" for UTC, "±hh:mm" or "Europe/Amsterdam". See
+-- [GTimeZone](https://developer.gnome.org/glib/stable/glib-GTimeZone.html#g-time-zone-new).
 -- @property timezone
 -- @tparam string timezone
 
@@ -44,9 +61,10 @@ function textclock:get_timezone()
     return self._private.tzid
 end
 
---- Set the clock's refresh rate
+--- Set the clock's refresh rate.
+--
 -- @property refresh
--- @tparam number How often the clock is updated, in seconds
+-- @tparam number refresh How often the clock is updated, in seconds
 
 function textclock:set_refresh(refresh)
     self._private.refresh = refresh or self._private.refresh
@@ -58,6 +76,8 @@ function textclock:get_refresh()
 end
 
 --- Force a textclock to update now.
+--
+-- @method force_update
 function textclock:force_update()
     self._timer:emit_signal("timeout")
 end
@@ -70,13 +90,11 @@ end
 
 --- Create a textclock widget. It draws the time it is in a textbox.
 --
--- @tparam[opt=" %a %b %d, %H:%M "] string format The time format.
+-- @tparam[opt=" %a %b %d&comma; %H:%M "] string format The time [format](#format).
 -- @tparam[opt=60] number refresh How often to update the time (in seconds).
--- @tparam[opt=local timezone] string timezone The timezone to use,
---   e.g. "Z" for UTC, "±hh:mm" or "Europe/Amsterdam". See
---   https://developer.gnome.org/glib/stable/glib-GTimeZone.html#g-time-zone-new.
+-- @tparam[opt=local timezone] string timezone The [timezone](#timezone) to use.
 -- @treturn table A textbox widget.
--- @function wibox.widget.textclock
+-- @constructorfct wibox.widget.textclock
 local function new(format, refresh, tzid)
     local w = textbox()
     gtable.crush(w, textclock, true)
@@ -87,7 +105,7 @@ local function new(format, refresh, tzid)
     w._private.timezone = tzid and TimeZone.new(tzid)
 
     function w._private.textclock_update_cb()
-        local str = DateTime.new_now(w._private.timezone or TimeZone.new_local()):format(w._private.format)
+        local str = DateTime_new_now(w._private.timezone or TimeZone.new_local()):format(w._private.format)
         if str == nil then
             require("gears.debug").print_warning("textclock: "
                     .. "g_date_time_format() failed for format "

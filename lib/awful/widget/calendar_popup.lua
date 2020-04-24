@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
--- A calendar popup wibox
+-- A calendar popup wibox.
 --
 -- Display a month or year calendar popup using `calendar_popup.month` or `calendar_popup.year`.
 -- The calendar style can be tweaked by providing tables of style properties at creation:
@@ -18,11 +18,11 @@
 -- The wibox visibility can be changed calling the `toggle` method.
 -- The `attach` method adds mouse bindings to an existing widget in order to toggle the display of the wibox.
 --
---@DOC_wibox_awidget_defaults_calendar_popup_EXAMPLE@
+--@DOC_awful_widget_calendar_popup_default_EXAMPLE@
 --
 -- @author getzze
 -- @copyright 2017 getzze
--- @classmod awful.widget.calendar_popup
+-- @popupmod awful.widget.calendar_popup
 ---------------------------------------------------------------------------
 
 local setmetatable = setmetatable
@@ -39,13 +39,11 @@ local calendar_popup = { offset = 0, mt = {} }
 local properties = { "markup", "fg_color", "bg_color", "shape", "padding", "border_width", "border_color", "opacity" }
 local styles = { "year", "month", "yearheader", "monthheader", "header", "weekday", "weeknumber", "normal", "focus" }
 
-
 --- The generic calendar style table.
 --
 -- Each table property can also be defined by `beautiful.calendar_[flag]_[property]=val`.
 -- @beautiful beautiful.calendar_style
 -- @tparam cell_properties table Table of cell style properties
-
 
 --- Cell properties.
 -- @field markup Markup function or format string
@@ -68,8 +66,6 @@ local styles = { "year", "month", "yearheader", "monthheader", "header", "weekda
 -- @field normal Normal day cell properties table
 -- @field focus Current day cell properties table
 -- @table cell_flags
-
-
 
 --- Create a container for the grid layout
 -- @tparam table tprops Table of calendar container properties.
@@ -98,19 +94,18 @@ local function embed(tprops)
                 margins = props.padding + props.border_width,
                 widget  = wibox.container.margin
             },
-            shape              = props.shape or gears.shape.rectangle,
-            shape_border_color = props.border_color,
-            shape_border_width = props.border_width,
-            fg                 = props.fg_color,
-            bg                 = props.bg_color,
-            opacity            = props.opacity,
-            widget             = wibox.container.background
+            shape        = props.shape or gears.shape.rectangle,
+            border_color = props.border_color,
+            border_width = props.border_width,
+            fg           = props.fg_color,
+            bg           = props.bg_color,
+            opacity      = props.opacity,
+            widget       = wibox.container.background
         }
         return out
     end
     return fn
 end
-
 
 --- Parse the properties of the cell type and set default values
 -- @tparam string cell The cell type
@@ -136,7 +131,7 @@ local function parse_cell_options(cell, args)
         elseif prop == 'border_width' then
             default = beautiful.border_width or 0
         elseif prop == 'border_color' then
-            default = beautiful.border_normal or beautiful.fg_normal
+            default = beautiful.border_color_normal or beautiful.fg_normal
         end
 
         -- Get default
@@ -164,7 +159,6 @@ local function parse_all_options(args)
     end
     return props
 end
-
 
 --- Make the geometry of a wibox
 -- @tparam widget widget Calendar widget
@@ -209,6 +203,7 @@ end
 -- @tparam string position Two-character position of the calendar in the screen
 -- @tparam screen screen Screen where to display the calendar
 -- @treturn wibox The wibox calendar
+-- @method call_calendar
 function calendar_popup:call_calendar(offset, position, screen)
     local inc_offset = offset or 0
     local pos = position or self.position
@@ -236,13 +231,12 @@ function calendar_popup:call_calendar(offset, position, screen)
     return self
 end
 
-
---- Toggle calendar visibility
+--- Toggle calendar visibility.
+-- @method toggle
 function calendar_popup:toggle()
     self:call_calendar(0)
     self.visible = not self.visible
 end
-
 
 --- Attach the calendar to a widget to display at a specific position.
 --
@@ -255,11 +249,13 @@ end
 -- @tparam[opt={}] table args Additional options
 -- @tparam[opt=true] bool args.on_hover Show popup during mouse hover
 -- @treturn wibox The wibox calendar
+-- @method attach
 function calendar_popup:attach(widget, position, args)
     position = position or "tr"
     args = args or {}
     if args.on_hover == nil then args.on_hover=true end
-    widget:buttons(gears.table.join(
+
+    widget.buttons = {
         abutton({ }, 1, function ()
                               if not self.visible or self._calendar_clicked_on then
                                   self:call_calendar(0, position)
@@ -269,7 +265,8 @@ function calendar_popup:attach(widget, position, args)
                         end),
         abutton({ }, 4, function () self:call_calendar(-1) end),
         abutton({ }, 5, function () self:call_calendar( 1) end)
-    ))
+    }
+
     if args.on_hover then
         widget:connect_signal("mouse::enter", function ()
             if not self._calendar_clicked_on then
@@ -285,7 +282,6 @@ function calendar_popup:attach(widget, position, args)
     end
     return self
 end
-
 
 --- Return a new calendar wibox by type.
 --
@@ -336,18 +332,19 @@ local function get_cal_wibox(caltype, args)
     }
     ret:set_widget(widget)
 
-    ret:buttons(gears.table.join(
-            abutton({ }, 1, function ()
-                ret.visible=false
-                ret._calendar_clicked_on=false
-            end),
-            abutton({ }, 3, function ()
-                ret.visible=false
-                ret._calendar_clicked_on=false
-            end),
-            abutton({ }, 4, function () ret:call_calendar(-1) end),
-            abutton({ }, 5, function () ret:call_calendar( 1) end)
-    ))
+    ret.buttons = {
+        abutton({ }, 1, function ()
+            ret.visible=false
+            ret._calendar_clicked_on=false
+        end),
+        abutton({ }, 3, function ()
+            ret.visible=false
+            ret._calendar_clicked_on=false
+        end),
+        abutton({ }, 4, function () ret:call_calendar(-1) end),
+        abutton({ }, 5, function () ret:call_calendar( 1) end)
+    }
+
     return ret
 end
 
@@ -380,11 +377,10 @@ end
 -- @tparam table args.style_normal Cell style for the normal day cells (see `cell_properties`)
 -- @tparam table args.style_focus Cell style for the current day cell (see `cell_properties`)
 -- @treturn wibox A wibox containing the calendar
--- @function awful.widget.calendar_popup.month
+-- @constructorfct awful.widget.calendar_popup.month
 function calendar_popup.month(args)
     return get_cal_wibox("month", args)
 end
-
 
 --- A year calendar wibox.
 --
@@ -417,7 +413,7 @@ end
 -- @tparam table args.style_normal Cell style for the normal day cells (see `cell_properties`)
 -- @tparam table args.style_focus Cell style for the current day cell (see `cell_properties`)
 -- @treturn wibox A wibox containing the calendar
--- @function awful.widget.calendar_popup.year
+-- @constructorfct awful.widget.calendar_popup.year
 function calendar_popup.year(args)
     return get_cal_wibox("year", args)
 end

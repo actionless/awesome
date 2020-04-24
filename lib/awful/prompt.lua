@@ -170,7 +170,7 @@ local function history_check_load(id, max)
 end
 
 local function is_word_char(c)
-    if string.find("[{[(,.:;_-+=@/ ]", c) then
+    if string.find(c, "[{[(,.:;_-+=@/ ]") then
         return false
     else
         return true
@@ -454,6 +454,7 @@ end
 --   with mod table, key and command as arguments when a key was pressed.
 --   [**DEPRECATED**]
 -- @see gears.color
+-- @staticfct awful.prompt.run
 function prompt.run(args, textbox, exe_callback, completion_callback,
                     history_path, history_max, done_callback,
                     changed_callback, keypressed_callback)

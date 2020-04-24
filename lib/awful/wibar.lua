@@ -3,9 +3,14 @@
 -- This module allows you to easily create wibox and attach them to the edge of
 -- a screen.
 --
+--@DOC_awful_wibar_default_EXAMPLE@
+--
+-- You can even have vertical bars too.
+--@DOC_awful_wibar_left_EXAMPLE@
+--
 -- @author Emmanuel Lepage Vallee &lt;elv1313@gmail.com&gt;
 -- @copyright 2016 Emmanuel Lepage Vallee
--- @classmod awful.wibar
+-- @popupmod awful.wibar
 ---------------------------------------------------------------------------
 
 -- Grab environment we need
@@ -36,14 +41,8 @@ local wiboxes = setmetatable({}, {__mode = "v"})
 --- If the wibar needs to be stretched to fill the screen.
 -- @property stretch
 -- @tparam boolean stretch
-
---- The wibar's width.
--- @property width
--- @tparam integer width
-
---- The wibar's height.
--- @property height
--- @tparam integer height
+-- @propbeautiful
+-- @propemits true false
 
 --- If the wibar needs to be stretched to fill the screen.
 -- @beautiful beautiful.wibar_stretch
@@ -165,8 +164,17 @@ local function reattach(wb)
 end
 
 --- The wibox position.
+--
+-- The valid values are:
+--
+-- * left
+-- * right
+-- * top
+-- * bottom
+--
 -- @property position
--- @param string Either "left", right", "top" or "bottom"
+-- @tparam string position Either "left", right", "top" or "bottom"
+-- @propemits true false
 
 local function get_position(wb)
     return wb._position or "top"
@@ -215,12 +223,9 @@ local function set_position(wb, position, skip_reattach)
         -- or right wibars. To solve, this, they need to be re-attached.
         reattach(wb)
     end
-end
 
---- Stretch the wibar.
---
--- @property stretch
--- @param[opt=true] boolean
+    wb:emit_signal("property::position", position)
+end
 
 local function get_stretch(w)
     return w._stretch
@@ -230,10 +235,13 @@ local function set_stretch(w, value)
     w._stretch = value
 
     attach(w, w.position)
+
+    w:emit_signal("property::stretch", value)
 end
 
 --- Remove a wibar.
--- @function remove
+-- @method remove
+
 local function remove(self)
     self.visible = false
 
@@ -344,7 +352,7 @@ end
 -- @tparam string args.stretch If the wibar need to be stretched to fill the screen.
 --@DOC_wibox_constructor_COMMON@
 -- @return The new wibar
--- @function awful.wibar
+-- @constructorfct awful.wibar
 function awfulwibar.new(args)
     args = args or {}
     local position = args.position or "top"
@@ -425,6 +433,8 @@ function awfulwibar.new(args)
 
     w:connect_signal("property::visible", function() reattach(w) end)
 
+    assert(w.buttons)
+
     return w
 end
 
@@ -445,6 +455,8 @@ function awfulwibar.mt:__call(...)
 end
 
 --@DOC_wibox_COMMON@
+
+--@DOC_object_COMMON@
 
 return setmetatable(awfulwibar, awfulwibar.mt)
 

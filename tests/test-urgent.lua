@@ -2,6 +2,8 @@
 
 local awful = require("awful")
 local runner = require("_runner")
+local cruled = require("ruled.client")
+
 
 -- Some basic assertion that the tag is not marked "urgent" already.
 assert(awful.tag.getproperty(awful.screen.focused().tags[2], "urgent") == nil)
@@ -16,7 +18,7 @@ client.connect_signal("property::urgent", function (c)
 end)
 
 local manage_cb_done
-client.connect_signal("manage", function (c)
+client.connect_signal("request::manage", function (c)
     manage_cb_done = true
     assert(c.class == "XTerm", "Client should be xterm!")
 end)
@@ -31,7 +33,7 @@ local steps = {
             -- Select first tag.
             awful.screen.focused().tags[1]:view_only()
 
-            runner.add_to_default_rules({ rule = { class = "XTerm" },
+            cruled.append_rule({ rule = { class = "XTerm" },
                                         properties = { tag = "2", focus = true } })
 
             awful.spawn("xterm")
@@ -56,7 +58,7 @@ local steps = {
             assert(#client.get() == 1)
             local c = client.get()[1]
             assert(not c.urgent, "Client is not urgent anymore.")
-            assert(c == client.focus, "Client is focused.")
+            assert(c.active, "Client is focused.")
             assert(awful.tag.getproperty(awful.screen.focused().tags[2], "urgent") == false)
             assert(awful.tag.getproperty(awful.screen.focused().tags[2], "urgent_count") == 0)
             return true
@@ -71,7 +73,7 @@ local steps = {
             -- Select first tag.
             awful.screen.focused().tags[1]:view_only()
 
-            runner.add_to_default_rules({ rule = { class = "XTerm" },
+            cruled.append_rule({ rule = { class = "XTerm" },
                                         properties = { tag = "2", focus = true, switch_to_tags = true }})
 
             awful.spawn("xterm")
@@ -93,7 +95,7 @@ local steps = {
             client.get()[1]:kill()
             manage_cb_done = false
 
-            runner.add_to_default_rules({rule = { class = "XTerm" },
+            cruled.append_rule({rule = { class = "XTerm" },
                                         properties = { tag = "2", focus = false }})
 
             awful.spawn("xterm")
